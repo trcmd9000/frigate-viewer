@@ -14,7 +14,7 @@
             if (cleanPath.endsWith('/')) {
                 cleanPath = cleanPath.substring(0, cleanPath.length - 1);
             }
-            const deeplink = "viewerforfrigate:/" + cleanPath + queryString;
+            const deeplink = "viewerforfrigate://" + cleanPath + queryString;
             window.location.href = deeplink;
         };
     </script>
