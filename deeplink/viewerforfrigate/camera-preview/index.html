@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Opening Viewer for Frigate</title>
+    <script>
+        window.onload = function() {
+            const path = window.location.pathname;
+            const queryString = window.location.search;
+            let cleanPath = path.replace(/^\/deeplink\/viewerforfrigate/, '');
+            if (cleanPath.startsWith('//')) {
+                cleanPath = cleanPath.substring(1);
+            }
+            const deeplink = "viewerforfrigate:/" + cleanPath + queryString;
+            window.location.href = deeplink;
+        };
+    </script>
+</head>
+<body>
+    <p id="status">Opening Viewer for Frigate app...</p>
+</body>
+</html>
