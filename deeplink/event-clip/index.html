@@ -7,7 +7,7 @@
         window.onload = function() {
             const path = window.location.pathname;
             const queryString = window.location.search;
-            let cleanPath = path.replace(/^\/deeplink\/, '');
+            let cleanPath = path.replace(/^\/deeplink/, '');
             if (cleanPath.startsWith('//')) {
                 cleanPath = cleanPath.substring(1);
             }
