@@ -1,25 +1,29 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <title>Opening Viewer for Frigate</title>
-    <script>
-        window.onload = function() {
-            const path = window.location.pathname;
-            const queryString = window.location.search;
-            let cleanPath = path.replace(/^\/deeplink/, '');
-            if (cleanPath.startsWith('//')) {
-                cleanPath = cleanPath.substring(1);
-            }
-            if (cleanPath.endsWith('/')) {
-                cleanPath = cleanPath.substring(0, cleanPath.length - 1);
-            }
-            const deeplink = "viewerforfrigate://" + cleanPath + queryString;
-            window.location.href = deeplink;
-        };
-    </script>
+  <meta charset="UTF-8" />
+  <title>Opening Viewer for Frigate</title>
+  <script>
+    window.onload = function () {
+      const path = window.location.pathname;
+      const query = window.location.search || "";
+
+      let cleanPath = path.replace(/^\/deeplink\/?/, "");
+      cleanPath = cleanPath.replace(/^\/+/, "").replace(/\/+$/, "");
+
+      cleanPath = cleanPath.replace(/^viewerforfrigate\/+/, "");
+
+      if (!cleanPath) {
+        document.getElementById("status").textContent = "Missing route";
+        return;
+      }
+
+      const deeplink = "viewerforfrigate://" + cleanPath + query;
+      window.location.replace(deeplink);
+    };
+  </script>
 </head>
 <body>
-    <p id="status">Opening Viewer for Frigate app...</p>
+  <p id="status">Opening Viewer for Frigate app...</p>
 </body>
 </html>
