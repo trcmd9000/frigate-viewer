@@ -1,3 +1,9 @@
+---
+layout: default
+title: Privacy Policy
+permalink: /privacy/
+---
+
 # Privacy Policy
 
 Effective date: August 26, 2026
@@ -80,6 +86,9 @@ collect personal information from children.
 ## Changes and contact
 
 Material changes will be published in this repository with a revised effective
-date. Privacy questions can be raised through
-[GitHub Issues](https://github.com/trcmd9000/frigate-viewer/issues) without
-including sensitive or personal data.
+date. Privacy questions can be sent to
+[trcmd9000@gmail.com](mailto:trcmd9000@gmail.com). General project questions
+can also be raised through
+[GitHub Issues](https://github.com/trcmd9000/frigate-viewer/issues). Do not
+include credentials, private server information, or other sensitive data in
+email or public issues.

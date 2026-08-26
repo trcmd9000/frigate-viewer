@@ -5,6 +5,7 @@ export default {
   'author.topBar.title': 'Author',
   'author.info.authorLabel': 'Author',
   'author.info.contactLabel': 'Contact',
+  'author.info.privacyPolicyLabel': 'Privacy Policy',
   'author.info.opensourceLabel': 'This project is open source.',
   'author.info.githubLabel': 'See on github',
   'author.buyMeCoffee.nonProfitLabel':

@@ -4,6 +4,7 @@ export const messages = makeMessages('author', {
   'topBar.title': 'Author',
   'info.authorLabel': 'Author',
   'info.contactLabel': 'Contact',
+  'info.privacyPolicyLabel': 'Privacy Policy',
   'info.opensourceLabel': 'This is open source project.',
   'info.githubLabel': 'See on github',
   'buyMeCoffee.nonProfitLabel':

@@ -48,13 +48,20 @@ official Frigate NVR project.
 
 ## Privacy policy
 
-Proposed public URL:
+Current public URL:
 
 `https://github.com/trcmd9000/frigate-viewer/blob/main/PRIVACY-POLICY.md`
 
-Verify that Google Play accepts the GitHub-hosted page and that it is reachable
-without authentication. A dedicated HTTPS page can replace it later without
-changing the policy text.
+Recommended GitHub Pages URL after publication:
+
+`https://trcmd9000.github.io/frigate-viewer/privacy/`
+
+The page must remain reachable without authentication. Keep the policy text in
+the repository as the source of truth.
+
+Public support email:
+
+`trcmd9000@gmail.com`
 
 ## Data Safety draft
 
@@ -127,8 +134,6 @@ content is synthetic and intentionally publishable.
 
 ## Maintainer actions still required
 
-- Provide a dedicated public support email that does not reveal a private or
-  workplace identity.
 - Provide private Play reviewer credentials for a sanitized test server.
 - Capture sanitized screenshots and create the feature graphic.
 - Complete Data Safety, content rating, target audience, app access, and policy

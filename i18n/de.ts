@@ -6,6 +6,7 @@ export default {
   'author.topBar.title': 'Autor',
   'author.info.authorLabel': 'Autor',
   'author.info.contactLabel': 'Kontakt',
+  'author.info.privacyPolicyLabel': 'Datenschutzrichtlinie',
   'author.info.opensourceLabel': 'Diese App ist ein Open Source Projekt',
   'author.info.githubLabel': 'Auf GitHub sehen',
   'author.buyMeCoffee.nonProfitLabel':

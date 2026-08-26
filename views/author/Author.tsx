@@ -82,6 +82,25 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
           <Text style={styles.itemValue}>trcmd9000</Text>
         </Text>
         <Text style={styles.item}>
+          <Text style={styles.itemLabel}>
+            {intl.formatMessage(messages['info.contactLabel'])}:{' '}
+          </Text>
+          <Text
+            style={[styles.itemValue, styles.link]}
+            onPress={openLink('mailto:trcmd9000@gmail.com')}
+          >
+            trcmd9000@gmail.com
+          </Text>
+        </Text>
+        <Text
+          style={[styles.item, styles.itemValue, styles.link]}
+          onPress={openLink(
+            'https://trcmd9000.github.io/frigate-viewer/privacy/',
+          )}
+        >
+          {intl.formatMessage(messages['info.privacyPolicyLabel'])}
+        </Text>
+        <Text style={styles.item}>
           <Text style={styles.itemLabel}>Repository: </Text>
           <Text
             style={[styles.itemValue, styles.link]}
