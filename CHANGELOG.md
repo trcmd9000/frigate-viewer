@@ -4,61 +4,49 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [14.3.1] - 2026-08-26
+
 ### Added
 
-- **Client Certificate Authentication (mTLS) Support**
-  - Android: Native Keystore integration for client certificates
-  - iOS: Native Keychain integration for client certificates
-  - Per-server client certificate configuration
-  - Automatic certificate validation and error handling
-  - Support for password-protected certificates
-  - Comprehensive setup guide for users and administrators
-  - Full test coverage for certificate operations
+- Android client-certificate authentication through the protected system
+  certificate chooser and Android KeyChain.
+- Per-server client identity selection and explicit self-signed server mode.
+- Certificate metadata and availability checks.
+- Independent Android application ID `com.trcmd9000.frigateviewer`.
+- Android adaptive launcher icons and release documentation.
+- Local and CI release-signing configuration without tracked secrets.
 
-### Technical Changes
+### Changed
 
-- New native modules:
-  - `ClientCertModule.java` (Android) - Keystore access and HTTP requests with client certs
-  - `ClientCertModule.swift` (iOS) - Keychain access and HTTP requests with client certs
-- New TypeScript helpers:
-  - `clientCertificates.ts` - Cross-platform abstraction layer
-  - `httpWithClientCert.ts` - HTTP client with certificate support
-- Updated `Server` interface to include optional `clientCertConfig`
-- Enhanced `ServerForm` with certificate selection UI
-- Added OkHttp 4.11.0 dependency for Android HTTP requests with certificates
+- Continued upstream versioning at `14.3.1` with Android `versionCode 21`.
+- Updated the Android build to compile and target API 35.
+- Aligned React Native build and test tooling with React Native 0.75.2.
+- Updated React Native Navigation and added a reproducible compatibility patch.
+- Replaced the obsolete certificate password UI with Android's system-managed
+  identity access.
+- Changed problem reporting to open a GitHub issue.
 
-### Documentation
+### Security
 
-- Added comprehensive Client Certificate Setup Guide (`docs/CLIENT_CERT_SETUP.md`)
-- Updated README with mTLS feature highlights
-- Included platform-specific setup instructions
-- Added troubleshooting and security best practices
+- Removed the global TLS and hostname-verification bypass.
+- Kept normal server certificate validation strict by default.
+- Removed silent fallback to unauthenticated HTTP after an mTLS failure.
+- Removed Firebase and Crashlytics dependencies and automatic telemetry.
+- Sanitized development logging and retained production error visibility.
+- Removed the tracked Android debug private key.
 
-### Testing
+### Validation
 
-- Unit tests for `ClientCertificateManager`
-- Redux state tests for certificate configuration
-- Mocked native module tests
-- Error handling validation
+- 141 Jest tests pass.
+- TypeScript validation passes.
+- Targeted ESLint validation has no errors.
+- Debug APK and signed arm64-v8a release AAB build successfully.
 
-### Breaking Changes
+### Platform status
 
-None. This feature is entirely optional and backward-compatible.
-
-### Migration
-
-No migration required. Existing server configurations will continue to work unchanged. Client certificate authentication is opt-in through the server settings.
-
-### Notes for Maintainers
-
-- This PR adds two new native modules that need to be maintained alongside the existing codebase
-- The Android implementation uses OkHttp for HTTP requests with client certificates
-- The iOS implementation uses URLSession with custom delegate for certificate handling
-- All new code is documented with JSDoc/KDoc comments
-- Feature is designed to work seamlessly alongside existing authentication methods
-
----
-
-## Version History
-
-(Previous versions would be listed here)
+- Android is the validated release target.
+- iOS mTLS is not part of this release and must not be considered supported.
+- The release remains a pre-release until physical-device mTLS testing is
+  complete.

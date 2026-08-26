@@ -1,43 +1,61 @@
 # Frigate Viewer
 
-This repository is an independently maintained fork of
-[sp-engineering/frigate-viewer](https://github.com/sp-engineering/frigate-viewer).
-
-A lightweight, unofficial mobile client for Frigate NVR, built with React Native. This app allows you to easily browse camera events and monitor your Frigate instance on the go.
+Frigate Viewer is an independently maintained, unofficial React Native client
+for Frigate NVR. This fork is based on
+[sp-engineering/frigate-viewer](https://github.com/sp-engineering/frigate-viewer)
+and currently focuses on a secure Android release.
 
 ## Features
 
-- 📱 Browse camera events and live feeds
-- 🔐 Support for multiple authentication methods (Basic Auth, Frigate Auth, mTLS)
-- 🔒 **Client Certificate Authentication (mTLS)** - for secure mutual TLS authentication
-- 🌍 Multi-language support
-- 🎨 Light/Dark mode
-- 📸 Event snapshots and clips
-- ⚙️ Configurable settings per server
+- Browse camera events, snapshots, clips, and live feeds.
+- Configure multiple Frigate servers.
+- Use Basic Auth, Frigate authentication, or Android client-certificate
+  authentication (mTLS).
+- Select an installed client identity through Android's protected system
+  certificate chooser.
+- Store server credentials through the platform credential-storage layer.
+- Use light and dark themes and the included translations.
 
-## Client Certificate Authentication (mTLS)
+## Android mTLS
 
-If your Frigate server requires client certificate authentication, this app has built-in support for it:
+Android mTLS uses `KeyChain.choosePrivateKeyAlias`. The app stores only the
+selected alias and asks Android to use the protected private key during TLS
+authentication. The private key is not exported to JavaScript or app storage.
 
-- **Android:** Automatically uses certificates from your device's Keystore
-- **iOS:** Automatically uses certificates from your device's Keychain
-- **Per-server configuration:** Each server can use a different certificate
-- **Seamless integration:** Certificate selection happens in the server settings
+Server certificate validation remains strict by default. Trusting a self-signed
+server certificate is an explicit, per-server opt-in.
 
-For detailed setup instructions, see [Client Certificate Setup Guide](./docs/CLIENT_CERT_SETUP.md).
+See [Client Certificate Setup](./docs/CLIENT_CERT_SETUP.md) for installation,
+configuration, and troubleshooting.
 
-## Support & Contact
+## Releases
 
-If you encounter any issues or have questions regarding the app:
+Version `14.3.1` is available as an Android pre-release for internal testing.
+See the [GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases)
+for signed artifacts. Validate mTLS on a physical device before production use.
 
-- **Issues:** Please open a [GitHub Issue](https://github.com/trcmd9000/frigate-viewer/issues) with a description of the problem.
+## Privacy and security
 
-## Platforms
+The app does not include analytics, advertising, Firebase, or automatic crash
+reporting. It communicates directly with the servers configured by the user.
+See the [Privacy Policy](./PRIVACY-POLICY.md) for details.
 
-- **Android:** Fully supported
-- **iOS:**
-  - No RTSP support yet
+Never include credentials, access tokens, certificates, private keys, server
+addresses, or diagnostic data in a public issue.
 
----
+## Platform status
 
-_Disclaimer: This is an unofficial application and is not affiliated with the official Frigate NVR project._
+- **Android:** Actively maintained by this fork.
+- **iOS:** Inherited source is present but is not part of the current release
+  validation. Android mTLS support must not be assumed to work on iOS.
+
+## Development
+
+- [Android release process](./docs/ANDROID_RELEASE.md)
+- [Changelog](./CHANGELOG.md)
+
+Report reproducible problems through
+[GitHub Issues](https://github.com/trcmd9000/frigate-viewer/issues), after
+removing all sensitive data.
+
+This project is not affiliated with the official Frigate NVR project.

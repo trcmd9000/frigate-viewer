@@ -1,186 +1,112 @@
-# Client Certificate Authentication Setup Guide
+# Android Client Certificate Authentication
 
-This guide explains how to configure the Frigate Viewer app to use client certificate authentication (mutual TLS/mTLS) with your Frigate server.
+This guide covers the Android mTLS implementation included in Frigate Viewer
+`14.3.1`. iOS mTLS is not part of the validated release.
 
-## Overview
+## How it works
 
-If your Frigate server requires client certificate authentication (mTLS), the Frigate Viewer app can be configured to automatically present your client certificate during the connection handshake. This provides an additional layer of security through mutual authentication.
+Android applications cannot enumerate or export arbitrary user client
+identities. Frigate Viewer therefore opens Android's protected system
+certificate chooser. After the user grants access, Android supplies the
+selected private key and certificate chain to the native TLS client.
+
+The app stores the selected certificate alias in the server configuration. It
+does not store the certificate import password and does not export the private
+key to JavaScript or app storage.
 
 ## Prerequisites
 
-- A valid client certificate (`.p12`/`.pfx`, `.pem`, or `.crt` format)
-- The private key associated with the certificate
-- Access to your device's certificate management
+- An Android device running API 23 or newer.
+- A client identity containing both the certificate and private key, normally
+  distributed as a password-protected PKCS#12 (`.p12` or `.pfx`) file.
+- A Frigate endpoint or reverse proxy configured to request and validate that
+  client certificate.
 
-## Android Setup
+## Install the identity in Android
 
-### Step 1: Install the Client Certificate
+Menu names vary by Android version and manufacturer:
 
-1. **Obtain your certificate files:**
+1. Transfer the PKCS#12 file to the device through a trusted method.
+2. Open Android **Settings** and locate the credential or certificate
+   installation screen.
+3. Choose the option for a VPN and app certificate.
+4. Select the PKCS#12 file and enter its import password.
+5. Confirm the installation and assign a recognizable name.
+6. Securely delete the transferred PKCS#12 file when it is no longer needed.
 
-   - You should have a certificate file (e.g., `client.p12`, `client.pfx`, or `client.pem`)
-   - Make sure you have the private key (usually in `.key` format or embedded in `.p12`)
+The password is used by Android during import. Frigate Viewer does not request
+or retain it.
 
-2. **Install on Android:**
+## Configure Frigate Viewer
 
-   - Transfer the certificate file to your Android device
-   - Open **Settings** → **Security** → **Install from storage** (or similar, varies by device/Android version)
-   - Select your certificate file
-   - Enter any required password for the certificate
-   - Confirm installation
-   - The certificate will be stored in your device's Keystore
+1. Add or edit a server.
+2. Use `https` and enter the server connection details.
+3. In **Client Certificate (mTLS)**, choose **Select certificate**.
+4. Select the installed identity in Android's system dialog.
+5. Save the server.
 
-3. **Verify Installation:**
-   - Go to **Settings** → **Security** → **Trusted Credentials**
-   - Your certificate should appear in the list
+Cancelling the system dialog leaves the existing selection unchanged. Use the
+remove action in the server form to stop using the selected identity.
 
-### Step 2: Configure in Frigate Viewer
+Each configured server can use a different Android identity.
 
-1. Open the **Frigate Viewer** app
-2. Go to **Settings** → **Add Server** (or edit existing server)
-3. Fill in the server details (host, port, protocol, authentication method)
-4. Scroll down to the **"Client Certificate (mTLS)"** section
-5. In the **"Certificate"** dropdown, select your installed certificate
-6. If your certificate is password-protected, enter the password in the **"Certificate Password"** field
-7. Tap **"Add Server"** or **"Save"**
+## Server certificate validation
 
-The app will now use your client certificate when communicating with the Frigate server.
+Client authentication and server authentication are independent:
 
-## iOS Setup
+- The client certificate proves the app's identity to the server.
+- The server certificate proves the server's identity to the app.
 
-### Step 1: Install the Client Certificate
-
-iOS handles certificates differently than Android. You can install certificates through several methods:
-
-#### Method 1: Via Mail (Recommended for `.p12`)
-
-1. Email yourself the `.p12` file
-2. Open the email on your iPhone
-3. Tap the attachment to open it
-4. Choose to "Open in"
-5. Tap "Install" when the certificate appears
-6. Follow the prompts to install
-
-#### Method 2: Via MDM or Website
-
-- If provided by your Frigate server administrator, follow their specific installation instructions
-
-#### Method 3: Via Configuration Profile
-
-- If provided as a `.mobileconfig` file, open it with your iPhone and follow the installation prompts
-
-### Step 2: Trust the Certificate
-
-1. Go to **Settings** → **General** → **VPN & Device Management**
-2. Locate your certificate and verify it's listed as "Installed"
-3. If there's a "Trust" option, enable it for the certificate
-
-### Step 3: Configure in Frigate Viewer
-
-1. Open the **Frigate Viewer** app
-2. Go to **Settings** → **Add Server** (or edit existing server)
-3. Fill in the server details (host, port, protocol, authentication method)
-4. Scroll down to the **"Client Certificate (mTLS)"** section
-5. In the **"Certificate"** dropdown, select your installed certificate
-6. If your certificate is password-protected, enter the password
-7. Tap **"Add Server"** or **"Save"**
+Server certificate and hostname validation remains enabled by default. Prefer a
+certificate trusted by Android. The **Allow self-signed server certificate**
+option disables those server checks for the selected server and should be used
+only when the risk is understood and the network is otherwise trusted.
 
 ## Troubleshooting
 
-### Certificate Not Appearing in the List
+### The expected identity is not shown
 
-**Android:**
+- Confirm that the PKCS#12 file contained a private key, not only a certificate.
+- Reinstall it as a VPN and app credential.
+- Check whether a device policy restricts certificate use.
+- The app cannot bypass or replace Android's system chooser.
 
-- Verify the certificate is actually installed in Settings → Security → Trusted Credentials
-- Make sure it's a client certificate (with a private key), not just a CA certificate
-- Try reinstalling the certificate
+### Android reports that the certificate is unavailable
 
-**iOS:**
+The identity may have been removed, replaced, or denied. Remove the saved
+selection in Frigate Viewer and select the identity again.
 
-- Check Settings → General → VPN & Device Management
-- Ensure the certificate was imported correctly
-- The certificate must include the private key (`.p12` format recommended)
+### The TLS connection fails
 
-### Connection Fails After Setting Certificate
+- Confirm that the server requests a client certificate from the correct CA.
+- Check certificate validity, key usage, chain, and expiration.
+- Confirm that the hostname matches the server certificate.
+- Inspect Frigate or reverse-proxy logs for the TLS rejection reason.
+- Test the same identity from a controlled client before changing app settings.
 
-- **Verify the certificate is valid:** The certificate must match what the Frigate server expects
-- **Check the certificate password:** If you entered a wrong password, the connection will fail
-- **Test the certificate independently:** Use an external tool (e.g., `openssl`, `curl`) to verify the certificate works with your server
-- **Check server logs:** Your Frigate server logs might contain information about certificate validation failures
+Configured mTLS failures are returned as errors. The app does not silently retry
+the request without a client certificate.
 
-### "Certificate Not Found" Error
+## Rotation and removal
 
-- The certificate may have been uninstalled or removed from the Keystore/Keychain
-- Reinstall the certificate following the instructions above
-- If the error persists, try clearing the app's cache and reconfiguring the server
+To rotate an identity, install the replacement in Android, select it in each
+affected server configuration, test access, and then remove the old identity
+through Android settings.
 
-## Generating a Client Certificate (For Server Administrators)
+Removing a server from the app does not remove its certificate from Android
+KeyChain.
 
-If you're setting up mTLS on your Frigate server, here's how to generate a client certificate:
+## Security guidance
 
-### Using OpenSSL
+- Never commit or publish PKCS#12 files, private keys, passwords, server
+  addresses, or certificate fingerprints tied to a private deployment.
+- Use a separate client identity per person or device when possible.
+- Set a reasonable certificate lifetime and maintain a revocation process.
+- Protect the Android device with a secure lock screen.
+- Prefer normal trusted server certificates over the self-signed override.
+- Review server access logs and revoke lost-device identities promptly.
 
-```bash
-# Generate a private key and CSR
-openssl req -new -newkey rsa:2048 -keyout client.key -out client.csr -subj "/CN=frigate-client"
-
-# Sign the CSR with your CA
-openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365
-
-# Create a .p12 file for mobile devices
-openssl pkcs12 -export -in client.crt -inkey client.key -out client.p12 -name "Frigate Client"
-```
-
-## Advanced Configuration
-
-### Certificate Rotation
-
-If you need to update your certificate:
-
-1. Install the new certificate on your device
-2. In the app, go to the server settings
-3. Select the new certificate from the dropdown
-4. Save the changes
-
-### Multiple Servers with Different Certificates
-
-The app supports configuring different certificates for different servers:
-
-1. Install all required certificates on your device
-2. For each server in the app, select the appropriate certificate
-3. Each server will use its designated certificate when connecting
-
-### Disabling Client Certificate Authentication
-
-If you want to temporarily disable client certificate authentication:
-
-1. Go to the server settings
-2. In the Client Certificate section, select the first option: "-- Select a Certificate --"
-3. Clear the selection and save
-4. The server will connect without using a client certificate
-
-## Security Best Practices
-
-- **Protect your certificates:** Keep your `.p12`/`.pfx` files secure
-- **Use strong passwords:** If your certificate file has a password, use a strong one
-- **Verify certificate validity:** Before installing, verify the certificate comes from a trusted source
-- **Rotate certificates periodically:** Update your client certificates regularly for security
-- **Monitor access:** Check your Frigate server logs for unauthorized certificate usage
-
-## Support
-
-If you encounter issues:
-
-1. Check the Troubleshooting section above
-2. Enable debug logging (if available in the app settings)
-3. Open an issue on [GitHub](https://github.com/trcmd9000/frigate-viewer/issues) with:
-   - Your iOS/Android version
-   - App version
-   - Error messages from logs
-   - (Do NOT share certificate details or passwords)
-
-## References
-
-- [OWASP mTLS Guide](https://owasp.org/www-community/attacks/Man-in-the-middle_attack)
-- [RFC 8446 - TLS 1.3](https://tools.ietf.org/html/rfc8446)
-- [OpenSSL Documentation](https://www.openssl.org/docs/)
+For support, open a
+[GitHub issue](https://github.com/trcmd9000/frigate-viewer/issues) containing
+only sanitized reproduction steps, Android/app versions, and non-sensitive
+error text.

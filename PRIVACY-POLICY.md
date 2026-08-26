@@ -1,48 +1,85 @@
-# Privacy Policy (updated June 8, 2026)
+# Privacy Policy
 
-## Introduction
+Effective date: August 26, 2026
 
-SP engineering built the Viewer for Frigate application as a Open Source Application. This App is provided at no cost and is intended for use as is. This page informs visitors regarding policies with the collection, use, and disclosure of Personal Information for anyone using the App.
+## Scope
 
-## Information Collection and Use
+This policy applies to the independently maintained Frigate Viewer application
+with Android package ID `com.trcmd9000.frigateviewer`.
 
-The App requires connection data for your Frigate NVR server and Home Assistant instance (such as Long-Lived Access Tokens). This sensitive data is stored exclusively on your device using industry-standard, hardware-backed secure storage mechanisms. It is never collected, shared, or transmitted to the developer or any external third-party servers.
+Frigate Viewer is a client for servers selected and operated by the user. The
+maintainer does not operate a relay, cloud backend, analytics service, or user
+account service for the app.
 
-The App can store snapshots and clips from your Frigate NVR server in the device's internal memory. These files are never transferred outside your device.
+## Data processed by the app
 
-## Diagnostics and Technical Logs
+To provide its functionality, the app processes data supplied by the user or by
+the configured Frigate server, including:
 
-To improve the stability and performance of the App, we use the following services:
+- Server addresses, ports, paths, and connection preferences.
+- Authentication credentials and session information.
+- The alias and public metadata of a client certificate selected through the
+  Android system certificate chooser.
+- Camera names, events, snapshots, clips, and live video returned by the
+  configured server.
+- App preferences such as theme, language, and per-server settings.
 
-- **Crash Reporting (Crashlytics):** If the App crashes, a technical report is sent to Firebase (a Google service). This includes information about your device type, OS version, and the code stack trace at the time of the crash. It contains no personal data or Frigate connection details. You can opt-out of this in the App settings.
-- **Technical Support Logs:** When you manually use the "Report a Problem" feature, a technical log including your app configuration (excluding passwords/secrets) and a sequence of navigation events (screen transitions) is sent to the developer. This is used solely to diagnose specific issues you encounter. These logs are anonymous and are not linked to your identity.
+Server credentials are stored through the platform credential-storage layer.
+Non-secret configuration is stored in the app's local storage. Android client
+certificate private keys remain under Android KeyChain control; the app stores
+the selected alias and does not export the private key.
 
-## In-App Purchases (Payments)
+## Network communication
 
-The App offers paid features. All transactions are processed securely by the respective app store platform (Apple App Store or Google Play Store).
+The app communicates directly from the device to the server addresses
+configured by the user. The maintainer does not receive or proxy this traffic.
+Users are responsible for the privacy policy, security, and retention practices
+of their own servers.
 
-- I do not collect or store any credit card numbers or personal billing information.
-- I only receive an anonymous confirmation from Google or Apple that a purchase was successful to unlock the features.
-- You can restore your previous purchases at any time using the "Restore Purchases" button within the App.
+The app does not include advertising, analytics, Firebase, Crashlytics, or
+automatic diagnostic uploads.
 
-## Service Providers and Third-Party Integrations
+## Files and sharing
 
-The App interacts with the Frigate NVR server API to display content. Furthermore, the App allows you to connect to your private Home Assistant instance to trigger automations and forward notifications (including snapshots) to services such as the Home Assistant Companion App, Telegram, or WhatsApp.
+Snapshots and clips may be cached, downloaded, or passed to Android's sharing
+interface when the user requests those actions. Files shared with another app
+are then subject to that app's privacy practices.
 
-All communication happens directly between your mobile device and your personal servers. The developer does not operate any intermediary servers, does not route your data, and has no control over the third-party integrations you configure within your Home Assistant ecosystem. I strongly advise you to review the Privacy Policies of Home Assistant and any communication platforms you utilize.
+## Support and external services
+
+The "Report a Problem" action opens GitHub rather than uploading diagnostics.
+Submitting an issue is optional and is governed by GitHub's privacy policy.
+Public issues must not contain credentials, tokens, certificates, private keys,
+private server addresses, camera images, or other sensitive information.
+
+Links opened from the app or documentation are governed by the destination
+website's privacy policy.
+
+## Retention and deletion
+
+The maintainer does not receive app data and therefore does not retain it.
+Locally stored app data can be removed by deleting configured servers, clearing
+the app's storage, or uninstalling the app. Certificates installed in Android
+KeyChain must be managed separately through Android settings.
 
 ## Security
 
-This App is designed to connect directly to the Frigate NVR and Home Assistant servers of your choice. The security of your data depends entirely on the security of your mobile device (where data is securely encrypted) and the configuration of your private servers. Ensure that your device is protected and that you use secure, encrypted network connections (such as HTTPS or VPN) to connect to your infrastructure. The developer cannot guarantee absolute security as it relies entirely on your own network setup.
+Use HTTPS with a certificate trusted by Android whenever possible. Support for
+self-signed server certificates is disabled by default and must be enabled
+explicitly for each server. Enabling that option weakens server authentication.
 
-## Links to Other Sites
+No software or transmission method can guarantee absolute security. Users are
+responsible for securing their device, network, Frigate server, certificates,
+and credentials.
 
-The app may contain links to other sites. If you click on a third party link, you will be directed to that site. Note that these external sites are not operated by me. Therefore, I strongly advise you to review the Privacy Policy of these websites.
+## Children's privacy
 
-## Children's Privacy
+The app is not directed to children and the maintainer does not knowingly
+collect personal information from children.
 
-The app is not intended for anyone under the age of 13. I do not knowingly collect personally identifiable information from children under 13. If you are a parent or guardian and you are aware that your child has provided me with personal information, please contact me so that I will be able to take necessary actions.
+## Changes and contact
 
-## Changes to This Privacy Policy
-
-I may update Privacy Policy from time to time. Thus, you are advised to review this page periodically for any changes.
+Material changes will be published in this repository with a revised effective
+date. Privacy questions can be raised through
+[GitHub Issues](https://github.com/trcmd9000/frigate-viewer/issues) without
+including sensitive or personal data.

@@ -34,7 +34,6 @@ android/signing.properties
 .cxx/
 *.keystore
 *.jks
-!debug.keystore
 
 # node.js
 #
