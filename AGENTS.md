@@ -103,6 +103,9 @@ The primary implementation surfaces are:
 See `docs/ANDROID_RELEASE.md` for commands and the physical-device release
 checklist.
 
+Use `docs/PLAY_STORE.md` for the current listing, Data Safety, reviewer-access,
+and internal-testing checklist.
+
 ## Dependencies and compatibility
 
 - React Native and its Babel, Metro, ESLint, and TypeScript tooling must remain
@@ -115,6 +118,8 @@ checklist.
 - Do not run `npm audit fix --force`. It currently proposes breaking React
   Native and navigation upgrades. Review dependency changes deliberately and
   validate native builds.
+- Keep `docs/DEPENDENCY_SECURITY.md` current when audit findings or dependency
+  chains change.
 - Firebase and Crashlytics were intentionally removed. Do not reintroduce them
   incidentally through copied upstream configuration.
 

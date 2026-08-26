@@ -16,6 +16,10 @@ describe('ClientCertificateManager', () => {
     manager = new ClientCertificateManager();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   describe('getDaysUntilExpiry', () => {
     it('should calculate days until expiry correctly', () => {
       const today = new Date();
@@ -39,6 +43,14 @@ describe('ClientCertificateManager', () => {
       const today = new Date();
       const daysUntilExpiry = manager.getDaysUntilExpiry(today);
       expect(daysUntilExpiry).toBeLessThanOrEqual(0);
+    });
+
+    it('should calculate calendar days across daylight-saving changes', () => {
+      jest.useFakeTimers().setSystemTime(new Date(2026, 7, 26, 12));
+
+      expect(
+        manager.getDaysUntilExpiry(new Date(2026, 9, 25, 12)),
+      ).toBe(60);
     });
   });
 

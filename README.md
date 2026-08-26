@@ -52,6 +52,8 @@ addresses, or diagnostic data in a public issue.
 ## Development
 
 - [Android release process](./docs/ANDROID_RELEASE.md)
+- [Google Play preparation](./docs/PLAY_STORE.md)
+- [Dependency security](./docs/DEPENDENCY_SECURITY.md)
 - [Changelog](./CHANGELOG.md)
 
 Report reproducible problems through

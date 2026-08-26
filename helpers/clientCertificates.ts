@@ -107,8 +107,17 @@ class ClientCertificateManager {
   getDaysUntilExpiry(notAfter: Date): number {
     const today = new Date();
     const expiryDate = new Date(notAfter);
-    const timeDiff = expiryDate.getTime() - today.getTime();
-    return Math.ceil(timeDiff / (1000 * 3600 * 24));
+    const todayUtc = Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    const expiryUtc = Date.UTC(
+      expiryDate.getFullYear(),
+      expiryDate.getMonth(),
+      expiryDate.getDate(),
+    );
+    return Math.round((expiryUtc - todayUtc) / (1000 * 3600 * 24));
   }
 
   /**
