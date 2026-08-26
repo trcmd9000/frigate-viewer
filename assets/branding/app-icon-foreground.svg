@@ -1,56 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Frigate logo silhouette: Copyright Frigate, Inc., used under the MIT License. -->
   <defs>
-    <linearGradient id="wings" x1="166" y1="304" x2="846" y2="648" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#B9FAF4" />
-      <stop offset="0.5" stop-color="#F4FFFF" />
-      <stop offset="1" stop-color="#78E8E5" />
+    <linearGradient id="bird" x1="180" y1="105" x2="850" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="0.58" stop-color="#D9FFFB" />
+      <stop offset="1" stop-color="#55D4D2" />
     </linearGradient>
-    <linearGradient id="tail" x1="512" y1="494" x2="512" y2="714" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#64E4E3" />
-      <stop offset="1" stop-color="#159DB1" />
-    </linearGradient>
-    <radialGradient id="lens" cx="0" cy="0" r="1" gradientTransform="translate(476 438) rotate(52) scale(190)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#17627B" />
-      <stop offset="0.58" stop-color="#09283C" />
-      <stop offset="1" stop-color="#040D18" />
+    <radialGradient id="iris">
+      <stop stop-color="#E8FFFC" />
+      <stop offset="0.28" stop-color="#44E0DA" />
+      <stop offset="0.72" stop-color="#1191A4" />
+      <stop offset="1" stop-color="#06131F" />
     </radialGradient>
-    <linearGradient id="iris" x1="438" y1="404" x2="583" y2="564" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#A9FFF7" />
-      <stop offset="1" stop-color="#18C9D0" />
-    </linearGradient>
-    <filter id="shadow" x="86" y="220" width="852" height="570" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#010711" flood-opacity="0.58" />
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="23" stdDeviation="24" flood-color="#00040B" flood-opacity="0.7" />
     </filter>
-    <filter id="lensGlow" x="340" y="310" width="344" height="344" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#25E7E3" flood-opacity="0.48" />
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="#43E1DB" flood-opacity="0.5" />
     </filter>
   </defs>
-
-  <g filter="url(#shadow)">
-    <path
-      d="M492 456C419 378 311 322 146 294c100 76 164 176 190 315 49-54 98-88 156-110l44-17-44-26Z"
-      fill="url(#wings)"
-    />
-    <path
-      d="M532 456c73-78 181-134 346-162-100 76-164 176-190 315-49-54-98-88-156-110l-44-17 44-26Z"
-      fill="url(#wings)"
-    />
-    <path d="M454 492 400 718l112-77 112 77-54-226-58 34-58-34Z" fill="url(#tail)" />
+  <g transform="translate(122.88 122.88) scale(0.76)">
+    <g fill="none" stroke="#49E2DC" stroke-width="19" stroke-linecap="round">
+      <path d="M168 335V188h147M709 188h147v147M856 689v147H709M315 836H168V689" />
+    </g>
+    <circle cx="828" cy="214" r="20" fill="#FF6F61" />
+    <g transform="scale(2)" filter="url(#shadow)">
+      <path d="M130 446.5C131.6 459.3 145 468 137 470C129 472 94 406.5 86 378.5C78 350.5 73.5 319 75.5 301C77.4999 283 181 255 181 247.5C181 240 147.5 247 146 241C144.5 235 171.3 238.6 178.5 229C189.75 214 204 216.5 213 208.5C222 200.5 233 170 235 157C237 144 215 129 209 119C203 109 222 102 268 83C314 64 460 22 462 27C464 32 414 53 379 66C344 79 287 104 287 111C287 118 290 123.5 288 139.5C286 155.5 285.76 162.971 282 173.5C279.5 180.5 277 197 282 212C286 224 299 233 305 235C310 235.333 323.8 235.8 339 235C358 234 385 236 385 241C385 246 344 243 344 250C344 257 386 249 385 256C384 263 350 260 332 260C317.6 260 296.333 259.333 287 256L285 263C281.667 263 274.7 265 267.5 265C258.5 265 258 268 241.5 268C225 268 230 267 215 266C200 265 144 308 134 322C124 336 130 370 130 385.5C130 399.428 128 430.5 130 446.5Z" fill="url(#bird)" />
+    </g>
+    <g filter="url(#glow)">
+      <circle cx="510" cy="551" r="87" fill="#06131F" stroke="#E9FFFC" stroke-width="13" />
+      <circle cx="510" cy="551" r="58" fill="url(#iris)" stroke="#39D9D4" stroke-width="8" />
+      <circle cx="510" cy="551" r="19" fill="#06131F" />
+      <circle cx="528" cy="531" r="9" fill="#FFFFFF" />
+      <path d="M510 437v37M510 628v37M396 551h37M587 551h37" stroke="#45E0DA" stroke-width="10" stroke-linecap="round" />
+    </g>
   </g>
-
-  <g filter="url(#lensGlow)">
-    <circle cx="512" cy="482" r="132" fill="#061521" stroke="#7AFFF5" stroke-width="16" />
-    <circle cx="512" cy="482" r="105" fill="url(#lens)" stroke="#159EB1" stroke-width="8" />
-    <circle cx="512" cy="482" r="74" fill="#071522" stroke="#50E7E3" stroke-width="5" />
-    <path
-      d="m512 414 59 34v68l-59 34-59-34v-68l59-34Zm0 31-32 19v37l32 19 32-19v-37l-32-19Z"
-      fill="url(#iris)"
-      fill-rule="evenodd"
-    />
-    <circle cx="512" cy="482" r="18" fill="#F4FFFF" />
-    <circle cx="548" cy="444" r="11" fill="#F4FFFF" fill-opacity="0.7" />
-  </g>
-
-  <circle cx="618" cy="382" r="22" fill="#071521" stroke="#F4FFFF" stroke-width="7" />
-  <circle cx="618" cy="382" r="11" fill="#FF6F61" />
 </svg>
