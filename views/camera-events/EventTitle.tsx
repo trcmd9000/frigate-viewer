@@ -5,25 +5,26 @@ import {formatVideoTime, useDateLocale} from '../../helpers/locale';
 import {selectLocaleDatesDisplay} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
 
-const stylesFn = (numColumns: number) => StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    left: 2,
-    top: 1,
-    width: '100%',
-    padding: 5 / numColumns,
-    backgroundColor: '#00000040',
-  },
-  timeText: {
-    fontSize: 12 / (numColumns / 1.5),
-    fontWeight: '600',
-    color: 'white',
-  },
-});
+const stylesFn = (numColumns: number) =>
+  StyleSheet.create({
+    wrapper: {
+      position: 'absolute',
+      display: 'flex',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      left: 2,
+      top: 1,
+      width: '100%',
+      padding: 5 / numColumns,
+      backgroundColor: '#00000040',
+    },
+    timeText: {
+      fontSize: 12 / (numColumns / 1.5),
+      fontWeight: '600',
+      color: 'white',
+    },
+  });
 
 interface IEventTitleProps {
   startTime: number;

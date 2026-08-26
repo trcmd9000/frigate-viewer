@@ -51,6 +51,40 @@ export interface Credentials {
   password: string;
 }
 
+/**
+ * Detailed information about a client certificate.
+ * Includes certificate metadata extracted from X.509 certificate fields.
+ */
+export interface CertificateInfo {
+  /** Certificate alias/name in the device's keystore/keychain */
+  alias: string;
+  /** Certificate subject DN (e.g., "CN=device.example.com,O=Company") */
+  subjectDN: string;
+  /** Certificate issuer DN (e.g., "CN=CA,O=RootCA") */
+  issuerDN: string;
+  /** Date from which the certificate is valid */
+  notBefore: Date;
+  /** Date after which the certificate expires */
+  notAfter: Date;
+  /** Serial number of the certificate */
+  serialNumber: string;
+  /** Thumbprint/fingerprint of the certificate */
+  thumbprint: string;
+}
+
+/**
+ * Client certificate configuration for mTLS authentication.
+ * The certificate must be installed in the device's keystore/keychain.
+ */
+export interface ClientCertConfig {
+  /** Alias/name of the certificate in the device's keystore/keychain */
+  alias: string;
+  /** Optional password to unlock the certificate (if encrypted) */
+  password?: string;
+  /** Allow self-signed server certificates (default: false for security). Only for trusted networks! */
+  allowSelfSignedServer?: boolean;
+}
+
 export interface Server {
   protocol: 'http' | 'https';
   host: string;
@@ -58,6 +92,8 @@ export interface Server {
   path: string;
   auth: 'basic' | 'frigate' | 'none';
   credentials: Credentials;
+  /** Client certificate configuration for mTLS authentication (optional) */
+  clientCertConfig?: ClientCertConfig;
 }
 
 export interface ISettings {
@@ -83,6 +119,8 @@ export interface ISettings {
     photoPreference: 'snapshot' | 'thumbnail';
     lockLandscapePlaybackOrientation: boolean;
   };
+  /** Client cert password cache (RAM-only, not persisted) */
+  clientCertPasswordCache?: {[serverUrl: string]: string};
 }
 
 export const emptyServer = (): Server => ({
@@ -95,6 +133,7 @@ export const emptyServer = (): Server => ({
     username: '',
     password: '',
   },
+  clientCertConfig: undefined,
 });
 
 export const initialSettings: ISettings = {
@@ -156,7 +195,9 @@ const v1Migrations = (settings?: ISettings): ISettings | undefined => {
   if (!settings) {
     return settings;
   }
-  type DeprecatedV1Settings = {server?: Server};
+  interface DeprecatedV1Settings {
+    server?: Server;
+  }
   const {server, servers, ...restSettings} = settings as ISettings &
     DeprecatedV1Settings;
   return {
@@ -188,6 +229,41 @@ export const settingsStore = createSlice({
     setEventSnapshotHeight: (state, action: PayloadAction<number>) => {
       state.v1.events.snapshotHeight = action.payload;
     },
+    setServerClientCertConfig: (
+      state,
+      action: PayloadAction<{
+        serverIndex: number;
+        clientCertConfig?: ClientCertConfig;
+      }>,
+    ) => {
+      const {serverIndex, clientCertConfig} = action.payload;
+      if (state.v1.servers[serverIndex]) {
+        state.v1.servers[serverIndex].clientCertConfig = clientCertConfig;
+      }
+    },
+    setClientCertPassword: (
+      state,
+      action: PayloadAction<{
+        serverUrl: string;
+        certAlias: string;
+        password: string;
+      }>,
+    ) => {
+      const {serverUrl, certAlias, password} = action.payload;
+      if (!state.v1.clientCertPasswordCache) {
+        state.v1.clientCertPasswordCache = {};
+      }
+      state.v1.clientCertPasswordCache[`${serverUrl}:${certAlias}`] = password;
+    },
+    clearClientCertPassword: (
+      state,
+      action: PayloadAction<{serverUrl: string; certAlias: string}>,
+    ) => {
+      const {serverUrl, certAlias} = action.payload;
+      if (state.v1.clientCertPasswordCache) {
+        delete state.v1.clientCertPasswordCache[`${serverUrl}:${certAlias}`];
+      }
+    },
   },
 });
 
@@ -195,8 +271,14 @@ export const settingsStore = createSlice({
  * ACTIONS
  **/
 
-export const {saveSettings, setCameraPreviewHeight, setEventSnapshotHeight} =
-  settingsStore.actions;
+export const {
+  saveSettings,
+  setCameraPreviewHeight,
+  setEventSnapshotHeight,
+  setServerClientCertConfig,
+  setClientCertPassword,
+  clearClientCertPassword,
+} = settingsStore.actions;
 
 /**
  * SELECTORS

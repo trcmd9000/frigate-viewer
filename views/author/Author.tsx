@@ -3,7 +3,6 @@ import {useIntl} from 'react-intl';
 import {Image, ImageStyle, Text, View} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {menuButton, useMenu} from '../menu/menuHelpers';
-import {BuyMeACoffee} from './BuyMeACoffee';
 import {messages} from './messages';
 import {UsedLibs} from './UsedLibs';
 import {useOpenLink} from './useOpenLink';
@@ -80,16 +79,15 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
           <Text style={styles.itemLabel}>
             {intl.formatMessage(messages['info.authorLabel'])}:{' '}
           </Text>
-          <Text style={styles.itemValue}>SP engineering</Text>
+          <Text style={styles.itemValue}>trcmd9000</Text>
         </Text>
         <Text style={styles.item}>
-          <Text style={styles.itemLabel}>
-            {intl.formatMessage(messages['info.contactLabel'])}:{' '}
-          </Text>
+          <Text style={styles.itemLabel}>Repository: </Text>
           <Text
             style={[styles.itemValue, styles.link]}
-            onPress={openLink('mailto:szymon@piwowarczyk.net')}>
-            szymon@piwowarczyk.net
+            onPress={openLink('https://github.com/trcmd9000/frigate-viewer')}
+          >
+            github.com/trcmd9000/frigate-viewer
           </Text>
         </Text>
         <View style={[styles.item, styles.repository]}>
@@ -98,14 +96,14 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
           </Text>
           <Text
             style={[styles.itemValue, styles.link]}
-            onPress={openLink('https://github.com/sp-engineering')}>
-            {intl.formatMessage(messages['info.githubLabel'])}
+            onPress={openLink(
+              'https://github.com/sp-engineering/frigate-viewer',
+            )}
+          >
+            Based on the original open-source project by SP engineering
           </Text>
         </View>
       </View>
-      <BuyMeACoffee
-        onPress={openLink('https://www.buymeacoffee.com/sp.engineering')}
-      />
       <UsedLibs />
     </ScrollView>
   );

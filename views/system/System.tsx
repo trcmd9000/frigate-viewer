@@ -1,3 +1,4 @@
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {
@@ -7,25 +8,24 @@ import {
   Text,
   View,
 } from 'react-native-ui-lib';
-import {useAppSelector} from '../../store/store';
-import {selectServer} from '../../store/settings';
-import {useEffect, useMemo, useRef, useState} from 'react';
-import {menuButton, useMenu} from '../menu/menuHelpers';
-import {messages} from './messages';
-import {useRest} from '../../helpers/rest';
-import {Stats} from '../../helpers/interfaces';
 import {ScrollView} from 'react-native-gesture-handler';
 import {Background} from '../../components/Background';
-import {refreshButton} from '../../helpers/buttonts';
+import {useStyles} from '../../helpers/colors';
+import {Stats} from '../../helpers/interfaces';
+import {useRest} from '../../helpers/rest';
 import {selectAvailableCameras} from '../../store/events';
+import {selectServer} from '../../store/settings';
+import {useAppSelector} from '../../store/store';
+import {refreshButton} from '../../helpers/buttonts';
+import {menuButton, useMenu} from '../menu/menuHelpers';
+import {CameraInfoChart} from './CameraInfoChart';
+import {CameraInfo, CameraTable} from './CameraTable';
+import {CpuUsageChart} from './CpuUsageChart';
 import {DetectorRow, DetectorsTable} from './DetectorsTable';
 import {GpuRow, GpusTable} from './GpusTable';
-import {CameraInfo, CameraTable} from './CameraTable';
+import {messages} from './messages';
 import {SectionTitle} from './SectionTitle';
-import {CpuUsageChart} from './CpuUsageChart';
-import {CameraInfoChart} from './CameraInfoChart';
 import {SystemInfo} from './SystemInfo';
-import {useStyles} from '../../helpers/colors';
 
 const refreshFrequency = 30;
 
@@ -56,8 +56,16 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
   const server = useAppSelector(selectServer);
   const cameras = useAppSelector(selectAvailableCameras);
   const intl = useIntl();
-  const interval = useRef<NodeJS.Timeout>();
+  const interval = useRef<ReturnType<typeof setInterval>>();
   const {get} = useRest();
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    return get<Stats>(server, 'stats').then(nextStats => {
+      setStats(nextStats);
+      setLoading(false);
+    });
+  }, [get, server]);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
@@ -69,60 +77,58 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
         rightButtons: [refreshButton(refresh)],
       },
     });
-  }, [componentId, intl]);
+  }, [componentId, intl, refresh]);
 
   useEffect(() => {
-    refresh();
     const removeRefreshing = () => {
       if (interval.current) {
         clearInterval(interval.current);
       }
     };
+
+    const timeoutId = setTimeout(refresh, 0);
     removeRefreshing();
     interval.current = setInterval(async () => {
       await refresh();
     }, refreshFrequency * 1000);
-    return removeRefreshing;
-  }, []);
 
-  const refresh = () => {
-    setLoading(true);
-    return get<Stats>(server, `stats`).then(stats => {
-      setStats(stats);
-      setLoading(false);
-    });
-  };
+    return () => {
+      clearTimeout(timeoutId);
+      removeRefreshing();
+    };
+  }, [refresh]);
 
   const detectors: DetectorRow[] = useMemo(
     () =>
       stats
         ? Object.keys(stats.detectors).map(name => {
             const detector = stats.detectors[name];
-            const cpu_usage = stats.cpu_usages
+            const cpuUsage = stats.cpu_usages
               ? stats.cpu_usages[detector.pid]
               : undefined;
             return {
               name,
               inferenceSpeed: detector.inference_speed,
-              cpu: cpu_usage ? parseFloat(cpu_usage.cpu) : undefined,
-              mem: cpu_usage ? parseFloat(cpu_usage.mem) : undefined,
+              cpu: cpuUsage ? parseFloat(cpuUsage.cpu) : undefined,
+              mem: cpuUsage ? parseFloat(cpuUsage.mem) : undefined,
             };
           })
         : [],
     [stats],
   );
 
-  const gpus: GpuRow[] = useMemo(
-    () =>
-      stats && stats.gpu_usages
-        ? Object.keys(stats.gpu_usages).map(name => ({
-            name,
-            gpu: parseFloat(stats.gpu_usages![name].gpu.slice(0, -2)),
-            mem: parseFloat(stats.gpu_usages![name].mem.slice(0, -2)),
-          }))
-        : [],
-    [stats],
-  );
+  const gpus: GpuRow[] = useMemo(() => {
+    const gpuUsages = stats?.gpu_usages;
+    if (!gpuUsages) {
+      return [];
+    }
+
+    return Object.keys(gpuUsages).map(name => ({
+      name,
+      gpu: parseFloat(gpuUsages[name].gpu.slice(0, -2)),
+      mem: parseFloat(gpuUsages[name].mem.slice(0, -2)),
+    }));
+  }, [stats]);
 
   const cameraTables: Record<string, CameraInfo> = useMemo(() => {
     return stats && cameras
@@ -163,22 +169,19 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
           };
         }, {} as Record<string, CameraInfo>)
       : {};
-  }, [stats, cameras]);
+  }, [cameras, stats]);
 
   const isCarousel = useMemo(
     () =>
-      detectors &&
-      gpus &&
-      cameraTables &&
-      (detectors.some(detector => detector.cpu !== undefined) ||
-        gpus.some(gpu => gpu.gpu !== undefined) ||
-        Object.values(cameraTables).some(
-          info =>
-            info.ffmpeg.cpu !== undefined ||
-            info.capture.cpu !== undefined ||
-            info.detect.cpu !== undefined,
-        )),
-    [detectors, gpus, cameraTables],
+      detectors.some(detector => detector.cpu !== undefined) ||
+      gpus.some(gpu => gpu.gpu !== undefined) ||
+      Object.values(cameraTables).some(
+        info =>
+          info.ffmpeg.cpu !== undefined ||
+          info.capture.cpu !== undefined ||
+          info.detect.cpu !== undefined,
+      ),
+    [cameraTables, detectors, gpus],
   );
 
   const detectorsAndGpusFragment = (
@@ -226,21 +229,16 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
           <>
             <Carousel
               pageControlPosition={PageControlPosition.UNDER}
-              onChangePage={setPage}>
+              onChangePage={setPage}
+            >
               <CpuUsageChart {...{detectors, gpus}} />
               <CameraInfoChart cameraInfos={cameraTables} />
             </Carousel>
-            {page === 0 && detectors && gpus && detectorsAndGpusFragment}
-            {page === 1 &&
-              cameraTables &&
-              cameras.length > 0 &&
-              cameraTablesFragment}
+            {page === 0 && detectorsAndGpusFragment}
+            {page === 1 && cameras.length > 0 && cameraTablesFragment}
           </>
         ) : (
-          <>
-            {detectors && gpus && detectorsAndGpusFragment}
-            {cameraTables && cameras.length > 0 && cameraTablesFragment}
-          </>
+          <></>
         )}
         <SystemInfo service={stats.service} />
       </ScrollView>

@@ -1,8 +1,11 @@
-import { FC, useMemo } from 'react';
-import { StorageInfo, StorageShortPlace } from '../../helpers/interfaces';
-import { useIntl } from 'react-intl';
-import { messages } from './messages';
-import { ProgressChartData, ProgressChart } from '../../components/charts/ProgressChart';
+import {FC, useMemo} from 'react';
+import {StorageInfo, StorageShortPlace} from '../../helpers/interfaces';
+import {useIntl} from 'react-intl';
+import {messages} from './messages';
+import {
+  ProgressChartData,
+  ProgressChart,
+} from '../../components/charts/ProgressChart';
 
 interface IStorageChartProps {
   storage: Record<StorageShortPlace, StorageInfo>;
@@ -12,7 +15,7 @@ export const StorageChart: FC<IStorageChartProps> = ({storage}) => {
   const intl = useIntl();
 
   const chartData: ProgressChartData[] = useMemo(() => {
-    const { recordings, cache, shm } = storage;
+    const {recordings, cache, shm} = storage;
     return [
       {
         label: intl.formatMessage(messages['location.recordings']),

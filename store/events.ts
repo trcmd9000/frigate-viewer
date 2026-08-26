@@ -76,7 +76,7 @@ export const {
   setFiltersCameras,
   setFiltersLabels,
   setFiltersZones,
-  setFiltersRetained
+  setFiltersRetained,
 } = eventsStore.actions;
 
 /**

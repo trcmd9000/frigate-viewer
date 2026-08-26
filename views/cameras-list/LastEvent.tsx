@@ -46,7 +46,8 @@ export const LastEvent: FC<ILastEventProps> = ({height, event, onPress}) => {
         style={{
           width: '100%',
           height: height || previewHeight,
-        }}>
+        }}
+      >
         {event && (
           <>
             <EventSnapshot id={event.id} hasSnapshot={event.has_snapshot} />

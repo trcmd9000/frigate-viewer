@@ -1,12 +1,12 @@
-import {FC, useCallback, useEffect, useMemo, useState} from 'react';
-import {ZoomableImage} from '../../components/ZoomableImage';
+import {FC, useMemo} from 'react';
 import {
   ImageLoadEventData,
   NativeSyntheticEvent,
   StyleSheet,
 } from 'react-native';
-import {useAppSelector} from '../../store/store';
+import {ZoomableImage} from '../../components/ZoomableImage';
 import {selectEventsPhotoPreference, selectServer} from '../../store/settings';
+import {useAppSelector} from '../../store/store';
 import {authorizationHeader, buildServerApiUrl} from '../../helpers/rest';
 
 const styles = StyleSheet.create({
@@ -26,26 +26,22 @@ export const EventSnapshot: FC<IEventSnapshotProps> = ({
   hasSnapshot,
   onSnapshotLoad,
 }) => {
-  const [snapshot, setSnapshot] = useState<string>();
   const photoPreference = useAppSelector(selectEventsPhotoPreference);
   const server = useAppSelector(selectServer);
-
-  useEffect(() => {
+  const snapshot = useMemo(() => {
     const apiUrl = buildServerApiUrl(server);
-    const url =
-      hasSnapshot && photoPreference === 'snapshot'
-        ? `${apiUrl}/events/${id}/snapshot.jpg?bbox=1`
-        : `${apiUrl}/events/${id}/thumbnail.jpg`;
-    setSnapshot(url);
-  }, [id, hasSnapshot, server]);
+    return hasSnapshot && photoPreference === 'snapshot'
+      ? `${apiUrl}/events/${id}/snapshot.jpg?bbox=1`
+      : `${apiUrl}/events/${id}/thumbnail.jpg`;
+  }, [hasSnapshot, id, photoPreference, server]);
 
-  const onLoad = (event: NativeSyntheticEvent<ImageLoadEventData>) => {
-    if (onSnapshotLoad && snapshot) {
+  const onLoad = (_event: NativeSyntheticEvent<ImageLoadEventData>) => {
+    if (onSnapshotLoad) {
       onSnapshotLoad(snapshot);
     }
   };
 
-  return snapshot ? (
+  return (
     <ZoomableImage
       source={{uri: snapshot, headers: authorizationHeader(server)}}
       style={styles.image}
@@ -54,7 +50,5 @@ export const EventSnapshot: FC<IEventSnapshotProps> = ({
       resizeMethod="scale"
       onLoad={onLoad}
     />
-  ) : (
-    <></>
   );
 };

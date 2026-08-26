@@ -1,19 +1,19 @@
-import {useEffect, useState} from 'react';
+import {useMemo, useState} from 'react';
 
 export const useLoadingTime = () => {
   const [startLoadingTime, setStartLoadingTime] = useState<number>();
   const [endLoadingTime, setEndLoadingTime] = useState<number>();
-  const [loadingTime, setLoadingTime] = useState<number>();
-
-  useEffect(() => {
+  const loadingTime = useMemo(() => {
     if (
       startLoadingTime &&
       endLoadingTime &&
       endLoadingTime > startLoadingTime
     ) {
-      setLoadingTime(endLoadingTime - startLoadingTime);
+      return endLoadingTime - startLoadingTime;
     }
-  }, [startLoadingTime, endLoadingTime]);
+
+    return undefined;
+  }, [endLoadingTime, startLoadingTime]);
 
   return {
     loadingTime,

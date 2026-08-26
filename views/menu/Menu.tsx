@@ -9,17 +9,17 @@ import {
   View,
 } from 'react-native';
 import {Navigation} from 'react-native-navigation';
+import {ScrollView} from 'react-native-gesture-handler';
 import {MenuId} from './menuHelpers';
 import {MessageKey, messages} from './messages';
 import {ICameraEventsProps} from '../camera-events/CameraEvents';
-import {ScrollView} from 'react-native-gesture-handler';
 import {useAppColorScheme, useTheme, useStyles} from '../../helpers/colors';
 
 interface IMenuProps {
   current: string;
 }
 
-interface IMenuItem<P = {}> {
+interface IMenuItem<P = unknown> {
   id: MenuId;
   icon: OutlineGlyphMapType;
   label?: string;
@@ -121,9 +121,9 @@ export const Menu: FC<IMenuProps> = ({current}) => {
   const theme = useTheme();
   const appColorScheme = useAppColorScheme();
 
-  const styles = useStyles(({theme}) => ({
+  const styles = useStyles(({theme: palette}) => ({
     menuWrapper: {
-      backgroundColor: theme.background,
+      backgroundColor: palette.background,
       width: '100%',
       height: '100%',
     },
@@ -140,7 +140,7 @@ export const Menu: FC<IMenuProps> = ({current}) => {
       alignItems: 'center',
     },
     menuItemCurrent: {
-      backgroundColor: theme.highlighted,
+      backgroundColor: palette.highlighted,
     },
     menuItemIcon: {
       fontSize: 20,
@@ -148,7 +148,7 @@ export const Menu: FC<IMenuProps> = ({current}) => {
     },
     menuItemText: {
       fontSize: 20,
-      color: theme.text,
+      color: palette.text,
     },
   }));
 
@@ -173,7 +173,10 @@ export const Menu: FC<IMenuProps> = ({current}) => {
     [intl],
   );
 
-  const navigate = useCallback(navigateToMenuItem, []);
+  const navigate = useCallback(
+    (item: IMenuItem) => navigateToMenuItem(item),
+    [],
+  );
 
   const logo = useMemo(
     () =>
@@ -192,7 +195,8 @@ export const Menu: FC<IMenuProps> = ({current}) => {
             style={[
               styles.menuItem,
               item.id === current ? styles.menuItemCurrent : undefined,
-            ]}>
+            ]}
+          >
             <IconOutline
               name={item.icon}
               color={theme.text}

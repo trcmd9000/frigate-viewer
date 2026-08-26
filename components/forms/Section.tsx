@@ -1,5 +1,5 @@
 import React, {FC} from 'react';
-import {StyleSheet, Text, TextInputProps, View} from 'react-native';
+import {Text, TextInputProps, View} from 'react-native';
 import {useStyles} from '../../helpers/colors';
 
 export interface ISectionProps extends TextInputProps {

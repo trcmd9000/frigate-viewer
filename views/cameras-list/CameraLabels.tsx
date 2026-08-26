@@ -1,5 +1,5 @@
 import React, {FC, useCallback, useMemo} from 'react';
-import {Pressable, StyleSheet, Text} from 'react-native';
+import {ListRenderItemInfo, Pressable, StyleSheet, Text} from 'react-native';
 import {Colors} from 'react-native-ui-lib';
 import {selectAvailableLabels} from '../../store/events';
 import {
@@ -76,7 +76,7 @@ export const CameraLabels: FC<ICameraLabelsProps> = ({
     <FlatList
       data={labels}
       numColumns={4}
-      renderItem={({item}) => (
+      renderItem={({item}: ListRenderItemInfo<string>) => (
         <Pressable style={styles.label} onPress={onPress(item)}>
           {labelEmoji[item] && (
             <Text style={styles.iconEmoji}>{labelEmoji[item]}</Text>
@@ -84,10 +84,11 @@ export const CameraLabels: FC<ICameraLabelsProps> = ({
           <Text style={styles.labelText}>{item}</Text>
         </Pressable>
       )}
-      keyExtractor={label => label}
+      keyExtractor={(label: string) => label}
       style={[
         styles.wrapper,
         {height: (height || previewHeight) - 35 / numColumns},
-      ]}></FlatList>
+      ]}
+    />
   );
 };

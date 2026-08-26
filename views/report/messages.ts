@@ -4,13 +4,11 @@ import {makeMessages} from '../../helpers/locale';
 export const messages = makeMessages('report', {
   'topBar.title': 'Report problem',
   'introduction.info':
-    'The report will contain some logs of how you used the application. It will not contain your authentication info.',
+    'Describe the problem below. The app will open a new issue on GitHub; no diagnostics or credentials are uploaded automatically.',
   'issue.header': 'Issue',
   'issue.description.label': 'Describe the problem',
-  'action.send': 'Send',
-  'toast.success': 'The issue was reported successfully',
-  'error.crash-report-disabled':
-    'Reporting crashes is disabled. Go to settings and enable it to report an issue. It will help me to better understand the matter of the issue. You can also report it on GitHub.',
+  'action.send': 'Open GitHub',
+  'toast.error': 'GitHub could not be opened',
 });
 
 export type MessageKey = typeof messages extends Record<

@@ -3,7 +3,6 @@ import type {PropsWithChildren} from 'react';
 import {Dimensions, Image, StyleSheet, Text, View} from 'react-native';
 import {Navigation} from 'react-native-navigation';
 import {Carousel} from 'react-native-ui-lib';
-import crashlytics from '@react-native-firebase/crashlytics';
 import {useAppDispatch, useAppSelector} from '../../store/store';
 import {
   selectCamerasactionWhenPressed,
@@ -25,6 +24,7 @@ import {
 } from '../../helpers/rest';
 import {ICameraEvent} from '../camera-events/CameraEvent';
 import {LastEvent} from './LastEvent';
+import {SecureLogger} from '../../helpers/secureLogger';
 
 const stylesFn = (numColumns: number) =>
   StyleSheet.create({
@@ -79,7 +79,7 @@ export const CameraTile: FC<CameraTileProps> = ({cameraName, componentId}) => {
   };
 
   const getLastEvent = () => {
-    get<ICameraEvent[]>(server, `events`, {
+    get<ICameraEvent[]>(server, 'events', {
       queryParams: {
         cameras: cameraName,
         limit: '1',
@@ -150,7 +150,7 @@ export const CameraTile: FC<CameraTileProps> = ({cameraName, componentId}) => {
     }
     if (lastImageSrc) {
       try {
-        crashlytics().log(`Get camera preview size from ${lastImageSrc}`);
+        SecureLogger.logRequest('GET', '/camera/snapshot');
         Image.getSize(lastImageSrc, (width, height) => {
           const proportion = height / width;
           const windowWidth = Dimensions.get('window').width;
@@ -161,7 +161,7 @@ export const CameraTile: FC<CameraTileProps> = ({cameraName, componentId}) => {
           }
         });
       } catch (err) {
-        crashlytics().recordError(err as Error);
+        SecureLogger.logError(err as Error, 'loading-camera-preview');
       }
     }
   };
@@ -181,7 +181,8 @@ export const CameraTile: FC<CameraTileProps> = ({cameraName, componentId}) => {
     <View
       style={{
         width: `${100 / numColumns}%`,
-      }}>
+      }}
+    >
       <Carousel initialPage={1}>
         <LastEvent
           height={cameraHeight}

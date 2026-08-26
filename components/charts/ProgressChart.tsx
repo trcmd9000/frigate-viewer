@@ -80,10 +80,8 @@ export const ProgressChart: FC<IProgressChartProps> = ({
         {chartData.map((point, i) => (
           <View style={styles.legend} key={i}>
             <View
-              style={[
-                styles.legendMarker,
-                {backgroundColor: point.color},
-              ]}></View>
+              style={[styles.legendMarker, {backgroundColor: point.color}]}
+            />
             <Text style={styles.legendLabel}>{point.label}:</Text>
             <Text style={styles.legendValue}>{percent(point.value)}</Text>
           </View>

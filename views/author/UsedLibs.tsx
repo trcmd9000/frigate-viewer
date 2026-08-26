@@ -27,7 +27,7 @@ const libs = [
   'react-redux',
   'redux',
   'redux-persist',
-  'rn-fetch-blob',
+  'react-native-blob-util',
   'yup',
 ];
 

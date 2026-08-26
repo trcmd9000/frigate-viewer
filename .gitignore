@@ -28,10 +28,12 @@ build/
 .idea
 .gradle
 local.properties
+android/signing.properties
 *.iml
 *.hprof
 .cxx/
 *.keystore
+*.jks
 !debug.keystore
 
 # node.js

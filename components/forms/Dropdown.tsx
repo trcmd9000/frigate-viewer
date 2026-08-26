@@ -1,24 +1,26 @@
-import React, {FC, useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {FlatList, Modal, Pressable, StyleSheet, Text} from 'react-native';
 import {useFormsStyles} from './styles';
 import {useStyles} from '../../helpers/colors';
 
-interface IDropdownOption {
-  value: any;
+type DropdownValue = string | number | null | undefined;
+
+interface IDropdownOption<T extends DropdownValue> {
+  value: T;
   label?: string;
 }
 
-interface IDropdownProps {
-  value?: any;
-  options: IDropdownOption[];
-  onValueChange?: (value: any) => void;
+interface IDropdownProps<T extends DropdownValue> {
+  value?: T;
+  options: IDropdownOption<T>[];
+  onValueChange?: (value: T) => void;
 }
 
-export const Dropdown: FC<IDropdownProps> = ({
+export const Dropdown = <T extends DropdownValue>({
   value,
   options,
   onValueChange,
-}) => {
+}: IDropdownProps<T>) => {
   const formsStyles = useFormsStyles();
   const styles = useStyles(({theme}) => ({
     overlay: {
@@ -47,8 +49,11 @@ export const Dropdown: FC<IDropdownProps> = ({
     },
   }));
 
-  const [opened, setOpened] = useState<boolean>(false);
-  const [selected, setSelected] = useState<IDropdownOption>();
+  const [opened, setOpened] = useState(false);
+  const selected = useMemo(
+    () => options.find(option => value === option.value),
+    [options, value],
+  );
 
   const open = useCallback(() => {
     setOpened(true);
@@ -64,25 +69,15 @@ export const Dropdown: FC<IDropdownProps> = ({
     } else {
       open();
     }
-  }, [opened, open, close]);
+  }, [close, open, opened]);
 
   const select = useCallback(
-    (option: IDropdownOption) => () => {
-      setSelected(option);
-      if (onValueChange) {
-        onValueChange(option.value);
-      }
+    (option: IDropdownOption<T>) => () => {
+      onValueChange?.(option.value);
       close();
     },
     [close, onValueChange],
   );
-
-  useEffect(() => {
-    const found = options.find(option => value === option.value);
-    if (found) {
-      setSelected(found);
-    }
-  }, [value, options]);
 
   return (
     <>
@@ -98,7 +93,8 @@ export const Dropdown: FC<IDropdownProps> = ({
                   styles.item,
                   item === selected ? styles.itemSelected : undefined,
                 ]}
-                onPress={select(item)}>
+                onPress={select(item)}
+              >
                 <Text style={styles.itemText}>{item.label || item.value}</Text>
               </Pressable>
             )}

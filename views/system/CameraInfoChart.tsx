@@ -67,13 +67,7 @@ export const CameraInfoChart: FC<ICameraInfoChartProps> = ({cameraInfos}) => {
     [cameraNames],
   );
 
-  const yAxisData = useMemo(
-    () =>
-      cameraNames.map(name => {
-        name;
-      }),
-    [cameraNames],
-  );
+  const yAxisData = useMemo(() => cameraNames.map(() => 0), [cameraNames]);
 
   return (
     <View>
@@ -83,7 +77,7 @@ export const CameraInfoChart: FC<ICameraInfoChartProps> = ({cameraInfos}) => {
             data={yAxisData}
             yAccessor={({index}) => index}
             scale={scale.scaleBand}
-            formatLabel={(d, i) => cameraNames[i]}
+            formatLabel={(_value, i) => cameraNames[i]}
           />
         )}
         <View style={{flex: 1}}>
@@ -94,7 +88,8 @@ export const CameraInfoChart: FC<ICameraInfoChartProps> = ({cameraInfos}) => {
             gridMin={0}
             gridMax={100}
             spacingInner={0.3}
-            spacingOuter={0.3}>
+            spacingOuter={0.3}
+          >
             <Grid direction={Grid.Direction.VERTICAL} />
           </BarChart>
           {/* <XAxis

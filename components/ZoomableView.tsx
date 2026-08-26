@@ -9,6 +9,21 @@ import Animated, {
 
 type IZoomableViewProps = ViewProps;
 
+interface TouchGestureEvent {
+  numberOfTouches: number;
+}
+interface PinchGestureEvent {
+  scale: number;
+}
+interface PanGestureEvent {
+  translationX: number;
+  translationY: number;
+  numberOfPointers: number;
+}
+interface GestureStateManager {
+  activate: () => void;
+}
+
 export const ZoomableView: FC<IZoomableViewProps> = ({style, ...viewProps}) => {
   const offset = useSharedValue({x: 0, y: 0});
   const scale = useSharedValue(1);
@@ -27,12 +42,12 @@ export const ZoomableView: FC<IZoomableViewProps> = ({style, ...viewProps}) => {
 
   const zoomGesture = Gesture.Pinch()
     .manualActivation(true)
-    .onTouchesDown((event, manager) => {
+    .onTouchesDown((event: TouchGestureEvent, manager: GestureStateManager) => {
       if (event.numberOfTouches > 1) {
         manager.activate();
       }
     })
-    .onUpdate(event => {
+    .onUpdate((event: PinchGestureEvent) => {
       scale.value = event.scale;
     })
     .onEnd(() => {
@@ -42,12 +57,12 @@ export const ZoomableView: FC<IZoomableViewProps> = ({style, ...viewProps}) => {
   const dragGesture = Gesture.Pan()
     .averageTouches(true)
     .manualActivation(true)
-    .onTouchesDown((event, manager) => {
+    .onTouchesDown((event: TouchGestureEvent, manager: GestureStateManager) => {
       if (event.numberOfTouches > 1) {
         manager.activate();
       }
     })
-    .onUpdate(event => {
+    .onUpdate((event: PanGestureEvent) => {
       if (event.numberOfPointers > 1) {
         offset.value = {
           x: event.translationX,

@@ -1,20 +1,14 @@
 import {IconOutline} from '@ant-design/icons-react-native';
-import React, {FC, useCallback, useMemo} from 'react';
-import {DimensionValue, Text, View} from 'react-native';
-import {formatVideoTime} from '../../helpers/locale';
+import React, {FC, useCallback, useMemo, useState} from 'react';
 import {
-  Gesture,
-  GestureDetector,
-  TouchableHighlight,
-} from 'react-native-gesture-handler';
-import Animated, {
-  clamp,
-  measure,
-  runOnJS,
-  useAnimatedRef,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+  DimensionValue,
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  Text,
+  View,
+} from 'react-native';
+import {TouchableHighlight} from 'react-native-gesture-handler';
+import {formatVideoTime} from '../../helpers/locale';
 import {useTheme, useStyles} from '../../helpers/colors';
 
 interface IProgressBarProps {
@@ -72,84 +66,81 @@ export const ProgressBar: FC<IProgressBarProps> = ({
   }));
   const theme = useTheme();
 
-  const ballPos = useSharedValue<number | undefined>(undefined);
-  const trackRef = useAnimatedRef();
-
-  const animatedBall = useAnimatedStyle(() => ({
-    display: ballPos.value !== undefined ? 'flex' : 'none',
-    transform: [{translateX: ballPos.value || 0}],
-  }));
+  const [ballPos, setBallPos] = useState<number | undefined>();
+  const [trackWidth, setTrackWidth] = useState(0);
 
   const currentTimeStr = useMemo(
     () => formatVideoTime(currentTime),
     [currentTime],
   );
-
   const durationStr = useMemo(() => formatVideoTime(duration), [duration]);
-
   const percentage = useMemo(
-    () => `${(currentTime / duration) * 100}%`,
+    () => `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
     [currentTime, duration],
   );
 
   const play = useCallback(() => {
-    if (onPausePress) {
-      onPausePress(false);
-    }
+    onPausePress?.(false);
   }, [onPausePress]);
 
   const pause = useCallback(() => {
-    if (onPausePress) {
-      onPausePress(true);
-    }
+    onPausePress?.(true);
   }, [onPausePress]);
 
   const togglePause = useCallback(() => {
-    if (onPausePress) {
-      onPausePress(!paused);
-    }
-  }, [onPausePress]);
+    onPausePress?.(!paused);
+  }, [onPausePress, paused]);
 
-  const seek = useCallback((seekPos: number) => {
-    if (onSeek) {
-      const seekTime = seekPos * duration;
-      onSeek(seekTime);
-    }
+  const seek = useCallback(
+    (seekPos: number) => {
+      if (onSeek) {
+        onSeek(seekPos * duration);
+      }
+    },
+    [duration, onSeek],
+  );
+
+  const clampPosition = useCallback(
+    (position: number) => Math.max(0, Math.min(position, trackWidth)),
+    [trackWidth],
+  );
+
+  const updatePosition = useCallback(
+    (locationX: number) => {
+      if (trackWidth <= 0) {
+        return;
+      }
+
+      const nextBallPos = clampPosition(locationX);
+      setBallPos(nextBallPos);
+      seek(nextBallPos / trackWidth);
+    },
+    [clampPosition, seek, trackWidth],
+  );
+
+  const handleTouchStart = useCallback(
+    (event: GestureResponderEvent) => {
+      pause();
+      updatePosition(event.nativeEvent.locationX);
+    },
+    [pause, updatePosition],
+  );
+
+  const handleTouchMove = useCallback(
+    (event: GestureResponderEvent) => {
+      updatePosition(event.nativeEvent.locationX);
+    },
+    [updatePosition],
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    play();
+    setBallPos(undefined);
+  }, [play]);
+
+  const handleTrackLayout = useCallback((event: LayoutChangeEvent) => {
+    setTrackWidth(event.nativeEvent.layout.width);
   }, []);
-
-  const tapGesture = Gesture.Manual()
-    .hitSlop({top: 26, bottom: 6})
-    .onTouchesDown((event, manager) => {
-      manager.activate();
-      const trackMeasurements = measure(trackRef);
-      if (trackMeasurements) {
-        ballPos.value = clamp(
-          event.allTouches[0].x,
-          0,
-          trackMeasurements.width,
-        );
-        runOnJS(pause)();
-        runOnJS(seek)(ballPos.value / trackMeasurements.width);
-      }
-    })
-    .onTouchesMove(event => {
-      const trackMeasurements = measure(trackRef);
-      if (trackMeasurements && ballPos.value !== undefined) {
-        ballPos.value = clamp(
-          event.allTouches[0].x,
-          0,
-          trackMeasurements.width,
-        );
-        runOnJS(seek)(ballPos.value / trackMeasurements.width);
-      }
-    })
-    .onTouchesUp((event, manager) => {
-      if (event.numberOfTouches === 0) {
-        manager.end();
-        runOnJS(play)();
-        ballPos.value = undefined;
-      }
-    });
 
   return (
     <View style={[styles.playerBar]}>
@@ -161,21 +152,30 @@ export const ProgressBar: FC<IProgressBarProps> = ({
         )}
       </TouchableHighlight>
       <Text style={[styles.playerBarText]}>{currentTimeStr}</Text>
-      <GestureDetector gesture={tapGesture}>
-        <View style={[styles.playerProgressBar]}>
-          <Animated.View style={styles.playerProgressBarTrack} ref={trackRef}>
+      <View style={[styles.playerProgressBar]}>
+        <View
+          style={styles.playerProgressBarTrack}
+          onLayout={handleTrackLayout}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <View
+            style={[
+              styles.playerProgressBarProgress,
+              {width: percentage as DimensionValue},
+            ]}
+          />
+          {ballPos !== undefined && (
             <View
               style={[
-                styles.playerProgressBarProgress,
-                {width: percentage as DimensionValue},
+                styles.playerProgressBarBall,
+                {transform: [{translateX: ballPos}]},
               ]}
             />
-            <Animated.View
-              style={[styles.playerProgressBarBall, animatedBall]}
-            />
-          </Animated.View>
+          )}
         </View>
-      </GestureDetector>
+      </View>
       <Text style={[styles.playerBarText]}>{durationStr}</Text>
     </View>
   );

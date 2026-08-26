@@ -1,0 +1,104 @@
+diff --git a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactTypefaceUtils.java b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactTypefaceUtils.java
+index 834d734..4b3e876 100644
+--- a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactTypefaceUtils.java
++++ b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactTypefaceUtils.java
+@@ -19,7 +19,6 @@ import android.text.TextUtils;
+ import androidx.annotation.Nullable;
+ import com.facebook.react.bridge.ReadableArray;
+ import com.facebook.react.views.text.ReactFontManager;
+-import com.facebook.react.views.text.ReactTextShadowNode;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+@@ -96,12 +95,12 @@ public class ReactTypefaceUtils {
+ 
+     int want = 0;
+     if ((weight == Typeface.BOLD)
+-        || ((oldStyle & Typeface.BOLD) != 0 && weight == ReactTextShadowNode.UNSET)) {
++        || ((oldStyle & Typeface.BOLD) != 0 && weight == UNSET)) {
+       want |= Typeface.BOLD;
+     }
+ 
+     if ((style == Typeface.ITALIC)
+-        || ((oldStyle & Typeface.ITALIC) != 0 && style == ReactTextShadowNode.UNSET)) {
++        || ((oldStyle & Typeface.ITALIC) != 0 && style == UNSET)) {
+       want |= Typeface.ITALIC;
+     }
+ 
+diff --git a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactViewGroup.kt b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactViewGroup.kt
+index f92580c..be6ccad 100644
+--- a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactViewGroup.kt
++++ b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/ReactViewGroup.kt
+@@ -1,7 +1,7 @@
+ package com.reactnativenavigation.utils
+ 
+-import com.facebook.react.views.view.ReactViewBackgroundDrawable
++import com.facebook.react.uimanager.drawable.CSSBackgroundDrawable
+ import com.facebook.react.views.view.ReactViewGroup
+ 
+ val ReactViewGroup.borderRadius: Float
+-    get() = (background as? ReactViewBackgroundDrawable)?.fullBorderRadius ?: 0f
+\ No newline at end of file
++    get() = (background as? CSSBackgroundDrawable)?.computedBorderRadius?.topLeft ?: 0f
+\ No newline at end of file
+diff --git a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/viewcontrollers/viewcontroller/LayoutDirectionApplier.kt b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/viewcontrollers/viewcontroller/LayoutDirectionApplier.kt
+index 89216ae..462bdfc 100644
+--- a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/viewcontrollers/viewcontroller/LayoutDirectionApplier.kt
++++ b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/viewcontrollers/viewcontroller/LayoutDirectionApplier.kt
+@@ -6,10 +6,11 @@ import com.reactnativenavigation.options.Options
+ 
+ class LayoutDirectionApplier {
+     fun apply(root: ViewController<*>, options: Options, instanceManager: ReactInstanceManager) {
+-        if (options.layout.direction.hasValue() && instanceManager.currentReactContext != null) {
++        val reactContext = instanceManager.currentReactContext
++        if (options.layout.direction.hasValue() && reactContext != null) {
+             root.activity.window.decorView.layoutDirection = options.layout.direction.get()
+-            I18nUtil.getInstance().allowRTL(instanceManager.currentReactContext, options.layout.direction.isRtl)
+-            I18nUtil.getInstance().forceRTL(instanceManager.currentReactContext, options.layout.direction.isRtl)
++            I18nUtil.getInstance().allowRTL(reactContext, options.layout.direction.isRtl)
++            I18nUtil.getInstance().forceRTL(reactContext, options.layout.direction.isRtl)
+         }
+     }
+ }
+\ No newline at end of file
+diff --git a/node_modules/react-native-navigation/lib/android/app/src/reactNative71/java/com/reactnativenavigation/react/modal/ModalContentLayout.kt b/node_modules/react-native-navigation/lib/android/app/src/reactNative71/java/com/reactnativenavigation/react/modal/ModalContentLayout.kt
+index ea8516f..551f72b 100644
+--- a/node_modules/react-native-navigation/lib/android/app/src/reactNative71/java/com/reactnativenavigation/react/modal/ModalContentLayout.kt
++++ b/node_modules/react-native-navigation/lib/android/app/src/reactNative71/java/com/reactnativenavigation/react/modal/ModalContentLayout.kt
+@@ -49,17 +49,17 @@ class ModalContentLayout(context: Context?) : ReactViewGroup(context), RootView{
+             updateFirstChildView()
+         }
+     }
+-    override fun onChildStartedNativeGesture(child: View, androidEvent: MotionEvent?) {
++    override fun onChildStartedNativeGesture(child: View, androidEvent: MotionEvent) {
+         mJSTouchDispatcher.onChildStartedNativeGesture(androidEvent, this.getEventDispatcher())
+     }
+-    override fun onChildStartedNativeGesture(androidEvent: MotionEvent?) {
++    override fun onChildStartedNativeGesture(androidEvent: MotionEvent) {
+         mJSTouchDispatcher.onChildStartedNativeGesture(androidEvent, this.getEventDispatcher())
+     }
+-    override fun onChildEndedNativeGesture(child: View, androidEvent: MotionEvent?) {
++    override fun onChildEndedNativeGesture(child: View, androidEvent: MotionEvent) {
+         mJSTouchDispatcher.onChildEndedNativeGesture(androidEvent, this.getEventDispatcher())
+     }
+     override fun requestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {}
+-    private fun getEventDispatcher(): EventDispatcher? {
++    private fun getEventDispatcher(): EventDispatcher {
+         val reactContext: ReactContext = this.getReactContext()
+         return reactContext.getNativeModule(UIManagerModule::class.java)!!.eventDispatcher
+     }
+@@ -73,12 +73,12 @@ class ModalContentLayout(context: Context?) : ReactViewGroup(context), RootView{
+         return this.context as ReactContext
+     }
+ 
+-    override fun onInterceptTouchEvent(event: MotionEvent?): Boolean {
++    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+         mJSTouchDispatcher.handleTouchEvent(event, getEventDispatcher())
+         return super.onInterceptTouchEvent(event)
+     }
+ 
+-    override fun onTouchEvent(event: MotionEvent?): Boolean {
++    override fun onTouchEvent(event: MotionEvent): Boolean {
+         mJSTouchDispatcher.handleTouchEvent(event, getEventDispatcher())
+         super.onTouchEvent(event)
+         return true

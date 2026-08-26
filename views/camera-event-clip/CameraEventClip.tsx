@@ -9,8 +9,7 @@ import React, {
 import {ActivityIndicator, Text, View} from 'react-native';
 import {NavigationFunctionComponent} from 'react-native-navigation';
 import VLCPlayer, {State} from '@lunarr/vlc-player';
-import RNFetchBlob from 'rn-fetch-blob';
-import crashlytics from '@react-native-firebase/crashlytics';
+import RNBlobUtil from 'react-native-blob-util';
 import {ZoomableView} from '../../components/ZoomableView';
 import {selectServer} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
@@ -23,6 +22,7 @@ import {ICameraEvent} from '../camera-events/CameraEvent';
 import {IconOutline} from '@ant-design/icons-react-native';
 import {TouchableHighlight} from 'react-native-gesture-handler';
 import {useTheme, useStyles} from '../../helpers/colors';
+import {SecureLogger} from '../../helpers/secureLogger';
 
 interface ICameraEventClipProps {
   event: ICameraEvent;
@@ -127,24 +127,29 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     (async () => {
       try {
         setLoading(true);
-        const dirs = RNFetchBlob.fs.dirs;
+        const dirs = RNBlobUtil.fs.dirs;
         const filePath = `${dirs.CacheDir}/${fileName}`;
-        RNFetchBlob.session('playback').dispose();
-        const downloader = RNFetchBlob.config({
+        RNBlobUtil.session('playback').dispose();
+        const downloader = RNBlobUtil.config({
           fileCache: true,
           session: 'playback',
           path: filePath,
         });
         await downloader
           .fetch('GET', clipUrl, authorizationHeader(server))
-          .progress((received, total) => {
-            const progress = Math.round((received / total) * 100);
+          .progress((received: number | string, total: number | string) => {
+            const totalBytes = Number(total);
+            const receivedBytes = Number(received);
+            const progress =
+              totalBytes > 0
+                ? Math.round((receivedBytes / totalBytes) * 100)
+                : 0;
             setProgress(progress);
           });
         setUri(filePath);
         setLoading(false);
       } catch (err) {
-        crashlytics().recordError(err as Error);
+        SecureLogger.logError(err as Error, 'loading-event-clip');
         setLoading(false);
         setError(JSON.stringify(err));
       }
@@ -183,7 +188,8 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
             currentTime={progressInfo?.currentTime}
             duration={progressInfo?.duration}
             onPaused={onPaused}
-            onSeek={seek}>
+            onSeek={seek}
+          >
             <VLCPlayer
               ref={player}
               paused={paused}

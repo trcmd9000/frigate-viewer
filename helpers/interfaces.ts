@@ -33,7 +33,7 @@ export interface Service {
   last_updated?: number; // timestamp
   latest_version?: string; // latest frigate nvr version
   storage: Record<StoragePlace, StorageInfo>;
-  temperatures?: {};
+  temperatures?: Record<string, unknown>;
   uptime: number; // seconds
   version: string; // current frigate nvr version
 }

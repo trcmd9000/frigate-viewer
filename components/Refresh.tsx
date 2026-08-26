@@ -1,7 +1,6 @@
-import {RefreshControl} from 'react-native-gesture-handler';
 import {useTheme} from '../helpers/colors';
 import {FC} from 'react';
-import {RefreshControlProps} from 'react-native';
+import {RefreshControl, RefreshControlProps} from 'react-native';
 
 export const Refresh: FC<RefreshControlProps> = refreshControlProps => {
   const theme = useTheme();

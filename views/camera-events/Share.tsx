@@ -1,53 +1,125 @@
-import {FC, useEffect, useMemo, useState} from 'react';
+import {FC, useCallback, useMemo, useState} from 'react';
 import {ActionSheet, Dialog} from 'react-native-ui-lib';
-import {ICameraEvent} from './CameraEvent';
 import {useIntl} from 'react-intl';
-import RNFetchBlob from 'rn-fetch-blob';
+import RNBlobUtil from 'react-native-blob-util';
 import RNShare from 'react-native-share';
+import {ActivityIndicator, Text, ToastAndroid} from 'react-native';
+import {ICameraEvent} from './CameraEvent';
 import {messages} from './messages';
 import {authorizationHeader, buildServerApiUrl} from '../../helpers/rest';
-import {useAppSelector} from '../../store/store';
 import {selectServer} from '../../store/settings';
-import {ActivityIndicator, Text, ToastAndroid} from 'react-native';
-import crashlytics from '@react-native-firebase/crashlytics';
+import {useAppSelector} from '../../store/store';
 import {clipFilename, snapshotFilename} from './eventHelpers';
 import {useStyles} from '../../helpers/colors';
+import {handleError, getUserFriendlyMessage} from '../../helpers/errorHandler';
+import {SecureLogger} from '../../helpers/secureLogger';
 
 interface ShareProps {
   event?: ICameraEvent;
   onDismiss?: () => void;
 }
 
-const stall = (ms: number = 0) =>
-  new Promise(resolve => setTimeout(resolve, ms));
+const stall = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const Share: FC<ShareProps> = ({event, onDismiss}) => {
-  const [isVisible, setIsVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const intl = useIntl();
   const server = useAppSelector(selectServer);
 
-  const styles = useStyles(({theme}) => ({
+  const styles = useStyles(() => ({
     loadingText: {
       textAlign: 'center',
       color: 'white',
     },
   }));
 
-  useEffect(() => {
-    if (event) {
-      setIsVisible(true);
-    }
-  }, [event]);
+  const download = useCallback(
+    async (filename: string, url: string): Promise<string | undefined> => {
+      try {
+        SecureLogger.logRequest('GET', '/events/media');
+        setLoading(true);
+        const dirs = RNBlobUtil.fs.dirs;
+        const filePath = `${dirs.CacheDir}/${filename}`;
+        const downloader = RNBlobUtil.config({
+          fileCache: true,
+          session: 'share',
+          path: filePath,
+        });
+        await downloader
+          .fetch('GET', url, authorizationHeader(server))
+          .progress((received: number | string, total: number | string) => {
+            const totalBytes = Number(total);
+            const receivedBytes = Number(received);
+            const nextProgress =
+              totalBytes > 0
+                ? Math.round((receivedBytes / totalBytes) * 100)
+                : 0;
+            setProgress(nextProgress);
+          });
+        setLoading(false);
+        return filePath;
+      } catch (err) {
+        const appError = await handleError(err, 'Share.download');
+        setLoading(false);
+        ToastAndroid.show(getUserFriendlyMessage(appError), ToastAndroid.LONG);
+        return undefined;
+      }
+    },
+    [server],
+  );
 
-  const options = useMemo(() => {
-    return [
+  const shareSnapshot = useCallback(async () => {
+    if (!event) {
+      return;
+    }
+
+    const apiUrl = buildServerApiUrl(server);
+    const filename = snapshotFilename(event);
+    const path = await download(
+      filename,
+      `${apiUrl}/events/${event.id}/snapshot.jpg?bbox=1`,
+    );
+    if (!path) {
+      return;
+    }
+    await stall(200);
+    RNShare.open({
+      url: `file://${path}`,
+    }).then(() => {
+      RNBlobUtil.session('share').dispose();
+    });
+  }, [download, event, server]);
+
+  const shareClip = useCallback(async () => {
+    if (!event) {
+      return;
+    }
+
+    const apiUrl = buildServerApiUrl(server);
+    const filename = clipFilename(event);
+    const path = await download(
+      filename,
+      `${apiUrl}/events/${event.id}/clip.mp4`,
+    );
+    if (!path) {
+      return;
+    }
+    await stall(200);
+    RNShare.open({
+      url: `file://${path}`,
+    }).then(() => {
+      RNBlobUtil.session('share').dispose();
+    });
+  }, [download, event, server]);
+
+  const options = useMemo(
+    () => [
       ...(event?.has_snapshot
         ? [
             {
               label: intl.formatMessage(messages['share.snapshot.label']),
-              onPress: () => shareSnapshot(),
+              onPress: shareSnapshot,
             },
           ]
         : []),
@@ -55,81 +127,23 @@ export const Share: FC<ShareProps> = ({event, onDismiss}) => {
         ? [
             {
               label: intl.formatMessage(messages['share.clip.label']),
-              onPress: () => shareClip(),
+              onPress: shareClip,
             },
           ]
         : []),
-    ];
-  }, [event]);
-
-  const download = async (filename: string, url: string) => {
-    try {
-      crashlytics().log(`Share ${filename} from ${url}`);
-      setLoading(true);
-      const dirs = RNFetchBlob.fs.dirs;
-      const filePath = `${dirs.CacheDir}/${filename}`;
-      const downloader = RNFetchBlob.config({
-        fileCache: true,
-        session: 'share',
-        path: filePath,
-      });
-      await downloader
-        .fetch('GET', url, authorizationHeader(server))
-        .progress((received, total) => {
-          const progress = Math.round((received / total) * 100);
-          setProgress(progress);
-        });
-      setLoading(false);
-      return filePath;
-    } catch (err) {
-      crashlytics().recordError(err as Error);
-      setLoading(false);
-      ToastAndroid.show(JSON.stringify(err), ToastAndroid.LONG);
-    }
-  };
-
-  const shareSnapshot = async () => {
-    const apiUrl = buildServerApiUrl(server);
-    const filename = snapshotFilename(event!);
-    const path = await download(
-      filename,
-      `${apiUrl}/events/${event!.id}/snapshot.jpg?bbox=1`,
-    );
-    await stall(200);
-    RNShare.open({
-      url: `file://${path}`,
-    }).then(() => {
-      RNFetchBlob.session('share').dispose();
-    });
-  };
-
-  const shareClip = async () => {
-    const apiUrl = buildServerApiUrl(server);
-    const filename = clipFilename(event!);
-    const path = await download(
-      filename,
-      `${apiUrl}/events/${event!.id}/clip.mp4`,
-    );
-    await stall(200);
-    RNShare.open({
-      url: `file://${path}`,
-    }).then(() => {
-      RNFetchBlob.session('share').dispose();
-    });
-  };
+    ],
+    [event, intl, shareClip, shareSnapshot],
+  );
 
   const close = () => {
-    setIsVisible(false);
-    if (onDismiss) {
-      onDismiss();
-    }
+    onDismiss?.();
   };
 
   return (
     <>
       <ActionSheet
         title={intl.formatMessage(messages['action.share'])}
-        visible={isVisible}
+        visible={Boolean(event)}
         options={options}
         onDismiss={close}
       />

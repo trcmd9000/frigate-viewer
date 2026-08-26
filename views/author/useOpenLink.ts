@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
-import { useIntl } from 'react-intl';
-import { Alert, Linking } from 'react-native';
-import { messages } from './messages';
+import {useCallback} from 'react';
+import {useIntl} from 'react-intl';
+import {Alert, Linking} from 'react-native';
+import {messages} from './messages';
 
 export const useOpenLink = () => {
   const intl = useIntl();

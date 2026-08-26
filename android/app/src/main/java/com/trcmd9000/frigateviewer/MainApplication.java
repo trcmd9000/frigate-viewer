@@ -1,4 +1,4 @@
-package com.frigateviewer;
+package com.trcmd9000.frigateviewer;
 
 import android.app.Application;
 import com.facebook.react.PackageList;
@@ -8,11 +8,8 @@ import com.facebook.react.ReactPackage;
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint;
 import com.facebook.react.defaults.DefaultReactNativeHost;
 import com.reactnativenavigation.react.NavigationReactNativeHost;
-import com.facebook.react.flipper.ReactNativeFlipper;
 import com.facebook.soloader.SoLoader;
 import java.util.List;
-import com.horcrux.svg.SvgPackage;
-import com.facebook.react.modules.network.OkHttpClientProvider;
 
 public class MainApplication extends NavigationApplication {
 
@@ -29,7 +26,7 @@ public class MainApplication extends NavigationApplication {
           List<ReactPackage> packages = new PackageList(this).getPackages();
           // Packages that cannot be autolinked yet can be added manually here, for example:
           // packages.add(new MyReactNativePackage());
-          packages.add(new SvgPackage());
+          packages.add(new ClientCertPackage());
           return packages;
         }
 
@@ -62,7 +59,5 @@ public class MainApplication extends NavigationApplication {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       DefaultNewArchitectureEntryPoint.load();
     }
-    OkHttpClientProvider.setOkHttpClientFactory(new IgnoreSSLFactory());
-    ReactNativeFlipper.initializeFlipper(this, getReactNativeHost().getReactInstanceManager());
   }
 }

@@ -39,6 +39,10 @@ const styles = StyleSheet.create({
   },
 });
 
+interface PanGestureEvent {
+  translationX: number;
+}
+
 interface IVideoHUDProps extends ViewProps {
   paused: boolean;
   currentTime?: number;
@@ -139,7 +143,7 @@ export const VideoHUD: FC<IVideoHUDProps> = ({
     .onStart(() => {
       pause();
     })
-    .onUpdate(event => {
+    .onUpdate((event: PanGestureEvent) => {
       if (currentTime !== undefined && duration !== undefined) {
         const position = currentTime / duration;
         const distance = event.translationX;
@@ -157,8 +161,12 @@ export const VideoHUD: FC<IVideoHUDProps> = ({
 
   const formattedSeekTime = useMemo(
     () =>
-      seekTime !== undefined && duration !== undefined && currentTime !== undefined
-        ? `${seekTime > currentTime ? '+' : ''}${formatVideoTime(seekTime - currentTime)}`
+      seekTime !== undefined &&
+      duration !== undefined &&
+      currentTime !== undefined
+        ? `${seekTime > currentTime ? '+' : ''}${formatVideoTime(
+            seekTime - currentTime,
+          )}`
         : undefined,
     [seekTime, duration, currentTime],
   );

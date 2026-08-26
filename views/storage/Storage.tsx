@@ -1,26 +1,26 @@
+import {useCallback, useEffect, useState} from 'react';
+import {StyleSheet} from 'react-native';
 import {useIntl} from 'react-intl';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {Carousel, LoaderScreen, PageControlPosition} from 'react-native-ui-lib';
-import {useAppSelector} from '../../store/store';
-import {selectServer} from '../../store/settings';
-import {useEffect, useState} from 'react';
-import {menuButton, useMenu} from '../menu/menuHelpers';
-import {messages} from './messages';
-import {useRest} from '../../helpers/rest';
+import {ScrollView} from 'react-native-gesture-handler';
+import {Background} from '../../components/Background';
+import {refreshButton} from '../../helpers/buttonts';
 import {
   CamerasStorage,
   Stats,
   StorageInfo,
   StorageShortPlace,
 } from '../../helpers/interfaces';
-import {ScrollView} from 'react-native-gesture-handler';
-import {Background} from '../../components/Background';
-import {StorageChart} from './StorageChart';
-import {StorageTable} from './StorageTable';
-import {StyleSheet} from 'react-native';
-import {refreshButton} from '../../helpers/buttonts';
+import {useRest} from '../../helpers/rest';
+import {selectServer} from '../../store/settings';
+import {useAppSelector} from '../../store/store';
+import {menuButton, useMenu} from '../menu/menuHelpers';
+import {messages} from './messages';
 import {CamerasStorageChart} from './CamerasStorageChart';
 import {CamerasStorageTable} from './CamerasStorageTable';
+import {StorageChart} from './StorageChart';
+import {StorageTable} from './StorageTable';
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -39,27 +39,11 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
   const intl = useIntl();
   const {get} = useRest();
 
-  useEffect(() => {
-    Navigation.mergeOptions(componentId, {
-      topBar: {
-        title: {
-          text: intl.formatMessage(messages['topBar.title']),
-        },
-        leftButtons: [menuButton],
-        rightButtons: [refreshButton(refresh)],
-      },
-    });
-  }, [componentId, intl]);
-
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setLoading(true);
     Promise.allSettled([
-      get<Stats>(server, `stats`),
-      get<CamerasStorage>(server, `recordings/storage`),
+      get<Stats>(server, 'stats'),
+      get<CamerasStorage>(server, 'recordings/storage'),
     ]).then(([stats, cameras]) => {
       if (stats.status === 'fulfilled') {
         const {service} = stats.value;
@@ -75,7 +59,26 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
       }
       setLoading(false);
     });
-  };
+  }, [get, server]);
+
+  useEffect(() => {
+    Navigation.mergeOptions(componentId, {
+      topBar: {
+        title: {
+          text: intl.formatMessage(messages['topBar.title']),
+        },
+        leftButtons: [menuButton],
+        rightButtons: [refreshButton(refresh)],
+      },
+    });
+  }, [componentId, intl, refresh]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(refresh, 0);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [refresh]);
 
   return loading || storage === undefined ? (
     <LoaderScreen />
@@ -84,7 +87,8 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
       <ScrollView style={styles.wrapper}>
         <Carousel
           pageControlPosition={PageControlPosition.UNDER}
-          onChangePage={setPage}>
+          onChangePage={setPage}
+        >
           <StorageChart storage={storage} />
           {camerasStorage !== undefined && (
             <CamerasStorageChart camerasStorage={camerasStorage} />

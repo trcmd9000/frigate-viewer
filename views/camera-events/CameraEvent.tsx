@@ -1,8 +1,7 @@
-import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {FC, ComponentType, useCallback, useMemo, useState} from 'react';
+import {Image, TouchableWithoutFeedback, View, ViewStyle} from 'react-native';
 import {useIntl} from 'react-intl';
-import {Image, TouchableWithoutFeedback, View} from 'react-native';
-import {Colors, Drawer, DrawerItemProps} from 'react-native-ui-lib';
-import crashlytics from '@react-native-firebase/crashlytics';
+import {Colors} from 'react-native-ui-lib';
 import {useRest} from '../../helpers/rest';
 import {
   selectEventsSnapshotHeight,
@@ -15,6 +14,21 @@ import {EventTitle} from './EventTitle';
 import {messages} from './messages';
 import {EventSnapshot} from './EventSnapshot';
 import {useStyles} from '../../helpers/colors';
+import {SecureLogger} from '../../helpers/secureLogger';
+
+interface DrawerItemProps {
+  text: string;
+  icon: number;
+  background: string;
+  onPress: () => void;
+}
+
+const Drawer = require('react-native-ui-lib').Drawer as ComponentType<{
+  leftItem?: DrawerItemProps;
+  rightItems?: DrawerItemProps[];
+  style?: ViewStyle;
+  children?: React.ReactNode;
+}>;
 
 export interface ICameraEvent {
   id: string;
@@ -68,32 +82,25 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     data,
     retain_indefinitely,
   } = event;
-  const [retained, setRetained] = useState(false);
+  const [retained, setRetained] = useState(retain_indefinitely);
   const server = useAppSelector(selectServer);
   const snapshotHeight = useAppSelector(selectEventsSnapshotHeight);
   const numColumns = useAppSelector(selectEventsNumColumns);
   const intl = useIntl();
   const {del, post} = useRest();
 
-  useEffect(() => {
-    setRetained(retain_indefinitely);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const onSnapshotLoad = useCallback(
     async (snapshot: string) => {
-      if (snapshot) {
-        try {
-          crashlytics().log(`Get image size of ${snapshot}`);
-          Image.getSize(snapshot, (width, height) => {
-            onSnapshotDimensions(width, height);
-          });
-        } catch (err) {
-          crashlytics().recordError(err as Error);
-        }
+      try {
+        SecureLogger.logRequest('GET', '/snapshot');
+        Image.getSize(snapshot, (width, height) => {
+          onSnapshotDimensions(width, height);
+        });
+      } catch (err) {
+        SecureLogger.logError(err as Error, 'loading-snapshot');
       }
     },
-    [numColumns, snapshotHeight, onSnapshotDimensions],
+    [onSnapshotDimensions],
   );
 
   const deleteDrawerItem: DrawerItemProps = useMemo(
@@ -107,7 +114,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
         });
       },
     }),
-    [server, id, intl, onDelete],
+    [del, id, intl, onDelete, server],
   );
 
   const retainDrawerItem: DrawerItemProps = useMemo(
@@ -133,7 +140,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
               });
             },
           },
-    [server, id, intl, retained],
+    [del, id, intl, post, retained, server],
   );
 
   const shareDrawerItem: DrawerItemProps = useMemo(
@@ -145,7 +152,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
         onShare(event);
       },
     }),
-    [intl],
+    [event, intl, onShare],
   );
 
   return (
@@ -155,7 +162,8 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
       style={{
         width: `${100 / numColumns}%`,
         height: snapshotHeight,
-      }}>
+      }}
+    >
       <TouchableWithoutFeedback onPress={() => onEventPress(event)}>
         <View
           style={[
@@ -163,7 +171,8 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
             {
               height: snapshotHeight,
             },
-          ]}>
+          ]}
+        >
           <EventSnapshot
             id={id}
             hasSnapshot={has_snapshot}

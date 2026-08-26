@@ -1,4 +1,5 @@
 import {FC} from 'react';
+import {ListRenderItemInfo} from 'react-native';
 import {FlatList} from 'react-native-gesture-handler';
 import {Text} from 'react-native-ui-lib';
 import {useStyles} from '../../helpers/colors';
@@ -28,8 +29,10 @@ export const LogPreview: FC<ILogPreviewProps> = ({log}) => {
     <FlatList
       style={styles.wrapper}
       data={log.data}
-      renderItem={({item}) => <Text style={styles.line}>{item}</Text>}
-      keyExtractor={(_, index) => `${index}`}
+      renderItem={({item}: ListRenderItemInfo<string>) => (
+        <Text style={styles.line}>{item}</Text>
+      )}
+      keyExtractor={(_item: string, index: number) => `${index}`}
       inverted={true}
     />
   );

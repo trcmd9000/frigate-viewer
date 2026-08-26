@@ -1,11 +1,11 @@
-import React, {FC, useMemo} from 'react';
-import {useIntl} from 'react-intl';
+import React, {FC} from 'react';
 import {Pressable, Text, View} from 'react-native';
+import {useIntl} from 'react-intl';
+import {IconOutline} from '@ant-design/icons-react-native';
 import {Server} from '../../store/settings';
 import {useStyles, useTheme} from '../../helpers/colors';
 import {buildServerUrl} from '../../helpers/rest';
 import {messages} from './messages';
-import {IconOutline} from '@ant-design/icons-react-native';
 
 interface ServerItemProps {
   server: Server;
@@ -54,7 +54,7 @@ export const ServerItem: FC<ServerItemProps> = ({
   const theme = useTheme();
   const intl = useIntl();
 
-  const url = useMemo(() => buildServerUrl(server), [server]) ?? '-';
+  const url = buildServerUrl(server) ?? '-';
 
   return (
     <Pressable style={styles.wrapper} onPress={onPress}>

@@ -55,7 +55,8 @@ export const FilterItem: FC<IFilterItemProps> = ({
           styles.text,
           ...(selected ? [styles.selectedText] : []),
           ...(disabled ? [styles.disabledText] : []),
-        ]}>
+        ]}
+      >
         {label}
       </Text>
     </Pressable>

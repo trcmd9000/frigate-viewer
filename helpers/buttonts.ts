@@ -1,6 +1,8 @@
-import { OptionsTopBarButton } from 'react-native-navigation';
+import {OptionsTopBarButton} from 'react-native-navigation';
 
-export const refreshButton: (onPress?: () => void) => OptionsTopBarButton = onPress => ({
+export const refreshButton: (
+  onPress?: () => void,
+) => OptionsTopBarButton = onPress => ({
   id: 'refresh',
   component: {
     id: 'FilterButton',

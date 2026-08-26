@@ -6,6 +6,7 @@ import {useStyles} from '../../helpers/colors';
 
 interface IFilterSwitchProps extends SwitchProps {
   label?: string | JSX.Element;
+  value?: boolean;
   actionOnChange?: ActionCreatorWithPayload<boolean>;
 }
 

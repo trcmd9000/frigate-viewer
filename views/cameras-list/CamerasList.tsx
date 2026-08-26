@@ -1,8 +1,10 @@
-import React, {useEffect, useState} from 'react';
-import {useIntl} from 'react-intl';
+import React, {useCallback, useEffect, useState} from 'react';
 import {FlatList, Text} from 'react-native';
+import {useIntl} from 'react-intl';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
+import {View} from 'react-native-ui-lib';
 import {useRest} from '../../helpers/rest';
+import {handleError} from '../../helpers/errorHandler';
 import {
   selectAvailableCameras,
   setAvailableCameras,
@@ -17,7 +19,6 @@ import {messages} from './messages';
 import {useNoServer} from '../settings/useNoServer';
 import {Background} from '../../components/Background';
 import {useStyles} from '../../helpers/colors';
-import {View} from 'react-native-ui-lib';
 import {Refresh} from '../../components/Refresh';
 
 interface IConfigResponse {
@@ -51,20 +52,9 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
   const intl = useIntl();
   const {get} = useRest();
 
-  useEffect(() => {
-    Navigation.mergeOptions(componentId, {
-      topBar: {
-        title: {
-          text: intl.formatMessage(messages['topBar.title']),
-        },
-        leftButtons: [menuButton],
-      },
-    });
-  }, [componentId, intl]);
-
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setLoading(true);
-    get<IConfigResponse>(server, `config`)
+    get<IConfigResponse>(server, 'config')
       .then(config => {
         const availableCameras = Object.keys(config.cameras);
         const availableLabels = config.objects.track;
@@ -81,20 +71,36 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
         dispatch(setAvailableLabels(availableLabels));
         dispatch(setAvailableZones(availableZones));
       })
-      .catch(() => {
+      .catch(async error => {
+        await handleError(error, 'CamerasList.refresh');
         dispatch(setAvailableCameras([]));
-        return [];
       })
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, [dispatch, get, server]);
+
+  useEffect(() => {
+    Navigation.mergeOptions(componentId, {
+      topBar: {
+        title: {
+          text: intl.formatMessage(messages['topBar.title']),
+        },
+        leftButtons: [menuButton],
+      },
+    });
+  }, [componentId, intl]);
 
   useEffect(() => {
     if (server.host) {
-      refresh();
+      const timeoutId = setTimeout(refresh, 0);
+      return () => {
+        clearTimeout(timeoutId);
+      };
     }
-  }, [server]);
+
+    return undefined;
+  }, [refresh, server.host]);
 
   return (
     <Background>
@@ -102,7 +108,7 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
         <View>
           <Refresh refreshing={loading} onRefresh={refresh} />
           <Text style={styles.noCameras}>
-            {intl.formatMessage(messages['noCameras'])}
+            {intl.formatMessage(messages.noCameras)}
           </Text>
         </View>
       )}

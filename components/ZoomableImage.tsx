@@ -9,6 +9,14 @@ import Animated, {
 
 type IZoomableImageProps = ImageProps;
 
+interface PinchGestureEvent {
+  scale: number;
+}
+interface PanGestureEvent {
+  translationX: number;
+  translationY: number;
+}
+
 export const ZoomableImage: FC<IZoomableImageProps> = ({
   style,
   ...imageProps
@@ -29,7 +37,7 @@ export const ZoomableImage: FC<IZoomableImageProps> = ({
   const nativeGesture = Gesture.Native();
 
   const zoomGesture = Gesture.Pinch()
-    .onUpdate(event => {
+    .onUpdate((event: PinchGestureEvent) => {
       scale.value = event.scale;
     })
     .onEnd(() => {
@@ -39,7 +47,7 @@ export const ZoomableImage: FC<IZoomableImageProps> = ({
   const dragGesture = Gesture.Pan()
     .averageTouches(true)
     .minPointers(2)
-    .onUpdate(event => {
+    .onUpdate((event: PanGestureEvent) => {
       offset.value = {
         x: event.translationX,
         y: event.translationY,

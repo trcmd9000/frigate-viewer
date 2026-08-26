@@ -173,7 +173,7 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
   useEffect(() => {
     if (server.host) {
       if (refreshing) {
-        get<ICameraEvent[]>(server, `events`, {queryParams: eventsQueryParams})
+        get<ICameraEvent[]>(server, 'events', {queryParams: eventsQueryParams})
           .then(data => {
             watchEndReached(data);
             setEvents(data);
@@ -181,7 +181,7 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
               listRef.current?.scrollToIndex({index: 0});
             }
           })
-          .catch(() => {})
+          .catch(() => undefined)
           .finally(() => {
             setRefreshing(false);
           });
@@ -192,7 +192,7 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
 
   const loadMore = () => {
     if (!endReached) {
-      get<ICameraEvent[]>(server, `events`, {
+      get<ICameraEvent[]>(server, 'events', {
         queryParams: eventsQueryParams,
       }).then(data => {
         watchEndReached(data);
@@ -203,7 +203,6 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersCameras, filtersLabels, filtersZones, filtersRetained]);
 
   const onDelete = (deletedIds: string[]) => {
@@ -262,7 +261,7 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
         <View>
           <Refresh refreshing={refreshing} onRefresh={refresh} />
           <Text style={styles.noEvents}>
-            {intl.formatMessage(messages['noEvents'])}
+            {intl.formatMessage(messages.noEvents)}
           </Text>
         </View>
       )}

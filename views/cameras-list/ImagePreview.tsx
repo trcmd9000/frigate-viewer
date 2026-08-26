@@ -1,6 +1,6 @@
 import React, {FC} from 'react';
-import {TouchableWithoutFeedback} from 'react-native-gesture-handler';
-import {StyleSheet, View} from 'react-native';
+
+import {StyleSheet, TouchableWithoutFeedback, View} from 'react-native';
 import {ZoomableImage} from '../../components/ZoomableImage';
 import {useAppSelector} from '../../store/store';
 import {selectCamerasPreviewHeight, selectServer} from '../../store/settings';
@@ -38,7 +38,8 @@ export const ImagePreview: FC<IImagePreviewProps> = ({
         style={[
           styles.wrapper,
           {width: '100%', height: height || previewHeight},
-        ]}>
+        ]}
+      >
         {imageUrl && (
           <ZoomableImage
             source={{

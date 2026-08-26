@@ -1,4 +1,4 @@
-package com.frigateviewer;
+package com.trcmd9000.frigateviewer;
 
 import com.reactnativenavigation.NavigationActivity;
 import com.facebook.react.ReactActivityDelegate;

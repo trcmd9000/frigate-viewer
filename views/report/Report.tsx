@@ -1,19 +1,17 @@
 import {Formik, FormikProps} from 'formik';
 import React, {useEffect, useMemo, useRef} from 'react';
+import {Keyboard, Linking, Text, ToastAndroid} from 'react-native';
 import {useIntl} from 'react-intl';
-import {Keyboard, Text, ToastAndroid} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
-import crashlytics from '@react-native-firebase/crashlytics';
+import {ActionBar, View} from 'react-native-ui-lib';
+import {ScrollView} from 'react-native-gesture-handler';
 import {Input} from '../../components/forms/Input';
 import {Label} from '../../components/forms/Label';
 import {Section} from '../../components/forms/Section';
 import {messages} from './messages';
-import {ActionBar, View} from 'react-native-ui-lib';
-import {ScrollView} from 'react-native-gesture-handler';
 import {useTheme, useStyles} from '../../helpers/colors';
-import {useAppSelector} from '../../store/store';
-import {selectAppSendCrashReports, selectSettings} from '../../store/settings';
 import {menuButton, useMenu} from '../menu/menuHelpers';
+import {handleError} from '../../helpers/errorHandler';
 
 interface Problem {
   issue: {
@@ -53,8 +51,6 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
   const theme = useTheme();
 
   const formRef = useRef<FormikProps<Problem>>(null);
-  const currentSettings = useAppSelector(selectSettings);
-  const sendCrashReportEnabled = useAppSelector(selectAppSendCrashReports);
   const intl = useIntl();
 
   useMenu(componentId, 'report');
@@ -72,29 +68,19 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
 
   const send = async (problem: Problem) => {
     Keyboard.dismiss();
-    crashlytics().log('Reporting an issue');
-    if (problem.issue.description) {
-      crashlytics().log(`Description: ${problem.issue.description}`);
+    const body = encodeURIComponent(problem.issue.description);
+    try {
+      await Linking.openURL(
+        `https://github.com/trcmd9000/frigate-viewer/issues/new?body=${body}`,
+      );
+      formRef.current?.resetForm();
+    } catch (error) {
+      await handleError(error, 'Report.openGitHub');
+      ToastAndroid.show(
+        intl.formatMessage(messages['toast.error']),
+        ToastAndroid.LONG,
+      );
     }
-    const {server, ...settingsWithoutServerData} = currentSettings;
-    const settings = (
-      Object.keys(
-        settingsWithoutServerData,
-      ) as (keyof typeof settingsWithoutServerData)[]
-    ).reduce(
-      (obj, key) => ({
-        ...obj,
-        [key]: JSON.stringify(settingsWithoutServerData[key]),
-      }),
-      {},
-    );
-    await crashlytics().setAttributes(settings);
-    crashlytics().recordError(new Error('Reported by user'), 'reported');
-    formRef.current?.resetForm();
-    ToastAndroid.show(
-      intl.formatMessage(messages['toast.success']),
-      ToastAndroid.LONG,
-    );
   };
 
   const actions = useMemo(() => {
@@ -106,17 +92,7 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
       },
     };
     return [sendButton];
-  }, [formRef, theme]);
-
-  if (!sendCrashReportEnabled) {
-    return (
-      <ScrollView contentContainerStyle={styles.scrollArea}>
-        <Text style={styles.p}>
-          {intl.formatMessage(messages['error.crash-report-disabled'])}
-        </Text>
-      </ScrollView>
-    );
-  }
+  }, [intl, theme]);
 
   return (
     <Formik initialValues={initialValues} onSubmit={send} innerRef={formRef}>
@@ -130,7 +106,8 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
               <Label
                 text={intl.formatMessage(messages['issue.description.label'])}
                 touched={touched.issue?.description}
-                error={errors.issue?.description}>
+                error={errors.issue?.description}
+              >
                 <Input
                   value={values.issue.description}
                   onBlur={handleBlur('description')}

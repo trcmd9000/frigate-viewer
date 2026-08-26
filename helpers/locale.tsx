@@ -1,5 +1,25 @@
-import {enGB, enUS, pl, es, enAU, enCA, enIE, enNZ, fr, frCA, frCH, deAT, de, pt, ptBR, uk, it, itCH, sv} from 'date-fns/locale';
-import React, {useEffect, useState} from 'react';
+import {
+  enGB,
+  enUS,
+  pl,
+  es,
+  enAU,
+  enCA,
+  enIE,
+  enNZ,
+  fr,
+  frCA,
+  frCH,
+  deAT,
+  de,
+  pt,
+  ptBR,
+  uk,
+  it,
+  itCH,
+  sv,
+} from 'date-fns/locale';
+import React, {useMemo} from 'react';
 import {defineMessages, IntlProvider, MessageDescriptor} from 'react-intl';
 import {
   NavigationFunctionComponent,
@@ -115,35 +135,30 @@ const regionTranslationsMap: Record<Region, [LangCode, Lang]> = {
   sv_SE: ['sv', svLang],
 };
 
-const fallbackLanguage = 'en';
+const fallbackLanguage: LangCode = 'en';
 
 const useTranslations = () => {
-  const [langCode, setLangCode] = useState<LangCode>(fallbackLanguage);
-  const [messages, setMessages] = useState<Lang>({});
   const locale = useAppSelector(selectLocaleRegion);
 
-  useEffect(() => {
+  return useMemo<[LangCode, Lang]>(() => {
     if (locale && regionTranslationsMap[locale]) {
-      const [translationsLangCode, translationsMessages] =
-        regionTranslationsMap[locale];
-      setLangCode(translationsLangCode);
-      setMessages(translationsMessages);
+      return regionTranslationsMap[locale];
     }
-  }, [locale]);
 
-  return [langCode, messages] as [LangCode, Lang];
+    return [fallbackLanguage, {}];
+  }, [locale]);
 };
 
 export const withTranslations =
   <P extends object>(
-    Component: NavigationFunctionComponent<P>,
+    WrappedComponent: NavigationFunctionComponent<P>,
   ): NavigationFunctionComponent<P> =>
   (props: P & NavigationProps) => {
     const [langCode, messages] = useTranslations();
 
     return (
       <IntlProvider locale={langCode} messages={messages}>
-        <Component {...props} />
+        <WrappedComponent {...props} />
       </IntlProvider>
     );
   };

@@ -4,7 +4,6 @@ import {useIntl} from 'react-intl';
 import {Keyboard, Text} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import * as yup from 'yup';
-import crashlytics from '@react-native-firebase/crashlytics';
 import {Dropdown} from '../../components/forms/Dropdown';
 import {Input} from '../../components/forms/Input';
 import {Label} from '../../components/forms/Label';
@@ -13,7 +12,6 @@ import {
   ISettings,
   saveSettings,
   selectServer,
-  selectServers,
   selectSettings,
   Server,
 } from '../../store/settings';
@@ -23,6 +21,7 @@ import {ActionBar, Button, Switch, View} from 'react-native-ui-lib';
 import {ScrollView} from 'react-native-gesture-handler';
 import {useTheme, useStyles} from '../../helpers/colors';
 import {ServerItem} from './ServerItem';
+import {SecureLogger} from '../../helpers/secureLogger';
 
 export const Settings: NavigationFunctionComponent = () => {
   const styles = useStyles(({theme}) => ({
@@ -58,7 +57,6 @@ export const Settings: NavigationFunctionComponent = () => {
 
   const formRef = useRef<FormikProps<ISettings>>(null);
   const currentSettings = useAppSelector(selectSettings);
-  const servers = useAppSelector(selectServers);
   const server = useAppSelector(selectServer);
   const dispatch = useAppDispatch();
   const intl = useIntl();
@@ -104,10 +102,7 @@ export const Settings: NavigationFunctionComponent = () => {
 
   const save = useCallback(
     (settings: ISettings) => {
-      crashlytics().log(`Save settings`);
-      crashlytics().setCrashlyticsCollectionEnabled(
-        settings.app.sendCrashReports,
-      );
+      SecureLogger.logRequest('POST', '/settings');
       dispatch(saveSettings(settings));
       Keyboard.dismiss();
       Navigation.dismissAllModals();
@@ -181,7 +176,8 @@ export const Settings: NavigationFunctionComponent = () => {
       initialValues={currentSettings}
       validationSchema={settingsValidationSchema}
       onSubmit={save}
-      innerRef={formRef}>
+      innerRef={formRef}
+    >
       {({values, handleBlur, handleChange, setFieldValue, errors, touched}) => (
         <View style={styles.wrapper}>
           <ScrollView contentContainerStyle={styles.scrollArea}>
@@ -216,7 +212,8 @@ export const Settings: NavigationFunctionComponent = () => {
               <Label
                 text={intl.formatMessage(messages['locale.region.label'])}
                 touched={touched.locale?.region}
-                error={errors.locale?.region}>
+                error={errors.locale?.region}
+              >
                 <Dropdown
                   value={values.locale.region}
                   options={[
@@ -270,7 +267,8 @@ export const Settings: NavigationFunctionComponent = () => {
               <Label
                 text={intl.formatMessage(messages['locale.datesDisplay.label'])}
                 touched={touched.locale?.datesDisplay}
-                error={errors.locale?.datesDisplay}>
+                error={errors.locale?.datesDisplay}
+              >
                 <Dropdown
                   value={values.locale.datesDisplay}
                   options={[
@@ -296,7 +294,8 @@ export const Settings: NavigationFunctionComponent = () => {
                 text={intl.formatMessage(messages['app.colorScheme.label'])}
                 touched={touched.app?.colorScheme}
                 error={errors.app?.colorScheme}
-                required={true}>
+                required={true}
+              >
                 <Dropdown
                   value={values.app.colorScheme}
                   options={[
@@ -322,17 +321,6 @@ export const Settings: NavigationFunctionComponent = () => {
                   onValueChange={handleChange('app.colorScheme')}
                 />
               </Label>
-              <Label
-                text={intl.formatMessage(
-                  messages['app.sendCrashReports.label'],
-                )}>
-                <Switch
-                  value={values.app.sendCrashReports}
-                  onValueChange={value =>
-                    setFieldValue('app.sendCrashReports', value)
-                  }
-                />
-              </Label>
             </Section>
             <Section header={intl.formatMessage(messages['cameras.header'])}>
               <Label
@@ -340,7 +328,8 @@ export const Settings: NavigationFunctionComponent = () => {
                   messages['cameras.imageRefreshFrequency.label'],
                 )}
                 touched={touched.cameras?.refreshFrequency}
-                error={errors.cameras?.refreshFrequency}>
+                error={errors.cameras?.refreshFrequency}
+              >
                 <Input
                   value={`${values.cameras.refreshFrequency || ''}`}
                   onBlur={handleBlur('refreshFrequency')}
@@ -354,12 +343,13 @@ export const Settings: NavigationFunctionComponent = () => {
                 />
               </Label>
               <Label
-                text={intl.formatMessage(messages['cameras.liveView.label'])}>
+                text={intl.formatMessage(messages['cameras.liveView.label'])}
+              >
                 <Switch
                   value={values.cameras.liveView}
-                  onValueChange={value =>
-                    setFieldValue('cameras.liveView', value)
-                  }
+                  onValueChange={(value: boolean) => {
+                    setFieldValue('cameras.liveView', value);
+                  }}
                 />
                 <Text style={styles.tip}>
                   {intl.formatMessage(messages['cameras.liveView.disclaimer'])}
@@ -370,7 +360,8 @@ export const Settings: NavigationFunctionComponent = () => {
                   messages['cameras.numberOfColumns.label'],
                 )}
                 touched={touched.cameras?.numColumns}
-                error={errors.cameras?.numColumns}>
+                error={errors.cameras?.numColumns}
+              >
                 <Dropdown
                   value={values.cameras.numColumns}
                   options={[{value: 1}, {value: 2}, {value: 3}]}
@@ -383,7 +374,8 @@ export const Settings: NavigationFunctionComponent = () => {
                 )}
                 touched={touched.cameras?.actionWhenPressed}
                 error={errors.cameras?.actionWhenPressed}
-                required={true}>
+                required={true}
+              >
                 <Dropdown
                   value={values.cameras.actionWhenPressed}
                   options={[
@@ -410,7 +402,8 @@ export const Settings: NavigationFunctionComponent = () => {
                   messages['events.numberOfColumns.label'],
                 )}
                 touched={touched.events?.numColumns}
-                error={errors.events?.numColumns}>
+                error={errors.events?.numColumns}
+              >
                 <Dropdown
                   value={values.events.numColumns}
                   options={[{value: 1}, {value: 2}, {value: 3}]}
@@ -422,7 +415,8 @@ export const Settings: NavigationFunctionComponent = () => {
                   messages['events.photoPreference.label'],
                 )}
                 touched={touched.events?.photoPreference}
-                error={errors.events?.photoPreference}>
+                error={errors.events?.photoPreference}
+              >
                 <Dropdown
                   value={values.events.photoPreference}
                   options={[
@@ -445,15 +439,16 @@ export const Settings: NavigationFunctionComponent = () => {
               <Label
                 text={intl.formatMessage(
                   messages['events.lockLandscapePlaybackOrientation.label'],
-                )}>
+                )}
+              >
                 <Switch
                   value={values.events.lockLandscapePlaybackOrientation}
-                  onValueChange={value =>
+                  onValueChange={(value: boolean) => {
                     setFieldValue(
                       'events.lockLandscapePlaybackOrientation',
                       value,
-                    )
-                  }
+                    );
+                  }}
                 />
               </Label>
             </Section>
