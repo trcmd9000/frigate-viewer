@@ -17,6 +17,7 @@ export const FilterItem: FC<IFilterItemProps> = ({
 }) => {
   const styles = useStyles(({theme}) => ({
     wrapper: {
+      minHeight: 48,
       paddingVertical: 10,
       paddingHorizontal: 10,
       backgroundColor: theme.background,
@@ -48,7 +49,14 @@ export const FilterItem: FC<IFilterItemProps> = ({
   }, [onPress, disabled, label]);
 
   return (
-    <Pressable style={styles.wrapper} onPress={onItemPress}>
+    <Pressable
+      style={styles.wrapper}
+      onPress={onItemPress}
+      disabled={disabled}
+      accessibilityRole="checkbox"
+      accessibilityLabel={label}
+      accessibilityState={{checked: selected, disabled}}
+    >
       <Text style={[styles.checkmark]}>{selected ? '✔️' : ''}</Text>
       <Text
         style={[

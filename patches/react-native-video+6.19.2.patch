@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Source.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Source.kt
+index e9cf5ab..78a825f 100644
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Source.kt
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Source.kt
+@@ -273,7 +273,8 @@ class Source {
+                     lowerCaseUri == "content" ||
+                     lowerCaseUri == "file" ||
+                     lowerCaseUri == "rtsp" ||
+-                    lowerCaseUri == "asset"
++                    lowerCaseUri == "asset" ||
++                    lowerCaseUri == "frigate-media"
+                 )
+         }
+     }

@@ -1,5 +1,4 @@
-import {useCallback, useEffect, useState} from 'react';
-import {StyleSheet} from 'react-native';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {Carousel, LoaderScreen, PageControlPosition} from 'react-native-ui-lib';
@@ -16,35 +15,55 @@ import {useRest} from '../../helpers/rest';
 import {selectServer} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
 import {menuButton, useMenu} from '../menu/menuHelpers';
+import {RetryState} from '../../components/RetryState';
 import {messages} from './messages';
 import {CamerasStorageChart} from './CamerasStorageChart';
 import {CamerasStorageTable} from './CamerasStorageTable';
 import {StorageChart} from './StorageChart';
 import {StorageTable} from './StorageTable';
-
-const styles = StyleSheet.create({
-  wrapper: {
-    margin: 20,
-  },
-});
+import {useStyles, useTheme} from '../../helpers/colors';
 
 export const Storage: NavigationFunctionComponent = ({componentId}) => {
+  const theme = useTheme();
+  const styles = useStyles(() => ({
+    wrapper: {
+      margin: 20,
+    },
+  }));
   useMenu(componentId, 'storage');
   const [storage, setStorage] =
     useState<Record<StorageShortPlace, StorageInfo>>();
   const [camerasStorage, setCamerasStorage] = useState<CamerasStorage>();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [page, setPage] = useState(0);
   const server = useAppSelector(selectServer);
   const intl = useIntl();
   const {get} = useRest();
+  const getRef = useRef(get);
+  const mounted = useRef(true);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    getRef.current = get;
+  }, [get]);
+
+  useEffect(() => () => {
+    mounted.current = false;
+    requestId.current += 1;
+  }, []);
 
   const refresh = useCallback(() => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setError(false);
     Promise.allSettled([
-      get<Stats>(server, 'stats'),
-      get<CamerasStorage>(server, 'recordings/storage'),
+      getRef.current<Stats>(server, 'stats'),
+      getRef.current<CamerasStorage>(server, 'recordings/storage'),
     ]).then(([stats, cameras]) => {
+      if (!mounted.current || currentRequest !== requestId.current) {
+        return;
+      }
       if (stats.status === 'fulfilled') {
         const {service} = stats.value;
         setStorage({
@@ -57,9 +76,12 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
       if (cameras.status === 'fulfilled') {
         setCamerasStorage(cameras.value);
       }
+      if (stats.status === 'rejected' && cameras.status === 'rejected') {
+        setError(true);
+      }
       setLoading(false);
     });
-  }, [get, server]);
+  }, [server]);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
@@ -80,8 +102,22 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
     };
   }, [refresh]);
 
+  if (storage === undefined && error) {
+    return (
+      <RetryState
+        message={intl.formatMessage(messages.error)}
+        retryLabel={intl.formatMessage(messages.retry)}
+        testID="storage-retry"
+        onRetry={refresh}
+      />
+    );
+  }
+
   return loading || storage === undefined ? (
-    <LoaderScreen />
+    <LoaderScreen
+      backgroundColor={theme.background}
+      loaderColor={theme.link}
+    />
   ) : (
     <Background>
       <ScrollView style={styles.wrapper}>

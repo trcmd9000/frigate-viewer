@@ -1,8 +1,14 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {FlatList, Text} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {
+  AccessibilityActionEvent,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {useIntl} from 'react-intl';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
-import {View} from 'react-native-ui-lib';
 import {useRest} from '../../helpers/rest';
 import {handleError} from '../../helpers/errorHandler';
 import {
@@ -11,51 +17,135 @@ import {
   setAvailableLabels,
   setAvailableZones,
 } from '../../store/events';
-import {selectCamerasNumColumns, selectServer} from '../../store/settings';
+import {
+  selectCamerasNumColumns,
+  selectLocaleRegion,
+  selectServer,
+} from '../../store/settings';
 import {useAppDispatch, useAppSelector} from '../../store/store';
-import {menuButton, useMenu} from '../menu/menuHelpers';
+import {useMenu, menuButton} from '../menu/menuHelpers';
 import {CameraTile} from './CameraTile';
 import {messages} from './messages';
 import {useNoServer} from '../settings/useNoServer';
 import {Background} from '../../components/Background';
-import {useStyles} from '../../helpers/colors';
 import {Refresh} from '../../components/Refresh';
+import {RetryState} from '../../components/RetryState';
+import {InlineState} from '../../components/primitives';
+import {useDesignTokens} from '../../helpers/designTokens';
+import {
+  presentSettingsModal,
+  updatePrimaryDestinationLabels,
+} from '../../helpers/navigationShell';
 
 interface IConfigResponse {
-  cameras: Record<
-    string,
-    {
-      zones: Record<string, unknown>;
-    }
-  >;
-  objects: {
-    track: string[];
-  };
+  cameras: Record<string, {zones: Record<string, unknown>}>;
+  objects: {track: string[]};
 }
 
-export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
-  const styles = useStyles(({theme}) => ({
-    noCameras: {
-      padding: 20,
-      color: theme.text,
-      textAlign: 'center',
-    },
-  }));
+const styles = StyleSheet.create({
+  list: {
+    paddingBottom: 16,
+  },
+  refresh: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  refreshText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  skeletonCard: {
+    flex: 1,
+    margin: 8,
+    minWidth: 0,
+  },
+  skeletonMedia: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 16,
+  },
+});
 
-  useMenu(componentId, 'camerasList');
-  useNoServer();
-  const [loading, setLoading] = useState(true);
+const CameraListSkeleton = ({
+  numColumns,
+  loadingLabel,
+}: {
+  numColumns: number;
+  loadingLabel: string;
+}) => {
+  const tokens = useDesignTokens();
+  return (
+    <View testID="cameras-list-loading" style={{flexDirection: 'row', flexWrap: 'wrap'}}>
+      {Array.from({length: Math.max(numColumns * 2, 4)}, (_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.skeletonCard,
+            {width: `${100 / numColumns}%`},
+          ]}
+        >
+          <View
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={loadingLabel}
+            style={[
+              styles.skeletonMedia,
+              {backgroundColor: tokens.colors.mediaBackground},
+            ]}
+          />
+          <View
+            style={{
+              width: '65%',
+              height: 20,
+              marginTop: 10,
+              borderRadius: 6,
+              backgroundColor: tokens.colors.surfaceElevated,
+            }}
+          />
+        </View>
+      ))}
+    </View>
+  );
+};
+
+export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
+  const dispatch = useAppDispatch();
+  const intl = useIntl();
+  const tokens = useDesignTokens();
   const server = useAppSelector(selectServer);
   const cameras = useAppSelector(selectAvailableCameras);
   const numColumns = useAppSelector(selectCamerasNumColumns);
-  const dispatch = useAppDispatch();
-  const intl = useIntl();
+  const localeRegion = useAppSelector(selectLocaleRegion);
   const {get} = useRest();
+  const getRef = useRef(get);
+  const mounted = useRef(true);
+  const refreshRequestId = useRef(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [screenVisible, setScreenVisible] = useState(true);
+
+  useMenu(componentId, 'camerasList');
+  useNoServer(componentId);
+
+  useEffect(() => {
+    getRef.current = get;
+  }, [get]);
 
   const refresh = useCallback(() => {
+    if (!mounted.current || !server.host) {
+      return;
+    }
+    const currentRequest = ++refreshRequestId.current;
     setLoading(true);
-    get<IConfigResponse>(server, 'config')
+    setError(false);
+    getRef.current<IConfigResponse>(server, 'config')
       .then(config => {
+        if (!mounted.current || currentRequest !== refreshRequestId.current) {
+          return;
+        }
         const availableCameras = Object.keys(config.cameras);
         const availableLabels = config.objects.track;
         const availableZones = availableCameras.reduce(
@@ -71,55 +161,168 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
         dispatch(setAvailableLabels(availableLabels));
         dispatch(setAvailableZones(availableZones));
       })
-      .catch(async error => {
-        await handleError(error, 'CamerasList.refresh');
-        dispatch(setAvailableCameras([]));
+      .catch(async requestError => {
+        if (!mounted.current || currentRequest !== refreshRequestId.current) {
+          return;
+        }
+        await handleError(requestError, 'CamerasList.refresh');
+        if (mounted.current && currentRequest === refreshRequestId.current) {
+          setError(true);
+        }
       })
       .finally(() => {
-        setLoading(false);
+        if (mounted.current && currentRequest === refreshRequestId.current) {
+          setLoading(false);
+        }
       });
-  }, [dispatch, get, server]);
+  }, [dispatch, server]);
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
+      refreshRequestId.current += 1;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const listener = Navigation.events().registerComponentListener(
+      {
+        componentDidAppear() {
+          setScreenVisible(true);
+        },
+        componentDidDisappear() {
+          setScreenVisible(false);
+        },
+      },
+      componentId,
+    );
+    return () => listener.remove();
+  }, [componentId]);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
       topBar: {
-        title: {
-          text: intl.formatMessage(messages['topBar.title']),
-        },
+        title: {text: intl.formatMessage(messages['topBar.title'])},
         leftButtons: [menuButton],
       },
     });
   }, [componentId, intl]);
 
   useEffect(() => {
-    if (server.host) {
-      const timeoutId = setTimeout(refresh, 0);
-      return () => {
-        clearTimeout(timeoutId);
-      };
-    }
+    void updatePrimaryDestinationLabels({
+      cameras: intl.formatMessage(messages['tab.cameras']),
+      events: intl.formatMessage(messages['tab.events']),
+      settings: intl.formatMessage(messages['tab.settings']),
+    }).catch(navigationError => {
+      handleError(navigationError, 'CamerasList.updateTabLabels');
+    });
+  }, [intl, localeRegion]);
 
-    return undefined;
+  useEffect(() => {
+    if (!server.host) {
+      setLoading(false);
+      return undefined;
+    }
+    const timeoutId = setTimeout(refresh, 0);
+    return () => clearTimeout(timeoutId);
   }, [refresh, server.host]);
+
+  const openSettings = useCallback(() => {
+    void presentSettingsModal().catch(navigationError => {
+      handleError(navigationError, 'CamerasList.openSettings');
+    });
+  }, []);
+  const refreshLabel = intl.formatMessage(messages.refresh);
+  const onAccessibilityAction = useCallback(
+    ({nativeEvent}: AccessibilityActionEvent) => {
+      if (nativeEvent.actionName === 'activate') {
+        refresh();
+      }
+    },
+    [refresh],
+  );
+
+  const emptyState = loading ? (
+    <CameraListSkeleton
+      numColumns={numColumns}
+      loadingLabel={intl.formatMessage(messages.loadingSnapshot)}
+    />
+  ) : error ? (
+    <InlineState
+      testID="cameras-list-error"
+      icon="warning"
+      tone="error"
+      title={intl.formatMessage(messages.error)}
+      action={
+        <Pressable
+          testID="cameras-list-retry"
+          onPress={refresh}
+          accessibilityRole="button"
+          accessibilityLabel={intl.formatMessage(messages.retry)}
+          style={styles.refresh}
+        >
+          <Text style={[styles.refreshText, {color: tokens.colors.accent}]}>
+            {intl.formatMessage(messages.retry)}
+          </Text>
+        </Pressable>
+      }
+    />
+  ) : (
+    <InlineState
+      testID="cameras-list-empty"
+      icon="video-camera"
+      title={intl.formatMessage(messages.noCameras)}
+      description={intl.formatMessage(messages.emptyDescription)}
+      action={
+        <Pressable
+          testID="cameras-list-configure"
+          onPress={openSettings}
+          accessibilityRole="button"
+          accessibilityLabel={intl.formatMessage(messages.configure)}
+          style={styles.refresh}
+        >
+          <Text style={[styles.refreshText, {color: tokens.colors.accent}]}>
+            {intl.formatMessage(messages.configure)}
+          </Text>
+        </Pressable>
+      }
+    />
+  );
 
   return (
     <Background>
-      {!loading && cameras.length === 0 && (
-        <View>
-          <Refresh refreshing={loading} onRefresh={refresh} />
-          <Text style={styles.noCameras}>
-            {intl.formatMessage(messages.noCameras)}
-          </Text>
-        </View>
-      )}
       <FlatList
+        testID="cameras-list"
         data={cameras}
         renderItem={({item}) => (
-          <CameraTile cameraName={item} componentId={componentId} />
+          <CameraTile
+            cameraName={item}
+            componentId={componentId}
+            active={screenVisible}
+          />
         )}
         key={numColumns}
         keyExtractor={cameraName => cameraName}
         numColumns={numColumns}
+        initialNumToRender={Math.max(numColumns * 2, 6)}
+        maxToRenderPerBatch={numColumns * 4}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
+        accessibilityActions={[{name: 'activate', label: refreshLabel}]}
+        onAccessibilityAction={onAccessibilityAction}
+        ListEmptyComponent={emptyState}
+        ListFooterComponent={
+          error && cameras.length > 0 ? (
+            <RetryState
+              message={intl.formatMessage(messages.error)}
+              retryLabel={intl.formatMessage(messages.retry)}
+              testID="cameras-list-retry"
+              onRetry={refresh}
+            />
+          ) : null
+        }
+        contentContainerStyle={styles.list}
         refreshControl={<Refresh refreshing={loading} onRefresh={refresh} />}
       />
     </Background>

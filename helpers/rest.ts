@@ -1,27 +1,28 @@
 import {Buffer} from 'buffer';
 import {ToastAndroid} from 'react-native';
-import {Server} from '../store/settings';
+import type {Server} from '../store/settings';
 import {useIntl} from 'react-intl';
 import {messages} from './rest.messages';
-import {httpClientWithCert} from './httpWithClientCert';
+import {
+  HttpRequestOptions,
+  HttpResponse,
+  httpClientWithCert,
+} from './httpWithClientCert';
 import {SecureLogger} from './secureLogger';
 import {
   handleError,
   ErrorCode,
   getUserFriendlyMessage,
 } from './errorHandler';
+import {
+  canonicalServerEndpoint,
+  serverIdentity,
+  serverRouteIdentity,
+  serverUsesClientCertificate,
+} from './serverIdentity';
 
 export const buildServerUrl = (server: Server) => {
-  const {protocol, host, port, path} = server;
-  const pathPart = path
-    ? `${path
-        .split('/')
-        .filter(p => p !== '')
-        .join('/')}/`
-    : '';
-  return protocol && host
-    ? `${protocol}://${host}${port ? `:${port}` : ''}/${pathPart}`
-    : undefined;
+  return canonicalServerEndpoint(server)?.requestBaseUrl;
 };
 
 export const buildServerApiUrl = (server: Server) => {
@@ -40,37 +41,160 @@ export const authorizationHeader: (server: Server) => {
       }
     : {};
 
+export const requestServerIdentity = (server: Server): string => {
+  return requestRouteIdentity(server, 'remote');
+};
+
+const requestRouteIdentity = (
+  server: Server,
+  route: 'remote' | 'local',
+): string => {
+  const identity =
+    route === 'local'
+      ? serverRouteIdentity(server, 'local')
+      : server.profileId?.trim()
+        ? serverRouteIdentity(server, 'remote')
+        : serverIdentity(
+            server,
+            serverUsesClientCertificate(server)
+              ? server.clientCertConfig?.alias
+              : undefined,
+          );
+  if (typeof httpClientWithCert.scopeServerIdentity !== 'function') {
+    return identity;
+  }
+  return httpClientWithCert.scopeServerIdentity(
+    identity,
+    server.auth,
+    server.credentials.username,
+    server.credentials.password,
+  );
+};
+
+const loginRequests = new Map<string, Promise<void>>();
+
+const routeRequestUrl = (
+  url: string,
+  remoteBaseUrl: string,
+  localBaseUrl: string,
+): string => {
+  if (!remoteBaseUrl || !localBaseUrl || !url.startsWith(remoteBaseUrl)) {
+    return url;
+  }
+  return `${localBaseUrl}${url.slice(remoteBaseUrl.length)}`;
+};
+
+export const executeServerRequest = async (
+  server: Server,
+  url: string,
+  options: HttpRequestOptions,
+): Promise<HttpResponse> => {
+  const route = await httpClientWithCert.resolveServerRoute?.(
+    server,
+    options.method || 'GET',
+  );
+  const remoteBaseUrl = buildServerUrl(server) || '';
+  const useLocalRoute = route?.route === 'local';
+  const requestUrl = useLocalRoute
+    ? routeRequestUrl(url, remoteBaseUrl, route.baseUrl)
+    : url;
+  const routeServer =
+    useLocalRoute && server.localEndpoint
+      ? {
+          ...server,
+          protocol: server.localEndpoint.protocol,
+          host: server.localEndpoint.host,
+          port: server.localEndpoint.port,
+          path: server.localEndpoint.basePath,
+          mtlsEnabled: server.localTls?.mtlsEnabled === true,
+          clientCertConfig:
+            server.localTls?.mtlsEnabled === true
+              ? server.localTls.clientCertConfig
+              : undefined,
+        }
+      : server;
+
+  if (serverUsesClientCertificate(routeServer)) {
+    return httpClientWithCert.request(requestUrl, {
+      ...options,
+      clientCertAlias: routeServer.clientCertConfig?.alias || '',
+      clientCertServerIdentity:
+        useLocalRoute
+          ? requestRouteIdentity(server, 'local')
+          : requestServerIdentity(server),
+      allowSelfSignedServer:
+        routeServer.clientCertConfig?.allowSelfSignedServer || false,
+    });
+  }
+
+  return httpClientWithCert.request(requestUrl, {
+    ...options,
+    clientCertServerIdentity: useLocalRoute
+      ? requestRouteIdentity(server, 'local')
+      : requestServerIdentity(server),
+  });
+};
+
+export const loginServer = async (
+  server: Server,
+  errorMessages?: {
+    wrongCredentials?: string;
+    unauthorized?: string;
+  },
+): Promise<void> => {
+  const loginKey = requestServerIdentity(server);
+  const existingRequest = loginRequests.get(loginKey);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const request = (async () => {
+    const url = `${buildServerApiUrl(server)}/login`;
+    SecureLogger.logAuth('login');
+    const response = await executeServerRequest(server, url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user: server.credentials.username,
+        password: server.credentials.password,
+      }),
+    });
+    if (response.status === 400) {
+      const error = new Error(
+        errorMessages?.wrongCredentials ||
+          'Authorization error, check your credentials.',
+      );
+      error.name = ErrorCode.AUTH_FAILED;
+      throw error;
+    }
+    if (response.status === 401) {
+      const error = new Error(
+        errorMessages?.unauthorized ||
+          'Wrong credentials when trying to reach the configured server.',
+      );
+      error.name = ErrorCode.UNAUTHORIZED;
+      throw error;
+    }
+    if (response.status < 200 || response.status >= 300) {
+      const error = new Error(`Server returned HTTP ${response.status}.`);
+      error.name = ErrorCode.SERVER_ERROR;
+      throw error;
+    }
+  })();
+  loginRequests.set(loginKey, request);
+  try {
+    await request;
+  } finally {
+    if (loginRequests.get(loginKey) === request) {
+      loginRequests.delete(loginKey);
+    }
+  }
+};
+
 export const useRest = () => {
   const intl = useIntl();
-
-  const login = async (server: Server) => {
-    try {
-      const url = `${buildServerApiUrl(server)}/login`;
-      SecureLogger.logAuth('login');
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user: server.credentials.username,
-          password: server.credentials.password,
-        }),
-      });
-      if (response.status === 400) {
-        const error = new Error(
-          intl.formatMessage(messages['frigateAuth.wrongCredentials']),
-        );
-        error.name = ErrorCode.AUTH_FAILED;
-        throw error;
-      }
-      return response.json();
-    } catch (error) {
-      const appError = await handleError(error, 'login', {showToUser: true});
-      ToastAndroid.show(getUserFriendlyMessage(appError), ToastAndroid.LONG);
-      return Promise.reject(appError);
-    }
-  };
 
   interface QueryOptions {
     queryParams?: Record<string, string>;
@@ -90,73 +214,82 @@ export const useRest = () => {
         ...authorizationHeader(server),
       };
 
-      const executeFetch = () => {
-        // Use client certificate if configured, otherwise use standard fetch
-        if (server.clientCertConfig?.alias) {
-          return httpClientWithCert.request(
-            `${url}${
-              queryParams ? `?${new URLSearchParams(queryParams)}` : ''
-            }`,
-            {
-              method,
-              headers,
-              clientCertAlias: server.clientCertConfig.alias,
-              allowSelfSignedServer:
-                server.clientCertConfig.allowSelfSignedServer || false,
-            },
-          );
-        } else {
-          return fetch(
-            `${url}${
-              queryParams ? `?${new URLSearchParams(queryParams)}` : ''
-            }`,
-            {
-              method,
-              headers,
-            },
-          ).then(response => ({
-            status: response.status,
-            headers: Object.fromEntries(response.headers.entries()),
-            body: null,
-            json: async () => response.json(),
-            text: async () => response.text(),
-          }));
-        }
-      };
+      const executeFetch = () =>
+        executeServerRequest(
+          server,
+          `${url}${
+            queryParams ? `?${new URLSearchParams(queryParams)}` : ''
+          }`,
+          {
+            method,
+            headers,
+          },
+        );
 
       SecureLogger.logRequest(method, endpoint);
-      const response = await executeFetch();
+      let response = await executeFetch();
 
       if (!response) {
         SecureLogger.logRequest(method, endpoint);
         throw new Error(
-          intl.formatMessage(messages['error.unauthorized'], {url}),
+          intl.formatMessage(messages['error.unauthorized'], {
+            url: 'the configured server',
+          }),
         );
       }
 
       if (response.status === 401) {
         if (server.auth === 'frigate') {
-          await login(server);
-          const retriedResponse = await executeFetch();
-          return retriedResponse
-            ? retriedResponse[json === false ? 'text' : 'json']()
-            : Promise.reject(
-                new Error(
-                  intl.formatMessage(messages['error.unauthorized'], {url}),
-                ),
-              );
-        } else {
+          await loginServer(server, {
+            wrongCredentials: intl.formatMessage(
+              messages['frigateAuth.wrongCredentials'],
+            ),
+            unauthorized: intl.formatMessage(messages['error.unauthorized'], {
+              url: 'the configured server',
+            }),
+          });
+          if (
+            method === 'GET'
+          ) {
+            response = await executeFetch();
+          }
+        }
+
+        if (response.status === 401 || method === 'POST' || method === 'DELETE') {
           SecureLogger.logAuth('unauthorized-access');
           const error = new Error(
-            intl.formatMessage(messages['error.unauthorized'], {url}),
+            intl.formatMessage(messages['error.unauthorized'], {
+              url: 'the configured server',
+            }),
           );
           error.name = ErrorCode.UNAUTHORIZED;
           throw error;
         }
       }
 
-      const result = await response[json === false ? 'text' : 'json']();
-      return result;
+      if (response.status < 200 || response.status >= 300) {
+        const error = new Error(`Server returned HTTP ${response.status}.`);
+        error.name = ErrorCode.SERVER_ERROR;
+        throw error;
+      }
+
+      if (json === false) {
+        return (await response.text()) as T;
+      }
+
+      try {
+        return (await response.json()) as T;
+      } catch {
+        const contentTypeEntry = Object.entries(response.headers).find(
+          ([name]) => name.toLowerCase() === 'content-type',
+        );
+        const contentType = contentTypeEntry?.[1] || 'unknown content type';
+        const error = new Error(
+          `Server returned HTTP ${response.status} with ${contentType} instead of JSON.`,
+        );
+        error.name = ErrorCode.RESPONSE_FORMAT;
+        throw error;
+      }
     } catch (error) {
       const appError = await handleError(error, endpoint, {showToUser: true});
       ToastAndroid.show(getUserFriendlyMessage(appError), ToastAndroid.LONG);

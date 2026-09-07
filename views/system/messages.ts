@@ -2,6 +2,9 @@ import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('system', {
   'topBar.title': 'System',
+  error:
+    'Unable to load system information. Check your connection and try again.',
+  retry: 'Retry loading system information',
   'info.data_updated': 'Data updated',
   'info.current_version': 'Current version is {version}',
   'info.latest_version': 'Update available to {version}',

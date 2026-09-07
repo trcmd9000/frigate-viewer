@@ -1,0 +1,226 @@
+const socketId = '0123456789abcdef0123456789abcdef';
+const mockOpenSocket = jest.fn();
+const mockSendMessage = jest.fn();
+const mockCloseSocket = jest.fn();
+const mockProtectedMediaProfileId = jest.fn();
+const mockListeners = new Map<string, Set<(event: unknown) => void>>();
+
+const emit = (eventName: string, event: unknown) => {
+  mockListeners.get(eventName)?.forEach(listener => listener(event));
+};
+
+jest.mock('react-native', () => ({
+  NativeModules: {
+    ClientCertModule: {
+      openProtectedLiveSocket: (...args: unknown[]) => mockOpenSocket(...args),
+      sendProtectedLiveSocketMessage: (...args: unknown[]) =>
+        mockSendMessage(...args),
+      closeProtectedLiveSocket: (...args: unknown[]) => mockCloseSocket(...args),
+    },
+  },
+  NativeEventEmitter: class {
+    addListener(eventName: string, listener: (event: unknown) => void) {
+      const eventListeners = mockListeners.get(eventName) || new Set();
+      eventListeners.add(listener);
+      mockListeners.set(eventName, eventListeners);
+      return {
+        remove: () => eventListeners.delete(listener),
+      };
+    }
+  },
+  Platform: {OS: 'android'},
+}));
+
+jest.mock('../../helpers/protectedMedia', () => ({
+  protectedMediaProfileId: (...args: unknown[]) =>
+    mockProtectedMediaProfileId(...args),
+}));
+
+import type {Server} from '../../store/settings';
+import {
+  hasAcceptedVideoMedia,
+  openProtectedLiveSocket,
+  selectProtectedLiveStream,
+  selectProtectedLiveStreams,
+} from '../../helpers/protectedLive';
+
+const server = {} as Server;
+
+describe('protected live signaling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockListeners.clear();
+    mockProtectedMediaProfileId.mockResolvedValue('profile-id');
+    mockOpenSocket.mockResolvedValue(socketId);
+    mockSendMessage.mockResolvedValue(undefined);
+  });
+
+  it('recognizes only enabled video media sections in an SDP answer', () => {
+    expect(
+      hasAcceptedVideoMedia(
+        'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n',
+      ),
+    ).toBe(true);
+    expect(
+      hasAcceptedVideoMedia(
+        'v=0\r\nm=video 0 UDP/TLS/RTP/SAVPF 96\r\n',
+      ),
+    ).toBe(false);
+    expect(
+      hasAcceptedVideoMedia(
+        'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=recvonly\r\n',
+      ),
+    ).toBe(false);
+    expect(
+      hasAcceptedVideoMedia(
+        'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=inactive\r\n',
+      ),
+    ).toBe(false);
+    expect(
+      hasAcceptedVideoMedia(
+        'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendonly\r\n',
+      ),
+    ).toBe(true);
+    expect(hasAcceptedVideoMedia('v=0\r\nm=video\r\n')).toBe(false);
+  });
+
+  it('selects only configured go2rtc streams for the requested camera', () => {
+    expect(
+      selectProtectedLiveStream(
+        {
+          cameras: {
+            front: {
+              live: {
+                streams: {
+                  Main: 'front_main',
+                  Sub: 'front_sub',
+                },
+              },
+            },
+          },
+          go2rtc: {
+            streams: {
+              front_main: {},
+              unrelated: {},
+            },
+          },
+        },
+        'front',
+      ),
+    ).toBe('front_main');
+    expect(
+      selectProtectedLiveStreams(
+        {
+          cameras: {
+            front: {
+              live: {
+                streams: {
+                  Main: 'front_main',
+                  Sub: 'front_sub',
+                  Duplicate: 'front_main',
+                },
+              },
+            },
+          },
+          go2rtc: {
+            streams: {
+              front_main: {},
+              front_sub: {},
+              front: {},
+            },
+          },
+        },
+        'front',
+      ),
+    ).toEqual(['front_main', 'front_sub', 'front']);
+    expect(
+      selectProtectedLiveStream(
+        {go2rtc: {streams: {front: {}}}},
+        'front',
+      ),
+    ).toBe('front');
+    expect(
+      selectProtectedLiveStream(
+        {go2rtc: {streams: {unrelated: {}}}},
+        'front',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('buffers an opening event emitted before the native identifier resolves', async () => {
+    const onState = jest.fn();
+    const onMessage = jest.fn();
+    mockOpenSocket.mockImplementation(async () => {
+      emit('protectedLiveSocketState', {
+        socketId,
+        state: 'open',
+        statusCode: 101,
+      });
+      return socketId;
+    });
+
+    const socket = await openProtectedLiveSocket(server, 'front_main', {
+      onState,
+      onMessage,
+    });
+    await socket.ready;
+    emit('protectedLiveSocketMessage', {socketId, message: '{"type":"test"}'});
+    await socket.send('{"type":"webrtc/offer"}');
+
+    expect(mockOpenSocket).toHaveBeenCalledWith('profile-id', 'front_main');
+    expect(onState).toHaveBeenCalledWith({state: 'open', statusCode: 101});
+    expect(onMessage).toHaveBeenCalledWith('{"type":"test"}');
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      socketId,
+      '{"type":"webrtc/offer"}',
+    );
+
+    socket.close();
+    expect(mockCloseSocket).toHaveBeenCalledWith(socketId);
+  });
+
+  it('rejects invalid stream names before registering a native profile', async () => {
+    await expect(
+      openProtectedLiveSocket(server, '../front', {
+        onState: jest.fn(),
+        onMessage: jest.fn(),
+      }),
+    ).rejects.toThrow('stream name is invalid');
+
+    expect(mockProtectedMediaProfileId).not.toHaveBeenCalled();
+    expect(mockOpenSocket).not.toHaveBeenCalled();
+  });
+
+  it('closes a native socket that returns an invalid opaque identifier', async () => {
+    mockOpenSocket.mockResolvedValue('invalid');
+
+    await expect(
+      openProtectedLiveSocket(server, 'front', {
+        onState: jest.fn(),
+        onMessage: jest.fn(),
+      }),
+    ).rejects.toThrow('invalid identifier');
+
+    expect(mockCloseSocket).toHaveBeenCalledWith('invalid');
+    expect(mockListeners.get('protectedLiveSocketState')?.size || 0).toBe(0);
+    expect(mockListeners.get('protectedLiveSocketMessage')?.size || 0).toBe(0);
+  });
+
+  it('rejects readiness when native signaling fails before opening', async () => {
+    const onState = jest.fn();
+    const socket = await openProtectedLiveSocket(server, 'front', {
+      onState,
+      onMessage: jest.fn(),
+    });
+
+    emit('protectedLiveSocketState', {
+      socketId,
+      state: 'error',
+      statusCode: 401,
+    });
+
+    await expect(socket.ready).rejects.toThrow('HTTP 401');
+    expect(onState).toHaveBeenCalledWith({state: 'error', statusCode: 401});
+    socket.close();
+  });
+});

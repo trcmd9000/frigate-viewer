@@ -4,13 +4,13 @@ import {useFormsStyles} from './styles';
 
 type IInputProps = TextInputProps;
 
-export const Input: FC<IInputProps> = inputProps => {
+export const Input: FC<IInputProps> = ({style, ...inputProps}) => {
   const formsStyles = useFormsStyles();
 
   return (
     <TextInput
-      style={[formsStyles.input, formsStyles.inputText]}
       {...inputProps}
+      style={[formsStyles.input, formsStyles.inputText, style]}
     />
   );
 };

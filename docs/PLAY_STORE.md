@@ -9,9 +9,9 @@ Google Play review.
 - Package ID: `com.trcmd9000.frigateviewer`
 - Current version name: `14.3.1`
 - Current version code: `21`
-- Minimum Android version: API 23
+- Minimum Android version: API 24
 - Target Android version: API 35
-- Current testing ABI: `arm64-v8a`
+- Current release ABI: `arm64-v8a`
 - Suggested category: House & Home
 - Ads: No
 - In-app purchases: No

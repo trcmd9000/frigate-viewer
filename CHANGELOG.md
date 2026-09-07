@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-No unreleased changes.
+- Switched event clip playback to protected Frigate VOD HLS through the
+  Media3/react-native-video transport extension.
+- Added Android Frigate/go2rtc WebRTC live preview with native protected
+  WebSocket signaling, muted startup, bounded reconnects, and authenticated
+  snapshot fallback.
+- Raised the minimum Android version to API 24 for the current WebRTC runtime.
 
 ## [14.3.1] - 2026-08-26
 
@@ -31,7 +36,9 @@ No unreleased changes.
 ### Security
 
 - Removed the global TLS and hostname-verification bypass.
-- Kept normal server certificate validation strict by default.
+- Kept native mTLS server certificate validation strict by default.
+- Documented the unresolved Android cleartext compatibility exception; HTTP
+  remains available only when explicitly configured by the user.
 - Removed silent fallback to unauthenticated HTTP after an mTLS failure.
 - Removed Firebase and Crashlytics dependencies and automatic telemetry.
 - Sanitized development logging and retained production error visibility.

@@ -84,6 +84,10 @@ export const useDateLocale = () => {
 };
 
 export const formatVideoTime = (t: number) => {
+  if (!Number.isFinite(t) || Math.abs(t) > 7 * 24 * 60 * 60) {
+    return '0:00';
+  }
+
   const sign = t < 0 ? '-' : '';
   const time = Math.abs(Math.round(t));
   const minutes = Math.floor(time / 60);

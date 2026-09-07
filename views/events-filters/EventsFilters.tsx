@@ -1,6 +1,6 @@
 import React, {FC, useMemo} from 'react';
 import {useIntl} from 'react-intl';
-import {ScrollView} from 'react-native';
+import {Pressable, ScrollView, Text, View} from 'react-native';
 import {
   selectAvailableCameras,
   selectAvailableLabels,
@@ -14,12 +14,13 @@ import {
   setFiltersRetained,
   setFiltersZones,
 } from '../../store/events';
-import {useAppSelector} from '../../store/store';
+import {useAppDispatch, useAppSelector} from '../../store/store';
 import {Filters, IFilter, SectionHeader} from './Filters';
 import {messages} from './messages';
 import {Section} from '../../components/forms/Section';
 import {FilterSwitch} from './FilterSwitch';
 import {useStyles} from '../../helpers/colors';
+import {useDesignTokens} from '../../helpers/designTokens';
 
 interface IEventsFiltersProps {
   viewedCameraNames?: string[];
@@ -42,6 +43,20 @@ export const EventsFilters: FC<IEventsFiltersProps> = ({viewedCameraNames}) => {
   const filtersZones = useAppSelector(selectFiltersZones);
   const filtersRetained = useAppSelector(selectFiltersRetained);
   const intl = useIntl();
+  const dispatch = useAppDispatch();
+  const tokens = useDesignTokens();
+  const activeCount =
+    filtersCameras.length +
+    filtersLabels.length +
+    filtersZones.length +
+    (filtersRetained ? 1 : 0);
+
+  const clearFilters = () => {
+    dispatch(setFiltersCameras([]));
+    dispatch(setFiltersLabels([]));
+    dispatch(setFiltersZones([]));
+    dispatch(setFiltersRetained(false));
+  };
 
   const cameras: IFilter[] = useMemo(
     () =>
@@ -74,7 +89,39 @@ export const EventsFilters: FC<IEventsFiltersProps> = ({viewedCameraNames}) => {
   );
 
   return (
-    <ScrollView style={[styles.wrapper]}>
+    <ScrollView
+      style={[styles.wrapper]}
+      contentContainerStyle={{
+        padding: tokens.spacing.lg,
+        paddingBottom: tokens.spacing.xxl,
+      }}
+      accessibilityLabel={intl.formatMessage(messages['screen.label'])}
+    >
+      <View
+        style={{
+          minHeight: tokens.geometry.minimumTouchTarget,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: tokens.spacing.md,
+        }}
+      >
+        <Text style={{...tokens.typography.sectionTitle, color: tokens.colors.textPrimary}}>
+          {intl.formatMessage(messages['screen.title'])}
+        </Text>
+        {activeCount > 0 && (
+          <Pressable
+            onPress={clearFilters}
+            accessibilityRole="button"
+            accessibilityLabel={intl.formatMessage(messages['active.clear'])}
+            style={{minHeight: tokens.geometry.minimumTouchTarget, justifyContent: 'center'}}
+          >
+            <Text style={{...tokens.typography.label, color: tokens.colors.accent}}>
+              {intl.formatMessage(messages['active.clear'])}
+            </Text>
+          </Pressable>
+        )}
+      </View>
       <Filters
         header={intl.formatMessage(messages['cameras.title'])}
         items={cameras}

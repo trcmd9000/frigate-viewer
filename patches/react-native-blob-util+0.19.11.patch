@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native-blob-util/fetch.js b/node_modules/react-native-blob-util/fetch.js
+index 4f52ad3..de5a3e7 100644
+--- a/node_modules/react-native-blob-util/fetch.js
++++ b/node_modules/react-native-blob-util/fetch.js
+@@ -294,7 +294,7 @@ export function fetch(...args: any): Promise {
+         let fn = () => {
+         };
+         if (args.length === 2) {
+-            interval = args[0].interval || interval;
++            interval = args[0].interval ?? interval;
+             count = args[0].count || count;
+             fn = args[1];
+         }
+diff --git a/node_modules/react-native-blob-util/ios/ReactNativeBlobUtilRequest.mm b/node_modules/react-native-blob-util/ios/ReactNativeBlobUtilRequest.mm
+index f35c1a2..4fe3f5d 100644
+--- a/node_modules/react-native-blob-util/ios/ReactNativeBlobUtilRequest.mm
++++ b/node_modules/react-native-blob-util/ios/ReactNativeBlobUtilRequest.mm
+@@ -378,7 +378,7 @@ typedef NS_ENUM(NSUInteger, ResponseFormat) {
+             // For chunked downloads
+             body = @{
+                 @"taskId": taskId,
+-                @"written": [NSString stringWithFormat:@"%d", 0],
++                @"written": [NSString stringWithFormat:@"%lld", (long long) receivedBytes],
+                 @"total": [NSString stringWithFormat:@"%lld", (long long) expectedBytes],
+                 @"chunk": chunkString,
+             };

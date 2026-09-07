@@ -67,3 +67,6 @@ yarn-error.log
 /coverage
 
 google-services.json
+
+# Local MCP device tooling (contains a device-specific serial).
+/.vscode/mcp.json

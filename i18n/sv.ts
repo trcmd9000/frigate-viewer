@@ -74,7 +74,6 @@ export default {
   'settings.server.auth.option.none': 'Ingen',
   'settings.server.username.label': 'Användarnamn',
   'settings.server.password.label': 'Lösenord',
-  'settings.server.useDemoServerButton': 'Använd demoserver',
   'settings.locale.header': 'Språkinställning',
   'settings.locale.region.label': 'Region',
   'settings.locale.region.option.en_AU': 'Australien (engelska)',
@@ -118,7 +117,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Datum visas',
   'settings.locale.datesDisplay.option.descriptive': 'Beskrivande',
   'settings.locale.datesDisplay.option.numeric': 'Numeriskt',
-  'settings.app.header': 'Ansökan',
   'settings.app.colorScheme.label': 'Färgschema',
   'settings.app.colorScheme.option.auto': 'Bil',
   'settings.app.colorScheme.option.light': 'Ljus',
@@ -127,14 +125,7 @@ export default {
   'settings.cameras.header': 'Kameror',
   'settings.cameras.imageRefreshFrequency.label':
     'Uppdateringsfrekvens för bilder (sekunder)',
-  'settings.cameras.liveView.label': 'Livevisning',
-  'settings.cameras.liveView.disclaimer':
-    'Tänk på att uppdateringsfrekvensen beror på nätverkets latens',
   'settings.cameras.numberOfColumns.label': 'Antal kolumner',
-  'settings.cameras.actionWhenPressed.label': 'Åtgärd när du trycker',
-  'settings.cameras.actionWhenPressed.option.events': 'Lista över händelser',
-  'settings.cameras.actionWhenPressed.option.preview':
-    'Förhandsvisning av kamera',
   'settings.events.header': 'Händelser',
   'settings.events.numberOfColumns.label': 'Antal kolumner',
   'settings.events.photoPreference.label': 'Fotoinställning',

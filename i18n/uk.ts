@@ -75,7 +75,6 @@ export default {
   'settings.server.auth.option.none': 'Немає',
   'settings.server.username.label': "Ім'я користувача",
   'settings.server.password.label': 'Пароль',
-  'settings.server.useDemoServerButton': 'Використовувати демо-сервер',
   'settings.locale.header': 'Локаль',
   'settings.locale.region.label': 'Регіон',
   'settings.locale.region.option.en_AU': 'Австралія (англійська)',
@@ -119,7 +118,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Відображення дат',
   'settings.locale.datesDisplay.option.descriptive': 'Описовий',
   'settings.locale.datesDisplay.option.numeric': 'Числівник',
-  'settings.app.header': 'застосування',
   'settings.app.colorScheme.label': 'Колірна гамма',
   'settings.app.colorScheme.option.auto': 'Авто',
   'settings.app.colorScheme.option.light': 'світло',
@@ -128,14 +126,7 @@ export default {
   'settings.cameras.header': 'Камери',
   'settings.cameras.imageRefreshFrequency.label':
     'Частота оновлення зображення (секунди)',
-  'settings.cameras.liveView.label': 'Живий перегляд',
-  'settings.cameras.liveView.disclaimer':
-    'Майте на увазі, що частота оновлення залежить від затримки мережі',
   'settings.cameras.numberOfColumns.label': 'Кількість стовпців',
-  'settings.cameras.actionWhenPressed.label': 'Дія при натисканні',
-  'settings.cameras.actionWhenPressed.option.events': 'Список подій',
-  'settings.cameras.actionWhenPressed.option.preview':
-    'Попередній перегляд камери',
   'settings.events.header': 'Події',
   'settings.events.numberOfColumns.label': 'Кількість стовпців',
   'settings.events.photoPreference.label': 'Перевага фото',

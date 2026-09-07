@@ -6,8 +6,17 @@ plugins {
     id("com.facebook.react.settings")
 }
 
+def reactNativeCli = file("../node_modules/react-native/cli.js")
+def nodeExecutable = System.getenv("NODE_BINARY") ?: "node"
+def autolinkingOutput = file("build/generated/autolinking/autolinking.json")
+if (autolinkingOutput.exists() && autolinkingOutput.length() == 0L) {
+    autolinkingOutput.delete()
+}
+
 extensions.configure(com.facebook.react.ReactSettingsExtension) { extension ->
-    extension.autolinkLibrariesFromCommand()
+    extension.autolinkLibrariesFromCommand(
+        [nodeExecutable, reactNativeCli.absolutePath, "config"]
+    )
 }
 
 rootProject.name = "FrigateViewer"

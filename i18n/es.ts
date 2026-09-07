@@ -75,7 +75,6 @@ export default {
   'settings.server.auth.option.none': 'Ninguna',
   'settings.server.username.label': 'Nombre de usuario',
   'settings.server.password.label': 'Contraseña',
-  'settings.server.useDemoServerButton': 'Usar el servidor de demostración',
   'settings.locale.header': 'Configuración regional',
   'settings.locale.region.label': 'Región',
   'settings.locale.region.option.en_AU': 'Australia (inglés)',
@@ -119,7 +118,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Visualización de fechas',
   'settings.locale.datesDisplay.option.descriptive': 'Descriptivo',
   'settings.locale.datesDisplay.option.numeric': 'Numérico',
-  'settings.app.header': 'Aplicación',
   'settings.app.colorScheme.label': 'Esquema de colores',
   'settings.app.colorScheme.option.auto': 'Automático',
   'settings.app.colorScheme.option.light': 'Claro',
@@ -128,14 +126,7 @@ export default {
   'settings.cameras.header': 'Cámaras',
   'settings.cameras.imageRefreshFrequency.label':
     'Frecuencia de actualización de la imagen (segundos)',
-  'settings.cameras.liveView.label': 'Vista en vivo',
-  'settings.cameras.liveView.disclaimer':
-    'Tenga en cuenta que la frecuencia de actualización depende de la latencia de su red',
   'settings.cameras.numberOfColumns.label': 'Número de columnas',
-  'settings.cameras.actionWhenPressed.label': 'Acción al presionar',
-  'settings.cameras.actionWhenPressed.option.events': 'Lista de eventos',
-  'settings.cameras.actionWhenPressed.option.preview':
-    'Vista previa de la cámara',
   'settings.events.header': 'Eventos',
   'settings.events.numberOfColumns.label': 'Número de columnas',
   'settings.events.photoPreference.label': 'Preferencias de las imagen',

@@ -1,4 +1,5 @@
 import {Navigation} from 'react-native-navigation';
+import {Appearance} from 'react-native';
 import {gestureHandlerRootHOC} from 'react-native-gesture-handler';
 import {TopBarButton} from './components/icons/TopBarButton';
 import {Author} from './views/author/Author';
@@ -11,11 +12,20 @@ import {EventsFilters} from './views/events-filters/EventsFilters';
 import {Menu} from './views/menu/Menu';
 import {Settings} from './views/settings/Settings';
 import {withRedux} from './helpers/redux';
+import {withNavigationTheme} from './helpers/navigationTheme';
 import {withTranslations} from './helpers/locale';
 import {Logs} from './views/logs/Logs';
 import {Storage} from './views/storage/Storage';
 import {System} from './views/system/System';
 import {ServerForm} from './views/settings/ServerForm';
+import {cleanupMediaCache} from './helpers/mediaDownload';
+import {SecureLogger} from './helpers/secureLogger';
+import {createRootLayout} from './helpers/navigationShell';
+import {
+  darkTheme,
+  lightTheme,
+  navigationThemeOptions,
+} from './helpers/colors';
 
 const registerComponent = (name, component, decorators = []) => {
   Navigation.registerComponent(
@@ -29,7 +39,13 @@ const registerComponent = (name, component, decorators = []) => {
   );
 };
 
-const viewDecorators = [gestureHandlerRootHOC, withTranslations, withRedux];
+// withRedux is last so the navigation theme bridge is rendered inside Redux.
+const viewDecorators = [
+  gestureHandlerRootHOC,
+  withTranslations,
+  withNavigationTheme,
+  withRedux,
+];
 
 registerComponent('CamerasList', CamerasList, viewDecorators);
 registerComponent('CameraEvents', CameraEvents, viewDecorators);
@@ -50,66 +66,27 @@ registerComponent('Menu', Menu, [
 ]);
 registerComponent('EventsFilters', EventsFilters, [
   withTranslations,
+  withNavigationTheme,
   withRedux,
 ]);
-registerComponent('TopBarButton', TopBarButton);
+registerComponent('TopBarButton', TopBarButton, [withTranslations, withRedux]);
 
 Navigation.events().registerAppLaunchedListener(() => {
-  Navigation.setRoot({
-    root: {
-      sideMenu: {
-        center: {
-          stack: {
-            id: 'MainMenu',
-            children: [
-              {
-                component: {
-                  name: 'CamerasList',
-                },
-              },
-            ],
-          },
-        },
-        left: {
-          component: {
-            id: 'Menu',
-            name: 'Menu',
-          },
-        },
-        right: {
-          component: {
-            id: 'EventsFilters',
-            name: 'EventsFilters',
-          },
-        },
-        options: {
-          sideMenu: {
-            left: {
-              enabled: false,
-            },
-            right: {
-              enabled: false,
-            },
-          },
-        },
-      },
-    },
+  void cleanupMediaCache().catch(error => {
+    SecureLogger.logError(
+      error instanceof Error
+        ? error
+        : new Error('Media cache cleanup failed'),
+      'media-cache-cleanup',
+    );
   });
+  Navigation.setRoot(createRootLayout());
 });
 
-Navigation.setDefaultOptions({
-  statusBar: {
-    backgroundColor: 'black',
-  },
-  topBar: {
-    title: {
-      color: 'white',
-    },
-    backButton: {
-      color: 'white',
-    },
-    background: {
-      color: 'black',
-    },
-  },
-});
+const initialDarkMode = Appearance.getColorScheme() === 'dark';
+Navigation.setDefaultOptions(
+  navigationThemeOptions(
+    initialDarkMode ? darkTheme : lightTheme,
+    initialDarkMode ? 'dark' : 'light',
+  ),
+);

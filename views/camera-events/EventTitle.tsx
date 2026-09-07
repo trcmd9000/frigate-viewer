@@ -1,30 +1,10 @@
 import {format, formatDistance, formatRelative} from 'date-fns';
 import React, {FC, useMemo} from 'react';
-import {StyleProp, StyleSheet, Text, View, ViewStyle} from 'react-native';
+import {StyleProp, Text, View, ViewStyle} from 'react-native';
 import {formatVideoTime, useDateLocale} from '../../helpers/locale';
 import {selectLocaleDatesDisplay} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
-
-const stylesFn = (numColumns: number) =>
-  StyleSheet.create({
-    wrapper: {
-      position: 'absolute',
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      left: 2,
-      top: 1,
-      width: '100%',
-      padding: 5 / numColumns,
-      backgroundColor: '#00000040',
-    },
-    timeText: {
-      fontSize: 12 / (numColumns / 1.5),
-      fontWeight: '600',
-      color: 'white',
-    },
-  });
+import {useDesignTokens} from '../../helpers/designTokens';
 
 interface IEventTitleProps {
   startTime: number;
@@ -39,7 +19,6 @@ export const EventTitle: FC<IEventTitleProps> = ({
   endTime,
   retained,
   style,
-  numColumns,
 }) => {
   const dateLocale = useDateLocale();
   const datesDisplay = useAppSelector(selectLocaleDatesDisplay);
@@ -67,14 +46,40 @@ export const EventTitle: FC<IEventTitleProps> = ({
     [startTime, endTime, dateLocale, datesDisplay],
   );
 
-  const styles = useMemo(() => stylesFn(numColumns || 1), [numColumns]);
+  const tokens = useDesignTokens();
 
   return (
-    <View style={[styles.wrapper, style]}>
-      <Text style={styles.timeText}>
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: tokens.spacing.sm,
+        },
+        style,
+      ]}
+    >
+      <Text
+        style={{
+          ...tokens.typography.timestamp,
+          color: tokens.colors.textSecondary,
+          flexShrink: 1,
+        }}
+        accessibilityLabel={`${startDate}${!isInProgress ? `, duration ${duration}` : ''}`}
+      >
         {startDate} {!isInProgress && <Text>({duration})</Text>}
       </Text>
-      {retained && <Text>⭐</Text>}
+      {retained && (
+        <Text
+          accessible
+          accessibilityLabel="Retained event"
+          style={{fontSize: 18}}
+        >
+          ★
+        </Text>
+      )}
     </View>
   );
 };

@@ -11,24 +11,9 @@ export const useEventsFilters = (
     });
   }, [cameraNames]);
 
-  useEffect(() => {
-    Navigation.mergeOptions(componentId, {
-      sideMenu: {
-        right: {
-          enabled: true,
-        },
-      },
-    });
-    return () => {
-      Navigation.mergeOptions(componentId, {
-        sideMenu: {
-          right: {
-            enabled: false,
-          },
-        },
-      });
-    };
-  }, [componentId]);
+  // Filters are presented as a modal so the root shell can stay a single
+  // bottom-tabs navigation tree.
+  void componentId;
 };
 
 export const filterButton: (count?: number) => OptionsTopBarButton = count => ({
@@ -40,11 +25,9 @@ export const filterButton: (count?: number) => OptionsTopBarButton = count => ({
       icon: 'filter',
       count,
       onPress: () => {
-        Navigation.mergeOptions('Menu', {
-          sideMenu: {
-            right: {
-              visible: true,
-            },
+        void Navigation.showModal({
+          component: {
+            name: 'EventsFilters',
           },
         });
       },

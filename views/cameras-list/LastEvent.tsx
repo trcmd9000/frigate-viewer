@@ -1,6 +1,6 @@
 import {FC, useCallback} from 'react';
 import {ICameraEvent} from '../camera-events/CameraEvent';
-import {StyleSheet, TouchableWithoutFeedback, View} from 'react-native';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {EventSnapshot} from '../camera-events/EventSnapshot';
 import {EventLabels} from '../camera-events/EventLabels';
 import {EventTitle} from '../camera-events/EventTitle';
@@ -9,6 +9,7 @@ import {
   selectCamerasNumColumns,
   selectCamerasPreviewHeight,
 } from '../../store/settings';
+import {useStyles} from '../../helpers/colors';
 
 const styles = StyleSheet.create({
   eventMetadata: {
@@ -28,11 +29,22 @@ interface ILastEventProps {
   height?: number;
   event?: ICameraEvent;
   onPress?: () => void;
+  accessibilityLabel?: string;
 }
 
-export const LastEvent: FC<ILastEventProps> = ({height, event, onPress}) => {
+export const LastEvent: FC<ILastEventProps> = ({
+  height,
+  event,
+  onPress,
+  accessibilityLabel,
+}) => {
   const previewHeight = useAppSelector(selectCamerasPreviewHeight);
   const numColumns = useAppSelector(selectCamerasNumColumns);
+  const themedStyles = useStyles(({theme}) => ({
+    media: {
+      backgroundColor: theme.mediaBackground,
+    },
+  }));
 
   const onEventPress = useCallback(() => {
     if (onPress) {
@@ -41,16 +53,26 @@ export const LastEvent: FC<ILastEventProps> = ({height, event, onPress}) => {
   }, [onPress]);
 
   return (
-    <TouchableWithoutFeedback onPress={onEventPress}>
+    <Pressable
+      onPress={onEventPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={{minHeight: 48}}
+    >
       <View
         style={{
           width: '100%',
           height: height || previewHeight,
+          ...themedStyles.media,
         }}
       >
         {event && (
           <>
-            <EventSnapshot id={event.id} hasSnapshot={event.has_snapshot} />
+            <EventSnapshot
+              id={event.id}
+              hasSnapshot={event.has_snapshot}
+              enabled
+            />
             <View style={styles.eventMetadata}>
               <EventLabels
                 endTime={event.end_time}
@@ -71,6 +93,6 @@ export const LastEvent: FC<ILastEventProps> = ({height, event, onPress}) => {
           </>
         )}
       </View>
-    </TouchableWithoutFeedback>
+    </Pressable>
   );
 };

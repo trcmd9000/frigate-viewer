@@ -19,6 +19,9 @@ CI blocks newly introduced critical production advisories. Dependabot opens
 reviewable dependency pull requests; passing CI is required but does not replace
 native device testing.
 
+Android protected playback pins `react-native-video` 6.19.2 and Media3 1.8.0.
+Keep those versions aligned when changing the project-owned transport extension.
+
 ## Remaining dependency groups
 
 ### React Native and Metro

@@ -71,7 +71,7 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
       <View style={styles.authorInfo}>
         <View style={styles.logoWrapper}>
           <Image
-            source={require('./sp-engineering-logo.png')}
+            source={require('./frigate-viewer-icon.png')}
             style={styles.logo as ImageStyle}
           />
         </View>

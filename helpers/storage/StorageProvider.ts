@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform} from 'react-native';
+import {SecureLogger} from '../secureLogger';
 
 /**
  * Interface for secure storage providers
@@ -117,7 +118,7 @@ class KeychainStorageProvider implements ISecureStorageProvider {
             : KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
       });
     } catch (error) {
-      console.error(`Failed to save to Keychain: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.keychain.save');
       throw error;
     }
   }
@@ -139,12 +140,12 @@ class KeychainStorageProvider implements ISecureStorageProvider {
 
       return result.password;
     } catch (error) {
-      console.error(`Failed to load from Keychain: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.keychain.load');
       return null;
     }
   }
 
-  async remove(key: string): Promise<void> {
+  async remove(_key: string): Promise<void> {
     if (!KeychainModule) {
       return;
     }
@@ -153,7 +154,7 @@ class KeychainStorageProvider implements ISecureStorageProvider {
       const service = 'com.frigate.viewer';
       await KeychainModule.resetGenericPassword({service});
     } catch (error) {
-      console.error(`Failed to remove from Keychain: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.keychain.remove');
     }
   }
 
@@ -205,7 +206,7 @@ class KeystoreStorageProvider implements ISecureStorageProvider {
         storage: KeychainModule.STORAGE_TYPE.AES,
       });
     } catch (error) {
-      console.error(`Failed to save to Keystore: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.keystore.save');
       throw error;
     }
   }
@@ -227,12 +228,12 @@ class KeystoreStorageProvider implements ISecureStorageProvider {
 
       return result.password;
     } catch (error) {
-      console.error(`Failed to load from Keystore: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.keystore.load');
       return null;
     }
   }
 
-  async remove(key: string): Promise<void> {
+  async remove(_key: string): Promise<void> {
     if (!KeychainModule) {
       return;
     }
@@ -241,7 +242,7 @@ class KeystoreStorageProvider implements ISecureStorageProvider {
       const service = 'com.frigate.viewer';
       await KeychainModule.resetGenericPassword({service});
     } catch (error) {
-      console.error(`Failed to remove from Keystore: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.keystore.remove');
     }
   }
 
@@ -283,7 +284,7 @@ class AsyncStorageProvider implements ISecureStorageProvider {
       const fullKey = this.keyPrefix + key;
       await AsyncStorage.setItem(fullKey, value);
     } catch (error) {
-      console.error(`Failed to save to AsyncStorage: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.async.save');
       throw error;
     }
   }
@@ -293,7 +294,7 @@ class AsyncStorageProvider implements ISecureStorageProvider {
       const fullKey = this.keyPrefix + key;
       return await AsyncStorage.getItem(fullKey);
     } catch (error) {
-      console.error(`Failed to load from AsyncStorage: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.async.load');
       return null;
     }
   }
@@ -303,7 +304,7 @@ class AsyncStorageProvider implements ISecureStorageProvider {
       const fullKey = this.keyPrefix + key;
       await AsyncStorage.removeItem(fullKey);
     } catch (error) {
-      console.error(`Failed to remove from AsyncStorage: ${key}`, error);
+      SecureLogger.logError(error as Error, 'storage.async.remove');
     }
   }
 
@@ -317,7 +318,7 @@ class AsyncStorageProvider implements ISecureStorageProvider {
       const allKeys = await AsyncStorage.getAllKeys();
       return allKeys.filter(k => k.startsWith(this.keyPrefix));
     } catch (error) {
-      console.error('Failed to get all keys from AsyncStorage', error);
+      SecureLogger.logError(error as Error, 'storage.async.keys');
       return [];
     }
   }
@@ -327,7 +328,7 @@ class AsyncStorageProvider implements ISecureStorageProvider {
       const keys = await this.getAllKeys();
       await AsyncStorage.multiRemove(keys);
     } catch (error) {
-      console.error('Failed to clear AsyncStorage', error);
+      SecureLogger.logError(error as Error, 'storage.async.clear');
     }
   }
 
@@ -346,16 +347,13 @@ class AsyncStorageProvider implements ISecureStorageProvider {
  */
 export const getStorageProvider = (): ISecureStorageProvider => {
   if (Platform.OS === 'ios' && KeychainModule) {
-    console.log('Using iOS Keychain storage provider');
     return new KeychainStorageProvider();
   }
 
   if (Platform.OS === 'android' && KeychainModule) {
-    console.log('Using Android Keystore storage provider');
     return new KeystoreStorageProvider();
   }
 
-  console.log('Using AsyncStorage fallback provider');
   return new AsyncStorageProvider();
 };
 

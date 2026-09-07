@@ -41,8 +41,11 @@ export const BuyMeACoffee: FC<IButMeACoffeeProps> = ({
     button: {
       flexDirection: 'row',
       gap: 5,
+      minHeight: 48,
       paddingHorizontal: 10,
       paddingVertical: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: '#fd0',
       borderRadius: 5,
     },
@@ -63,7 +66,14 @@ export const BuyMeACoffee: FC<IButMeACoffeeProps> = ({
         {intl.formatMessage(messages['buyMeCoffee.sayThankYouLabel'])}
       </Text>
       <View style={styles.buttonInline}>
-        <Pressable style={styles.button} onPress={onPress}>
+        <Pressable
+          style={styles.button}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={intl.formatMessage(
+            messages['buyMeCoffee.buttonText'],
+          )}
+        >
           <Text style={styles.buttonText}>☕</Text>
           <Text style={styles.buttonText}>
             {intl.formatMessage(messages['buyMeCoffee.buttonText'])}

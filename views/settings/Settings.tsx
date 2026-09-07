@@ -1,465 +1,609 @@
-import {Formik, FormikProps} from 'formik';
 import React, {useCallback, useMemo, useRef} from 'react';
+import {Alert, Pressable, Text} from 'react-native';
 import {useIntl} from 'react-intl';
-import {Keyboard, Text} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
-import * as yup from 'yup';
+import {Button, Switch, View} from 'react-native-ui-lib';
+import {ScrollView} from 'react-native-gesture-handler';
 import {Dropdown} from '../../components/forms/Dropdown';
-import {Input} from '../../components/forms/Input';
 import {Label} from '../../components/forms/Label';
-import {Section} from '../../components/forms/Section';
+import {Card, SectionHeader} from '../../components/primitives';
+import {useStyles, useTheme} from '../../helpers/colors';
+import {handleError} from '../../helpers/errorHandler';
+import {SecureLogger} from '../../helpers/secureLogger';
 import {
+  emptyServer,
   ISettings,
   saveSettings,
-  selectServer,
+  selectActiveServerProfileId,
+  selectServers,
   selectSettings,
   Server,
+  setActiveServerProfileId,
 } from '../../store/settings';
 import {useAppDispatch, useAppSelector} from '../../store/store';
 import {MessageKey, messages} from './messages';
-import {ActionBar, Button, Switch, View} from 'react-native-ui-lib';
-import {ScrollView} from 'react-native-gesture-handler';
-import {useTheme, useStyles} from '../../helpers/colors';
 import {ServerItem} from './ServerItem';
-import {SecureLogger} from '../../helpers/secureLogger';
+import {deleteServerProfile} from './serverProfileDeletion';
+
+const REGION_CODES = [
+  'es_AR',
+  'en_AU',
+  'de_AT',
+  'es_BO',
+  'pt_BR',
+  'en_CA',
+  'fr_CA',
+  'es_CL',
+  'es_CO',
+  'es_CR',
+  'es_DO',
+  'es_EC',
+  'fr_FR',
+  'de_DE',
+  'en_GB',
+  'es_GT',
+  'es_HN',
+  'en_IE',
+  'it_IT',
+  'de_LU',
+  'es_MX',
+  'en_NZ',
+  'es_NI',
+  'es_PA',
+  'es_PY',
+  'es_PE',
+  'pl_PL',
+  'pt_PT',
+  'es_SV',
+  'es_ES',
+  'sv_SE',
+  'de_CH',
+  'fr_CH',
+  'it_CH',
+  'en_US',
+  'uk_UA',
+  'es_UY',
+  'es_VE',
+] as const;
+
+const withCurrentOption = <T extends string | number>(
+  value: T,
+  options: Array<{value: T; label?: string}>,
+  labelForValue?: (value: T) => string,
+) =>
+  options.some(option => Object.is(option.value, value))
+    ? options
+    : [{value, label: labelForValue?.(value)}, ...options];
 
 export const Settings: NavigationFunctionComponent = () => {
-  const styles = useStyles(({theme}) => ({
+  const theme = useTheme();
+  const intl = useIntl();
+  const dispatch = useAppDispatch();
+  const styles = useStyles(({theme: currentTheme}) => ({
     wrapper: {
       flex: 1,
-      justifyContent: 'space-between',
     },
     scrollArea: {
       paddingVertical: 8,
       paddingHorizontal: 16,
       width: '100%',
       flexGrow: 1,
-      backgroundColor: theme.background,
+      backgroundColor: currentTheme.background,
     },
-    header: {
-      color: theme.text,
-      fontSize: 22,
-      fontWeight: 'bold',
+    card: {
+      marginBottom: 12,
     },
-    tip: {
-      fontSize: 10,
-      color: theme.text,
-    },
-    error: {
-      color: theme.error,
-    },
-    addServerButton: {
+    empty: {
+      color: currentTheme.text,
       marginVertical: 8,
-      alignSelf: 'flex-start',
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      marginTop: 4,
+    },
+    secondaryAction: {
+      minHeight: 48,
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      marginLeft: 8,
+    },
+    secondaryActionText: {
+      color: currentTheme.link,
+      fontWeight: '600',
+    },
+    addButton: {
+      minHeight: 48,
+    },
+    settingText: {
+      color: currentTheme.text,
     },
   }));
-  const theme = useTheme();
 
-  const formRef = useRef<FormikProps<ISettings>>(null);
-  const currentSettings = useAppSelector(selectSettings);
-  const server = useAppSelector(selectServer);
-  const dispatch = useAppDispatch();
-  const intl = useIntl();
+  const currentSettings = useAppSelector(selectSettings) as ISettings;
+  const selectedProfileId = useAppSelector(selectActiveServerProfileId);
+  const selectedServers = useAppSelector(selectServers);
+  const servers = useMemo(
+    () =>
+      Array.isArray(selectedServers)
+        ? selectedServers
+        : Array.isArray(currentSettings?.servers)
+          ? currentSettings.servers
+          : [],
+    [currentSettings.servers, selectedServers],
+  );
+  const activeProfileId =
+    typeof selectedProfileId === 'string'
+      ? selectedProfileId
+      : currentSettings?.activeServerProfileId;
+  const serverFormNavigationInFlight = useRef(false);
+  const profileDeletionInFlight = useRef(new Set<string>());
 
-  const settingsValidationSchema = useMemo(() => {
-    const requiredError = intl.formatMessage(messages['error.required']);
-    const noServersError = intl.formatMessage(
-      messages['servers.error.noServer'],
-    );
-    const minError = ({min}: {min: number}) =>
-      intl.formatMessage(messages['error.min'], {min});
-    const maxError = ({max}: {max: number}) =>
-      intl.formatMessage(messages['error.max'], {max});
-
-    return yup.object().shape({
-      servers: yup.array().min(1, noServersError),
-      locale: yup.object().shape({
-        region: yup.string().required(requiredError),
-        datesDisplay: yup.string().required(requiredError),
-      }),
-      cameras: yup.object().shape({
-        refreshFrequency: yup.number().required(requiredError).min(1, minError),
-        numColumns: yup
-          .number()
-          .required(requiredError)
-          .min(1, minError)
-          .max(3, maxError),
-      }),
-      events: yup.object().shape({
-        numColumns: yup
-          .number()
-          .required(requiredError)
-          .min(1, minError)
-          .max(3, maxError),
-        photoPreference: yup.string().required(requiredError),
-      }),
-    });
-  }, [intl]);
-
-  const cancel = () => {
-    Navigation.dismissAllModals();
-  };
-
-  const save = useCallback(
-    (settings: ISettings) => {
-      SecureLogger.logRequest('POST', '/settings');
-      dispatch(saveSettings(settings));
-      Keyboard.dismiss();
-      Navigation.dismissAllModals();
+  const persist = useCallback(
+    (nextSettings: ISettings, operation: string) => {
+      try {
+        dispatch(saveSettings(nextSettings));
+      } catch (error) {
+        SecureLogger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+          operation,
+        );
+      }
     },
     [dispatch],
   );
 
-  const actions = useMemo(() => {
-    const cancelButton = {
-      label: intl.formatMessage(messages['action.cancel']),
-      color: theme.link,
-      onPress: cancel,
-    };
-    const saveButton = {
-      label: intl.formatMessage(messages['action.save']),
-      color: theme.link,
-      onPress: () => {
-        formRef.current?.handleSubmit();
-      },
-    };
-    return server.host ? [cancelButton, saveButton] : [saveButton];
-  }, [intl, server, formRef, theme]);
+  const updateSetting = useCallback(
+    (update: (settings: ISettings) => ISettings) => {
+      persist(update(currentSettings), 'settings.persist');
+    },
+    [currentSettings, persist],
+  );
 
-  const addServer = () => {
-    Navigation.showModal({
-      component: {
-        name: 'ServerForm',
-        passProps: {
-          onSubmit: (addedServer: Server) => {
-            if (formRef.current) {
-              const updatedServers = [
-                ...formRef.current.values.servers,
-                addedServer,
-              ];
-              formRef.current.setFieldValue('servers', updatedServers);
-            }
+  const showServerForm = useCallback(
+    (server: Server | undefined) => {
+      if (serverFormNavigationInFlight.current) {
+        return;
+      }
+      serverFormNavigationInFlight.current = true;
+      Navigation.showModal({
+        component: {
+          name: 'ServerForm',
+          passProps: {
+            ...(server ? {server} : {}),
+            onSubmit: (submittedServer: Server) => {
+              const profileId = submittedServer.profileId || emptyServer().profileId;
+              const normalizedServer = {...submittedServer, profileId};
+              const index = servers.findIndex(
+                item => item.profileId === server?.profileId,
+              );
+              const nextServers =
+                index >= 0
+                  ? servers.map((item, itemIndex) =>
+                      itemIndex === index ? normalizedServer : item,
+                    )
+                  : [...servers, normalizedServer];
+              persist(
+                {
+                  ...currentSettings,
+                  servers: nextServers,
+                  activeServerProfileId:
+                    currentSettings.activeServerProfileId ||
+                    (nextServers.length === 1 ? profileId : activeProfileId),
+                },
+                'settings.persist-server',
+              );
+            },
           },
         },
-      },
-    });
-  };
+      })
+        .catch(error => {
+          SecureLogger.logError(
+            error instanceof Error ? error : new Error(String(error)),
+            'navigation.server-form',
+          );
+        })
+        .finally(() => {
+          serverFormNavigationInFlight.current = false;
+        });
+    },
+    [activeProfileId, currentSettings, persist, servers],
+  );
 
-  const editServer = (server: Server, index: number) => {
-    Navigation.showModal({
-      component: {
-        name: 'ServerForm',
-        passProps: {
-          server,
-          onSubmit: (modifiedServer: Server) => {
-            if (formRef.current) {
-              const updatedServers = [...formRef.current.values.servers];
-              updatedServers[index] = modifiedServer;
-              formRef.current.setFieldValue('servers', updatedServers);
-            }
+  const selectProfile = useCallback(
+    (profileId?: string) => {
+      if (!profileId) {
+        return;
+      }
+      try {
+        dispatch(setActiveServerProfileId(profileId));
+      } catch (error) {
+        SecureLogger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+          'settings.select-server',
+        );
+      }
+    },
+    [dispatch],
+  );
+
+  const deleteProfile = useCallback(
+    (server: Server) => {
+      const profileId = server.profileId?.trim();
+      if (!profileId) {
+        return;
+      }
+      Alert.alert(
+        intl.formatMessage(messages['server.profile.delete.title']),
+        intl.formatMessage(messages['server.profile.delete.message']),
+        [
+          {
+            text: intl.formatMessage(messages['server.profile.delete.cancel']),
+            style: 'cancel',
           },
-        },
-      },
-    });
-  };
+          {
+            text: intl.formatMessage(messages['server.profile.delete.confirm']),
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                if (profileDeletionInFlight.current.has(profileId)) {
+                  return;
+                }
+                profileDeletionInFlight.current.add(profileId);
+                try {
+                  // resetGenericPassword is idempotent when a profile has no
+                  // credentials. Keep state until this completes so a secure
+                  // storage failure cannot orphan a Keychain entry.
+                  await deleteServerProfile(profileId, dispatch);
+                } catch (error) {
+                  await handleError(error, 'settings.delete-server', {
+                    showToUser: true,
+                  });
+                  Alert.alert(
+                    intl.formatMessage(messages['server.profile.delete.failure']),
+                  );
+                } finally {
+                  profileDeletionInFlight.current.delete(profileId);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [dispatch, intl],
+  );
 
-  const removeServer = (index: number) => {
-    if (formRef.current) {
-      const updatedServers = [...formRef.current.values.servers];
-      updatedServers.splice(index, 1);
-      formRef.current.setFieldValue('servers', updatedServers);
-    }
-  };
+  const tryDemo = useCallback(() => {
+    const demo = emptyServer();
+    const demoServer = {
+      ...demo,
+      host: 'demo.frigate.video',
+      port: 443,
+      auth: 'none' as const,
+    };
+    persist(
+      {
+        ...currentSettings,
+        servers: [...servers, demoServer],
+        activeServerProfileId: demoServer.profileId,
+      },
+      'settings.persist-demo-server',
+    );
+  }, [currentSettings, persist, servers]);
+
+  const regionOptions = useMemo(
+    () =>
+      REGION_CODES.map(code => ({
+        value: code,
+        label: intl.formatMessage(
+          messages[`locale.region.option.${code}` as MessageKey],
+        ),
+      })),
+    [intl],
+  );
+  const refreshOptions = useMemo(
+    () =>
+      withCurrentOption(
+        currentSettings.cameras.refreshFrequency,
+        [1, 5, 10, 30, 60].map(seconds => ({
+          value: seconds,
+          label: `${intl.formatNumber(seconds)} ${intl.formatMessage(
+            messages[
+              `cameras.imageRefreshFrequency.unit.${
+                seconds === 1 ? 'second' : 'seconds'
+              }`
+            ],
+          )}`,
+        })),
+        value =>
+          `${intl.formatNumber(value)} ${intl.formatMessage(
+            messages[
+              `cameras.imageRefreshFrequency.unit.${
+                value === 1 ? 'second' : 'seconds'
+              }`
+            ],
+          )}`,
+      ),
+    [currentSettings.cameras.refreshFrequency, intl],
+  );
+  const columnsOptions = useMemo(() => [{value: 1}, {value: 2}, {value: 3}], []);
 
   return (
-    <Formik
-      initialValues={currentSettings}
-      validationSchema={settingsValidationSchema}
-      onSubmit={save}
-      innerRef={formRef}
-    >
-      {({values, handleBlur, handleChange, setFieldValue, errors, touched}) => (
-        <View style={styles.wrapper}>
-          <ScrollView contentContainerStyle={styles.scrollArea}>
-            <Text style={styles.header}>
-              {intl.formatMessage(messages['topBar.title'])}
-            </Text>
-            <Section header={intl.formatMessage(messages['server.header'])}>
-              {values.servers.map((server, i) => (
+    <View style={styles.wrapper}>
+      <ScrollView contentContainerStyle={styles.scrollArea}>
+        <SectionHeader testID="settings-page-heading">
+          {intl.formatMessage(messages['topBar.title'])}
+        </SectionHeader>
+        <Card style={styles.card} testID="settings-server-profiles">
+          <SectionHeader>
+            {intl.formatMessage(messages['server.header'])}
+          </SectionHeader>
+          {servers.length === 0 ? (
+            <>
+              <Text style={styles.empty}>
+                {intl.formatMessage(messages['server.profile.empty'])}
+              </Text>
+              <View style={styles.actions}>
+                <Button
+                  label={intl.formatMessage(messages['server.profile.add'])}
+                  color={theme.link}
+                  style={styles.addButton}
+                  onPress={() => showServerForm(undefined)}
+                  testID="settings-add-server"
+                  accessibilityLabel={intl.formatMessage(
+                    messages['server.profile.add'],
+                  )}
+                />
+                <Pressable
+                  style={styles.secondaryAction}
+                  onPress={tryDemo}
+                  accessibilityRole="button"
+                  accessibilityLabel={intl.formatMessage(
+                    messages['server.profile.tryDemo'],
+                  )}
+                  testID="settings-try-demo"
+                >
+                  <Text style={styles.secondaryActionText}>
+                    {intl.formatMessage(messages['server.profile.tryDemo'])}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              {servers.map(server => (
                 <ServerItem
-                  key={i}
+                  key={server.profileId || server.host}
                   server={server}
-                  onPress={() => editServer(server, i)}
-                  onRemovePress={() => removeServer(i)}
+                  active={server.profileId === activeProfileId}
+                  onSelect={() => selectProfile(server.profileId)}
+                  onEdit={() => showServerForm(server)}
+                  onDelete={() => deleteProfile(server)}
                 />
               ))}
-              {touched.servers && errors.servers && (
-                <Text style={styles.error}>{errors.servers.toString()}</Text>
+              <Button
+                label={intl.formatMessage(messages['server.profile.add'])}
+                color={theme.link}
+                outline
+                outlineColor={theme.link}
+                style={styles.addButton}
+                onPress={() => showServerForm(undefined)}
+                testID="settings-add-server"
+                accessibilityLabel={intl.formatMessage(
+                  messages['server.profile.add'],
+                )}
+              />
+            </>
+          )}
+        </Card>
+
+        <Card style={styles.card} testID="settings-appearance">
+          <SectionHeader>
+            {intl.formatMessage(messages['appearance.header'])}
+          </SectionHeader>
+          <Label text={intl.formatMessage(messages['locale.region.label'])}>
+            <Dropdown
+              value={currentSettings.locale.region}
+              options={regionOptions}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  locale: {...settings.locale, region: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['locale.region.label'],
               )}
-              {values.servers.length === 0 && (
-                <Button
-                  label={intl.formatMessage(messages['action.add'])}
-                  size={Button.sizes.xSmall}
-                  color={theme.link}
-                  outlineColor={theme.link}
-                  outline
-                  style={styles.addServerButton}
-                  onPress={addServer}
-                />
+            />
+          </Label>
+          <Label
+            text={intl.formatMessage(messages['locale.datesDisplay.label'])}
+          >
+            <Dropdown
+              value={currentSettings.locale.datesDisplay}
+              options={[
+                {
+                  value: 'descriptive' as const,
+                  label: intl.formatMessage(
+                    messages['locale.datesDisplay.option.descriptive'],
+                  ),
+                },
+                {
+                  value: 'numeric' as const,
+                  label: intl.formatMessage(
+                    messages['locale.datesDisplay.option.numeric'],
+                  ),
+                },
+              ]}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  locale: {...settings.locale, datesDisplay: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['locale.datesDisplay.label'],
               )}
-            </Section>
-            <Section header={intl.formatMessage(messages['locale.header'])}>
-              <Label
-                text={intl.formatMessage(messages['locale.region.label'])}
-                touched={touched.locale?.region}
-                error={errors.locale?.region}
-              >
-                <Dropdown
-                  value={values.locale.region}
-                  options={[
-                    'es_AR', // Argentina
-                    'en_AU', // Australia
-                    'de_AT', // Austria
-                    'es_BO', // Bolivia
-                    'pt_BR', // Brazil
-                    'en_CA', // Canada
-                    'fr_CA', // Canada
-                    'es_CL', // Chile
-                    'es_CO', // Columbia
-                    'es_CR', // Costa Rica
-                    'es_DO', // Dominican Republic
-                    'es_EC', // Ecuador
-                    'fr_FR', // France
-                    'de_DE', // Germany
-                    'en_GB', // Great Britain
-                    'es_GT', // Guatemala
-                    'es_HN', // Honduras
-                    'en_IE', // Ireland
-                    'it_IT', // Italy
-                    'de_LU', // Luxembourg
-                    'es_MX', // Mexico
-                    'en_NZ', // New Zealand
-                    'es_NI', // Nicaragua
-                    'es_PA', // Panama
-                    'es_PY', // Paraguay
-                    'es_PE', // Peru
-                    'pl_PL', // Poland
-                    'pt_PT', // Portugal
-                    'es_SV', // El Salvador
-                    'es_ES', // Spain
-                    'sv_SE', // Sweden
-                    'de_CH', // Switzerland
-                    'fr_CH', // Switzerland
-                    'it_CH', // Switzerland
-                    'en_US', // United States
-                    'uk_UA', // Ukraine
-                    'es_UY', // Uruguay
-                    'es_VE', // Venezuela
-                  ].map(code => ({
-                    value: code,
-                    label: intl.formatMessage(
-                      messages[`locale.region.option.${code}` as MessageKey],
-                    ),
-                  }))}
-                  onValueChange={handleChange('locale.region')}
-                />
-              </Label>
-              <Label
-                text={intl.formatMessage(messages['locale.datesDisplay.label'])}
-                touched={touched.locale?.datesDisplay}
-                error={errors.locale?.datesDisplay}
-              >
-                <Dropdown
-                  value={values.locale.datesDisplay}
-                  options={[
-                    {
-                      value: 'descriptive',
-                      label: intl.formatMessage(
-                        messages['locale.datesDisplay.option.descriptive'],
-                      ),
-                    },
-                    {
-                      value: 'numeric',
-                      label: intl.formatMessage(
-                        messages['locale.datesDisplay.option.numeric'],
-                      ),
-                    },
-                  ]}
-                  onValueChange={handleChange('locale.datesDisplay')}
-                />
-              </Label>
-            </Section>
-            <Section header={intl.formatMessage(messages['app.header'])}>
-              <Label
-                text={intl.formatMessage(messages['app.colorScheme.label'])}
-                touched={touched.app?.colorScheme}
-                error={errors.app?.colorScheme}
-                required={true}
-              >
-                <Dropdown
-                  value={values.app.colorScheme}
-                  options={[
-                    {
-                      value: 'auto',
-                      label: intl.formatMessage(
-                        messages['app.colorScheme.option.auto'],
-                      ),
-                    },
-                    {
-                      value: 'light',
-                      label: intl.formatMessage(
-                        messages['app.colorScheme.option.light'],
-                      ),
-                    },
-                    {
-                      value: 'dark',
-                      label: intl.formatMessage(
-                        messages['app.colorScheme.option.dark'],
-                      ),
-                    },
-                  ]}
-                  onValueChange={handleChange('app.colorScheme')}
-                />
-              </Label>
-            </Section>
-            <Section header={intl.formatMessage(messages['cameras.header'])}>
-              <Label
-                text={intl.formatMessage(
-                  messages['cameras.imageRefreshFrequency.label'],
-                )}
-                touched={touched.cameras?.refreshFrequency}
-                error={errors.cameras?.refreshFrequency}
-              >
-                <Input
-                  value={`${values.cameras.refreshFrequency || ''}`}
-                  onBlur={handleBlur('refreshFrequency')}
-                  onChangeText={value =>
-                    setFieldValue(
-                      'cameras.refreshFrequency',
-                      parseFloat(value) || null,
-                    )
-                  }
-                  keyboardType="numeric"
-                />
-              </Label>
-              <Label
-                text={intl.formatMessage(messages['cameras.liveView.label'])}
-              >
-                <Switch
-                  value={values.cameras.liveView}
-                  onValueChange={(value: boolean) => {
-                    setFieldValue('cameras.liveView', value);
-                  }}
-                />
-                <Text style={styles.tip}>
-                  {intl.formatMessage(messages['cameras.liveView.disclaimer'])}
-                </Text>
-              </Label>
-              <Label
-                text={intl.formatMessage(
-                  messages['cameras.numberOfColumns.label'],
-                )}
-                touched={touched.cameras?.numColumns}
-                error={errors.cameras?.numColumns}
-              >
-                <Dropdown
-                  value={values.cameras.numColumns}
-                  options={[{value: 1}, {value: 2}, {value: 3}]}
-                  onValueChange={v => setFieldValue('cameras.numColumns', v)}
-                />
-              </Label>
-              <Label
-                text={intl.formatMessage(
-                  messages['cameras.actionWhenPressed.label'],
-                )}
-                touched={touched.cameras?.actionWhenPressed}
-                error={errors.cameras?.actionWhenPressed}
-                required={true}
-              >
-                <Dropdown
-                  value={values.cameras.actionWhenPressed}
-                  options={[
-                    {
-                      value: 'events',
-                      label: intl.formatMessage(
-                        messages['cameras.actionWhenPressed.option.events'],
-                      ),
-                    },
-                    {
-                      value: 'preview',
-                      label: intl.formatMessage(
-                        messages['cameras.actionWhenPressed.option.preview'],
-                      ),
-                    },
-                  ]}
-                  onValueChange={handleChange('cameras.actionWhenPressed')}
-                />
-              </Label>
-            </Section>
-            <Section header={intl.formatMessage(messages['events.header'])}>
-              <Label
-                text={intl.formatMessage(
-                  messages['events.numberOfColumns.label'],
-                )}
-                touched={touched.events?.numColumns}
-                error={errors.events?.numColumns}
-              >
-                <Dropdown
-                  value={values.events.numColumns}
-                  options={[{value: 1}, {value: 2}, {value: 3}]}
-                  onValueChange={v => setFieldValue('events.numColumns', v)}
-                />
-              </Label>
-              <Label
-                text={intl.formatMessage(
-                  messages['events.photoPreference.label'],
-                )}
-                touched={touched.events?.photoPreference}
-                error={errors.events?.photoPreference}
-              >
-                <Dropdown
-                  value={values.events.photoPreference}
-                  options={[
-                    {
-                      value: 'snapshot',
-                      label: intl.formatMessage(
-                        messages['events.photoPreference.option.snapshot'],
-                      ),
-                    },
-                    {
-                      value: 'thumbnail',
-                      label: intl.formatMessage(
-                        messages['events.photoPreference.option.thumbnail'],
-                      ),
-                    },
-                  ]}
-                  onValueChange={handleChange('events.photoPreference')}
-                />
-              </Label>
-              <Label
-                text={intl.formatMessage(
-                  messages['events.lockLandscapePlaybackOrientation.label'],
-                )}
-              >
-                <Switch
-                  value={values.events.lockLandscapePlaybackOrientation}
-                  onValueChange={(value: boolean) => {
-                    setFieldValue(
-                      'events.lockLandscapePlaybackOrientation',
-                      value,
-                    );
-                  }}
-                />
-              </Label>
-            </Section>
-          </ScrollView>
-          <ActionBar
-            backgroundColor={theme.background}
-            keepRelative
-            actions={actions}
-          />
-        </View>
-      )}
-    </Formik>
+            />
+          </Label>
+          <Label text={intl.formatMessage(messages['app.colorScheme.label'])}>
+            <Dropdown
+              value={currentSettings.app.colorScheme}
+              options={[
+                {
+                  value: 'auto' as const,
+                  label: intl.formatMessage(
+                    messages['app.colorScheme.option.auto'],
+                  ),
+                },
+                {
+                  value: 'light' as const,
+                  label: intl.formatMessage(
+                    messages['app.colorScheme.option.light'],
+                  ),
+                },
+                {
+                  value: 'dark' as const,
+                  label: intl.formatMessage(
+                    messages['app.colorScheme.option.dark'],
+                  ),
+                },
+              ]}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  app: {...settings.app, colorScheme: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['app.colorScheme.label'],
+              )}
+            />
+          </Label>
+        </Card>
+
+        <Card style={styles.card} testID="settings-camera-overview">
+          <SectionHeader>
+            {intl.formatMessage(messages['cameraOverview.header'])}
+          </SectionHeader>
+          <Label
+            text={intl.formatMessage(
+              messages['cameras.imageRefreshFrequency.label'],
+            )}
+          >
+            <Dropdown
+              value={currentSettings.cameras.refreshFrequency}
+              options={refreshOptions}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  cameras: {...settings.cameras, refreshFrequency: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['cameras.imageRefreshFrequency.label'],
+              )}
+            />
+          </Label>
+          <Label
+            text={intl.formatMessage(messages['cameras.numberOfColumns.label'])}
+          >
+            <Dropdown
+              value={currentSettings.cameras.numColumns}
+              options={columnsOptions}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  cameras: {...settings.cameras, numColumns: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['cameras.numberOfColumns.label'],
+              )}
+            />
+          </Label>
+        </Card>
+
+        <Card style={styles.card} testID="settings-events">
+          <SectionHeader>
+            {intl.formatMessage(messages['events.header'])}
+          </SectionHeader>
+          <Label
+            text={intl.formatMessage(messages['events.numberOfColumns.label'])}
+          >
+            <Dropdown
+              value={currentSettings.events.numColumns}
+              options={columnsOptions}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  events: {...settings.events, numColumns: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['events.numberOfColumns.label'],
+              )}
+            />
+          </Label>
+          <Label
+            text={intl.formatMessage(messages['events.photoPreference.label'])}
+          >
+            <Dropdown
+              value={currentSettings.events.photoPreference}
+              options={[
+                {
+                  value: 'snapshot' as const,
+                  label: intl.formatMessage(
+                    messages['events.photoPreference.option.snapshot'],
+                  ),
+                },
+                {
+                  value: 'thumbnail' as const,
+                  label: intl.formatMessage(
+                    messages['events.photoPreference.option.thumbnail'],
+                  ),
+                },
+              ]}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  events: {...settings.events, photoPreference: value},
+                }))
+              }
+              accessibilityLabel={intl.formatMessage(
+                messages['events.photoPreference.label'],
+              )}
+            />
+          </Label>
+          <Label
+            text={intl.formatMessage(
+              messages['events.lockLandscapePlaybackOrientation.label'],
+            )}
+          >
+            <Switch
+              value={currentSettings.events.lockLandscapePlaybackOrientation}
+              accessibilityRole="switch"
+              accessibilityLabel={intl.formatMessage(
+                messages['events.lockLandscapePlaybackOrientation.label'],
+              )}
+              accessibilityState={{
+                checked: currentSettings.events.lockLandscapePlaybackOrientation,
+              }}
+              onValueChange={value =>
+                updateSetting(settings => ({
+                  ...settings,
+                  events: {
+                    ...settings.events,
+                    lockLandscapePlaybackOrientation: value,
+                  },
+                }))
+              }
+            />
+          </Label>
+        </Card>
+      </ScrollView>
+    </View>
   );
 };

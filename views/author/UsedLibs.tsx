@@ -54,6 +54,10 @@ export const UsedLibs: FC = () => {
       marginBottom: 5,
       color: theme.link,
     },
+    libButton: {
+      minHeight: 48,
+      justifyContent: 'center',
+    },
   }));
 
   const openNpm = useCallback(
@@ -70,7 +74,13 @@ export const UsedLibs: FC = () => {
         {intl.formatMessage(messages['usedLibs.header'])}
       </Text>
       {libs.map((lib, index) => (
-        <Pressable onPress={openNpm(lib)} key={index}>
+        <Pressable
+          style={styles.libButton}
+          onPress={openNpm(lib)}
+          accessibilityRole="link"
+          accessibilityLabel={lib}
+          key={index}
+        >
           <Text style={styles.lib}>{lib}</Text>
         </Pressable>
       ))}

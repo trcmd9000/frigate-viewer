@@ -10,6 +10,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost;
 import com.reactnativenavigation.react.NavigationReactNativeHost;
 import com.facebook.soloader.SoLoader;
 import java.util.List;
+import com.brentvatne.react.ReactNativeVideoManager;
 
 public class MainApplication extends NavigationApplication {
 
@@ -54,6 +55,10 @@ public class MainApplication extends NavigationApplication {
   @Override
   public void onCreate() {
     super.onCreate();
+    MediaProfileRegistry.initialize(this);
+    ReactNativeVideoManager.Companion
+      .getInstance()
+      .registerPlugin(new ProtectedMediaPlugin(this));
     
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.

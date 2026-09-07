@@ -57,9 +57,12 @@ Do not:
 - Silently retry an mTLS-configured request without its client identity.
 - Add a global trust-all manager or hostname verifier.
 
-Normal server certificate and hostname validation must remain enabled by
+Native mTLS server certificate and hostname validation must remain enabled by
 default. The self-signed server option is an explicit per-server override and
-must stay clearly labeled as a security reduction.
+must stay clearly labeled as a security reduction. The Android manifest
+currently permits cleartext traffic for explicitly configured legacy HTTP
+servers, so do not describe the app as having a strict global cleartext
+default; tightening that compatibility exception requires product approval.
 
 The primary implementation surfaces are:
 
@@ -139,6 +142,25 @@ Set-Location android
 
 Also run targeted ESLint on changed JavaScript and TypeScript files and
 `git diff --check`.
+
+## Build worker
+
+- Prefer the dedicated remote Windows build worker (`ssh frigate-builder`) for
+  dependency installation, Android/Gradle builds, native compilation, full
+  test suites, APK/AAB inspection, and other CPU- or memory-intensive local
+  development work.
+- The worker's activity root is `D:\Development`. Use isolated worktrees and
+  the reproducible source-bundle pipeline for builds; do not put signing
+  material, private server data, certificates, or Android device state on it.
+- Keep local work limited to source inspection and editing, focused
+  low-cost checks, ADB/device validation, and local-only signing. Do not start
+  a full local Android build if `frigate-builder` is reachable.
+- Confirm SSH connectivity before a worker task. If the worker's network
+  adapter is unavailable, report the blocked build and wait for recovery
+  rather than silently falling back to a full local build.
+- The worker may lose network connectivity after sleep. Inspect the exact
+  build-specific worktree and artifact paths after an interrupted connection;
+  clean only verified per-build leftovers before retrying.
 
 For Android release artifacts:
 
