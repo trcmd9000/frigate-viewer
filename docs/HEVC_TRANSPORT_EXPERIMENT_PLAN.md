@@ -1,7 +1,8 @@
 # HEVC transport experiment plan
 
-Status: proposal and time-boxed spike. This document does not authorize a
-production transport change.
+Status: Phase A implementation complete; the remaining work is a proposal and
+time-boxed spike. This document does not authorize a production transport
+change.
 
 ## Non-negotiable boundaries
 
@@ -89,6 +90,23 @@ without changing the transport.
 
 Phase A does not prove that a frame can be rendered. It only produces a
 capability decision and instrumentation for Phase B.
+
+### Phase A implementation notes
+
+The Phase A observer uses only the existing protected
+`GET /api/go2rtc/streams/<encoded-name>` request through the profile-aware
+authenticated HTTP stack. It retains no producer URL, host, token, or unknown
+response field. The parser accepts the producer `medias` text and equivalent
+video/audio descriptor forms, but only keeps a small allow-listed descriptor;
+the UTF-8 response budget is 64 KiB. A missing, malformed, non-JSON, or
+oversized response is an explicit `unknown` result. Android codec discovery is
+static aggregate `MediaCodecList` inspection (API 24 through the current
+target), so it does not initialize a decoder or prove that WebRTC can negotiate
+HEVC. Hardware/software labels are emitted only on API 29+, where the platform
+classification APIs exist. HEVC remains experiment-only and the default
+decision keeps the existing fallback transport; H.264/VP8/VP9 eligibility is
+unchanged. A `supported` Phase A decision is capability/flag eligibility only,
+never evidence that a frame was decoded.
 
 ## Phase B: time-boxed WebRTC AAR and factory spike
 
