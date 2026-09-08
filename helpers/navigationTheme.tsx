@@ -10,11 +10,16 @@ import {
 
 const MEDIA_COMPONENT_NAMES = new Set(['CameraEventClip', 'CameraPreview']);
 const activeMediaComponentIds = new Set<string>();
+const activeAppComponentIds = new Set<string>();
 
 export const navigationSurfaceForComponent = (
   componentName: string | undefined,
 ): NavigationSurface =>
-  componentName && MEDIA_COMPONENT_NAMES.has(componentName) ? 'media' : 'app';
+  componentName === 'CameraEventClip'
+    ? 'event'
+    : componentName && MEDIA_COMPONENT_NAMES.has(componentName)
+    ? 'media'
+    : 'app';
 
 /**
  * Keeps native navigation chrome synchronized with the selected app theme.
@@ -30,15 +35,19 @@ export const withNavigationTheme =
     const scheme = useAppColorScheme();
     const surface = navigationSurfaceForComponent(props.componentName);
     const [screenVisible, setScreenVisible] = useState(false);
+    const screenVisibleRef = useRef(false);
     const themeRef = useRef(theme);
     const schemeRef = useRef(scheme);
     themeRef.current = theme;
     schemeRef.current = scheme;
 
     const mergeOptions = useCallback(
-      (surfaceToApply: 'app' | 'media') => {
+      (
+        surfaceToApply: NavigationSurface,
+        targetComponentId = props.componentId,
+      ) => {
         Navigation.mergeOptions(
-          props.componentId,
+          targetComponentId,
           navigationThemeOptions(
             themeRef.current,
             schemeRef.current,
@@ -48,25 +57,36 @@ export const withNavigationTheme =
       },
       [props.componentId],
     );
+    const restoreAppOptions = useCallback(() => {
+      const targetComponentId =
+        activeAppComponentIds.values().next().value ?? props.componentId;
+      mergeOptions('app', targetComponentId);
+    }, [mergeOptions, props.componentId]);
 
     useEffect(() => {
       const listener = Navigation.events().registerComponentListener(
         {
           componentDidAppear() {
+            screenVisibleRef.current = true;
             setScreenVisible(true);
-            if (surface === 'media') {
+            if (surface !== 'app') {
               activeMediaComponentIds.add(props.componentId);
+            } else {
+              activeAppComponentIds.add(props.componentId);
             }
           },
           componentDidDisappear() {
+            screenVisibleRef.current = false;
             setScreenVisible(false);
-            if (surface === 'media') {
+            if (surface !== 'app') {
               const wasActive = activeMediaComponentIds.delete(
                 props.componentId,
               );
               if (wasActive && activeMediaComponentIds.size === 0) {
-                mergeOptions('app');
+                restoreAppOptions();
               }
+            } else {
+              activeAppComponentIds.delete(props.componentId);
             }
           },
         },
@@ -75,25 +95,37 @@ export const withNavigationTheme =
 
       return () => {
         listener.remove();
-        if (surface === 'media') {
+        screenVisibleRef.current = false;
+        if (surface !== 'app') {
           const wasActive = activeMediaComponentIds.delete(props.componentId);
           if (wasActive && activeMediaComponentIds.size === 0) {
-            mergeOptions('app');
+            restoreAppOptions();
           }
+        } else {
+          activeAppComponentIds.delete(props.componentId);
         }
       };
-    }, [mergeOptions, props.componentId, surface]);
+    }, [props.componentId, restoreAppOptions, surface]);
 
     useEffect(() => {
       const appStateListener = AppState.addEventListener('change', nextState => {
-        if (nextState !== 'active' || !screenVisible) {
+        if (!screenVisibleRef.current) {
+          return;
+        }
+        if (nextState !== 'active') {
+          if (
+            surface !== 'app' &&
+            activeMediaComponentIds.has(props.componentId)
+          ) {
+            restoreAppOptions();
+          }
           return;
         }
         if (
-          surface === 'media' &&
+          surface !== 'app' &&
           activeMediaComponentIds.has(props.componentId)
         ) {
-          mergeOptions('media');
+          mergeOptions(surface);
         } else if (
           surface === 'app' &&
           activeMediaComponentIds.size === 0
@@ -106,6 +138,7 @@ export const withNavigationTheme =
     }, [
       mergeOptions,
       props.componentId,
+      restoreAppOptions,
       screenVisible,
       surface,
     ]);
@@ -114,11 +147,11 @@ export const withNavigationTheme =
       if (!screenVisible) {
         return;
       }
-      if (surface === 'media') {
+      if (surface !== 'app') {
         if (!activeMediaComponentIds.has(props.componentId)) {
           return;
         }
-        mergeOptions('media');
+        mergeOptions(surface);
       } else if (activeMediaComponentIds.size === 0) {
         mergeOptions('app');
       }

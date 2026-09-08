@@ -17,7 +17,7 @@ export const messages = makeMessages('menu', {
   'item.system.label': 'System',
   'item.logs.label': 'Logs',
   'item.settings.label': 'Settings',
-  'item.author.label': 'Author',
+  'item.author.label': 'About',
   'item.report.label': 'Report problem',
 });
 

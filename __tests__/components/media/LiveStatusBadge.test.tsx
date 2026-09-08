@@ -110,24 +110,26 @@ describe('LiveStatusBadge', () => {
     },
   );
 
-  it('reserves the status half of the top overlay for long localized text', () => {
+  it('uses intrinsic right-aligned width for long localized text', () => {
     const {UNSAFE_getByType: unsafeGetByType} = render(
       <IntlProvider locale="de" messages={de}>
-        <LiveStatusBadge state="connecting" />
+        <LiveStatusBadge state="connecting" viewportWidth={390} />
       </IntlProvider>,
     );
 
     const badgeStyle = unsafeGetByType(View).props.style;
     const labelStyle = unsafeGetByType(Text).props.style;
-    expect(badgeStyle.left).toBe('52%');
+    expect(badgeStyle.left).toBeUndefined();
     expect(badgeStyle.right).toBe(12);
+    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 - 24);
+    expect(badgeStyle.alignSelf).toBe('flex-end');
     expect(badgeStyle.overflow).toBe('hidden');
     expect(labelStyle.flexShrink).toBe(1);
   });
 
   it('uses the English fallback when a locale has no badge translations', () => {
     const {getByLabelText, getByText} = render(
-      <IntlProvider locale="fr" messages={{}}>
+      <IntlProvider locale="fr" messages={{}} onError={() => undefined}>
         <LiveStatusBadge state="reconnecting" />
       </IntlProvider>,
     );

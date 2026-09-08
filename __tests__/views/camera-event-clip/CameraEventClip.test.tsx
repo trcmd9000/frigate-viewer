@@ -1,7 +1,7 @@
 import React from 'react';
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import {IntlProvider} from 'react-intl';
-import {Platform} from 'react-native';
+import {Platform, StyleSheet} from 'react-native';
 import en from '../../../i18n/en';
 import de from '../../../i18n/de';
 import {CameraEventClip} from '../../../views/camera-event-clip/CameraEventClip';
@@ -221,28 +221,41 @@ describe('CameraEventClip protected playback state', () => {
     ).toEqual(expect.objectContaining({color: '#ffffff'}));
   });
 
-  it('exposes a localized share button with an adequate touch target', async () => {
+  it('puts localized share and save actions in the overflow menu', async () => {
+    mockEmitProgress.current = true;
     mockProtectedMediaUri.mockResolvedValueOnce(
       'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
     );
     const view = renderClip(de, 'de');
 
-    const shareButton = await view.findByRole('button', {
-      name: 'Geschützten Ereignisclip teilen',
-    });
+    const moreButton = await view.findByTestId('event-player-overflow');
+    fireEvent.press(moreButton);
+    const shareButton = view.getByTestId('event-player-share');
+    const menuStyle = StyleSheet.flatten(
+      view.getByTestId('event-player-overflow-menu').props.style,
+    );
+    expect(menuStyle.left).toBeGreaterThanOrEqual(-40);
+    expect(menuStyle.width).toBeLessThanOrEqual(280);
 
-    expect(view.getAllByRole('button')).toHaveLength(2);
+    expect(view.getByTestId('event-player-audio')).toBeTruthy();
+    expect(view.getByTestId('event-player-overflow')).toBeTruthy();
     const audio = view.getByTestId('event-player-audio');
     expect(audio.props.accessibilityLabel).toBe('Audio einschalten');
     expect(audio.props.accessibilityState).toEqual({checked: false});
     expect(view.getByTestId('event-player-audio-slash')).toBeTruthy();
+    expect(shareButton.props.accessibilityLabel).toBe('Clip teilen');
     expect(shareButton.props.accessibilityHint).toBe(
-      'Öffnet die Freigabeoptionen',
+      'Teilt den Clip mit einer anderen App',
     );
-    expect(shareButton.props.hitSlop).toBe(12);
+    expect(view.getByTestId('event-player-download').props.accessibilityLabel).toBe(
+      'Auf Gerät speichern',
+    );
     expect(
       view.getAllByTestId('share-icon').every(icon => icon.props.accessible === false),
     ).toBe(true);
+
+    fireEvent.press(shareButton);
+    expect(view.queryByTestId('event-player-overflow-menu')).toBeNull();
   });
 
   it('localizes event player action labels and hints in German', async () => {
@@ -269,10 +282,10 @@ describe('CameraEventClip protected playback state', () => {
     fireEvent.press(more);
     const download = view.getByTestId('event-player-download');
     expect(download.props.accessibilityLabel).toBe(
-      'Ereignisclip herunterladen',
+      'Auf Gerät speichern',
     );
     expect(download.props.accessibilityHint).toBe(
-      'Lädt den Ereignisclip herunter',
+      'Speichert eine Kopie des Clips auf diesem Gerät',
     );
   });
 

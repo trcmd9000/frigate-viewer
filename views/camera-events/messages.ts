@@ -9,6 +9,7 @@ export const messages = makeMessages('cameraEvents', {
   noServer: 'Add a server to see events.',
   loading: 'Loading events',
   'labels.inProgressLabel': 'In progress',
+  'labels.duration': 'duration {duration}',
   'action.delete': 'Delete',
   'action.retain': 'Retain',
   'action.unretain': 'Unretain',

@@ -1,6 +1,13 @@
 import React from 'react';
 import {act, render} from '@testing-library/react-native';
-import {View} from 'react-native';
+import {AppState, AppStateStatus, View} from 'react-native';
+
+const mockAppStateListeners: Array<(nextState: AppStateStatus) => void> = [];
+
+jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+  mockAppStateListeners.push(listener);
+  return {remove: jest.fn()};
+});
 
 const mockCallbacks: {
   componentDidAppear?: () => void;
@@ -32,17 +39,20 @@ jest.mock('../../helpers/colors', () => ({
   navigationThemeOptions: (
     theme: typeof mockCurrentTheme,
     _scheme: typeof mockCurrentScheme,
-    surface: 'app' | 'media' = 'app',
+    surface: 'app' | 'media' | 'event' = 'app',
   ) => ({
+    statusBar: {
+      visible: surface !== 'event',
+    },
     navigationBar: {
       backgroundColor:
-        surface === 'media' ? theme.mediaBackground : theme.background,
-      visible: surface !== 'media',
+        surface === 'app' ? theme.background : theme.mediaBackground,
+      visible: surface === 'app',
     },
   }),
 }));
 
-const {withNavigationTheme} =
+const {navigationSurfaceForComponent, withNavigationTheme} =
   require('../../helpers/navigationTheme') as typeof import('../../helpers/navigationTheme');
 
 const Screen = withNavigationTheme(() => <View />);
@@ -50,10 +60,17 @@ const Screen = withNavigationTheme(() => <View />);
 describe('withNavigationTheme', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAppStateListeners.length = 0;
     delete mockCallbacks.componentDidAppear;
     delete mockCallbacks.componentDidDisappear;
     mockCurrentTheme = {background: '#fff', mediaBackground: '#000'};
     mockCurrentScheme = 'light';
+  });
+
+  it('uses an immersive event surface without changing live preview status chrome', () => {
+    expect(navigationSurfaceForComponent('CameraEventClip')).toBe('event');
+    expect(navigationSurfaceForComponent('CameraPreview')).toBe('media');
+    expect(navigationSurfaceForComponent('Settings')).toBe('app');
   });
 
   it('applies media chrome while visible and restores the app surface on dismiss', () => {
@@ -65,6 +82,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'event-player',
       expect.objectContaining({
+        statusBar: {visible: false},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -79,6 +97,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'event-player',
       expect.objectContaining({
+        statusBar: {visible: false},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -87,6 +106,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'event-player',
       expect.objectContaining({
+        statusBar: {visible: true},
         navigationBar: {backgroundColor: '#121212', visible: true},
       }),
     );
@@ -107,6 +127,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'settings',
       expect.objectContaining({
+        statusBar: {visible: true},
         navigationBar: {backgroundColor: '#fff', visible: true},
       }),
     );
@@ -124,6 +145,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'repeated-player',
       expect.objectContaining({
+        statusBar: {visible: true},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -132,6 +154,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'repeated-player',
       expect.objectContaining({
+        statusBar: {visible: true},
         navigationBar: {backgroundColor: '#fff', visible: true},
       }),
     );
@@ -157,6 +180,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'unmounted-player',
       expect.objectContaining({
+        statusBar: {visible: false},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -165,8 +189,53 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'unmounted-player',
       expect.objectContaining({
+        statusBar: {visible: true},
         navigationBar: {backgroundColor: '#121212', visible: true},
       }),
     );
+  });
+
+  it('restores chrome in background and reapplies immersive chrome on foreground', () => {
+    const view = render(
+      <Screen componentId="foreground-event" componentName="CameraEventClip" />,
+    );
+    act(() => mockCallbacks.componentDidAppear?.());
+    act(() => mockAppStateListeners[0]?.('background'));
+    expect(mockMergeOptions).toHaveBeenLastCalledWith(
+      'foreground-event',
+      expect.objectContaining({
+        statusBar: {visible: true},
+        navigationBar: {backgroundColor: '#fff', visible: true},
+      }),
+    );
+
+    act(() => mockAppStateListeners[0]?.('active'));
+    expect(mockMergeOptions).toHaveBeenLastCalledWith(
+      'foreground-event',
+      expect.objectContaining({
+        statusBar: {visible: false},
+        navigationBar: {backgroundColor: '#000', visible: false},
+      }),
+    );
+
+    view.unmount();
+  });
+
+  it('does not let a disappeared event re-hide bars after returning to the app', () => {
+    const view = render(
+      <Screen componentId="stale-event" componentName="CameraEventClip" />,
+    );
+    act(() => mockCallbacks.componentDidAppear?.());
+    act(() => mockCallbacks.componentDidDisappear?.());
+    mockMergeOptions.mockClear();
+
+    act(() => {
+      mockCurrentTheme = {background: '#121212', mediaBackground: '#000'};
+      mockCurrentScheme = 'dark';
+      view.rerender(
+        <Screen componentId="stale-event" componentName="CameraEventClip" />,
+      );
+    });
+    expect(mockMergeOptions).not.toHaveBeenCalled();
   });
 });

@@ -1,12 +1,17 @@
 import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
 import type {PropsWithChildren} from 'react';
 import {
+  AccessibilityInfo,
+  Animated,
+  AppState,
   ImageStyle,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import {useIntl} from 'react-intl';
 import {useAppSelector} from '../../store/store';
@@ -54,7 +59,17 @@ type LivePreviewProps = PropsWithChildren<{
 const LIVE_PREVIEW_REFRESH_MS = 1000;
 const LIVE_FIRST_FRAME_TIMEOUT_MS = 15_000;
 
+const releaseDownloadedMediaSafely = (path?: string) => {
+  try {
+    Promise.resolve(releaseDownloadedMedia(path)).catch(() => undefined);
+  } catch {
+    // A native cache adapter may throw before returning its promise.
+  }
+};
+
 export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
+  const {width, height} = useWindowDimensions();
+  const landscape = width > height;
   const styles = useStyles(({theme}) => ({
     container: {
       flex: 1,
@@ -80,17 +95,30 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     },
     fallbackPanel: {
       position: 'absolute',
-      left: 16,
-      right: 16,
-      bottom: 16,
+      left: 8,
+      right: 8,
+      bottom: 8,
       alignItems: 'center',
-      backgroundColor: theme.mediaOverlay,
+      alignSelf: 'center',
+      maxWidth: 520,
+      backgroundColor: theme.mediaOverlayPanel || theme.mediaOverlay,
       borderRadius: 8,
-      padding: 8,
+      padding: 6,
+      flexDirection: 'column',
+    },
+    fallbackLandscape: {
+      flexDirection: 'row',
+      paddingHorizontal: 10,
+      maxWidth: 520,
+    },
+    fallbackLandscapeText: {
+      marginBottom: 0,
+      marginRight: 8,
     },
     fallbackText: {
       color: theme.textInverse,
-      marginBottom: 8,
+      flexShrink: 1,
+      marginBottom: 4,
       textAlign: 'center',
     },
     retryText: {
@@ -107,6 +135,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   }));
 
   const [snapshotState, setSnapshotState] = useState<SnapshotHandoffState>({});
+  const [mediaWidth, setMediaWidth] = useState<number>();
   const server = useAppSelector(selectServer);
   const interval = useRef<NodeJS.Timeout>();
   const currentPath = useRef<string>();
@@ -126,6 +155,10 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [decoded, setDecoded] = useState(false);
   const [fallbackReason, setFallbackReason] =
     useState<ProtectedLiveFailureReason>();
+  const [transientOverlayVisible, setTransientOverlayVisible] = useState(true);
+  const [overlayOpacity] = useState(() => new Animated.Value(1));
+  const overlayTimer = useRef<ReturnType<typeof setTimeout>>();
+  const overlayGeneration = useRef(0);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [discoveryGeneration, setDiscoveryGeneration] = useState(0);
   const reconnectAttempts = useRef(0);
@@ -136,6 +169,114 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const pendingImageRef = useRef<SnapshotHandoffState['pending']>();
   const nextHandoffId = useRef(0);
   const intl = useIntl();
+  const clearOverlayTimer = useCallback(() => {
+    if (overlayTimer.current) {
+      clearTimeout(overlayTimer.current);
+      overlayTimer.current = undefined;
+    }
+  }, []);
+  const hideTransientOverlay = useCallback(() => {
+    if (!mounted.current) {
+      return;
+    }
+    const generation = overlayGeneration.current;
+    const announcement =
+      livePhase === 'fallback' || livePhase === 'degraded'
+        ? intl.formatMessage({
+            id: fallbackReason
+              ? `cameraPreview.fallback.${fallbackReason}`
+              : 'cameraPreview.fallback.message',
+            defaultMessage:
+              'Live unavailable; protected snapshots are shown instead.',
+          })
+        : intl.formatMessage({
+            id: 'cameraPreview.status.live',
+            defaultMessage: 'Live stream',
+          });
+    AccessibilityInfo.announceForAccessibility?.(announcement);
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(({finished}) => {
+      if (
+        finished &&
+        mounted.current &&
+        generation === overlayGeneration.current
+      ) {
+        setTransientOverlayVisible(false);
+      }
+    });
+  }, [fallbackReason, intl, livePhase, overlayOpacity]);
+  const scheduleOverlayHide = useCallback(() => {
+    clearOverlayTimer();
+    if (!playbackActive || (livePhase !== 'live' && livePhase !== 'fallback' && livePhase !== 'degraded')) {
+      return;
+    }
+    overlayTimer.current = setTimeout(
+      hideTransientOverlay,
+      livePhase === 'live' ? 3000 : 6000,
+    );
+  }, [clearOverlayTimer, hideTransientOverlay, livePhase, playbackActive]);
+  const revealTransientOverlays = useCallback(() => {
+    overlayGeneration.current += 1;
+    clearOverlayTimer();
+    overlayOpacity.stopAnimation();
+    overlayOpacity.setValue(1);
+    setTransientOverlayVisible(true);
+    scheduleOverlayHide();
+  }, [clearOverlayTimer, overlayOpacity, scheduleOverlayHide]);
+  const cancelTransientOverlay = useCallback(() => {
+    overlayGeneration.current += 1;
+    clearOverlayTimer();
+    overlayOpacity.stopAnimation();
+  }, [clearOverlayTimer, overlayOpacity]);
+  const handleMediaLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    if (nextWidth > 0) {
+      setMediaWidth(current => (current === nextWidth ? current : nextWidth));
+    }
+  }, []);
+
+  useEffect(() => {
+    overlayGeneration.current += 1;
+    clearOverlayTimer();
+    overlayOpacity.stopAnimation();
+    overlayOpacity.setValue(1);
+    setTransientOverlayVisible(true);
+    scheduleOverlayHide();
+    return cancelTransientOverlay;
+  }, [
+    cancelTransientOverlay,
+    activationId,
+    cameraName,
+    clearOverlayTimer,
+    decoded,
+    fallbackReason,
+    height,
+    livePhase,
+    overlayOpacity,
+    playbackActive,
+    scheduleOverlayHide,
+    width,
+  ]);
+
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active') {
+        cancelTransientOverlay();
+        overlayOpacity.setValue(1);
+        setTransientOverlayVisible(true);
+      } else {
+        scheduleOverlayHide();
+      }
+    });
+    return () => listener.remove();
+  }, [
+    cancelTransientOverlay,
+    overlayOpacity,
+    scheduleOverlayHide,
+  ]);
   const setActiveTransport = useCallback((next: LivePreviewTransport) => {
     transportRef.current = next;
     setTransport(next);
@@ -147,7 +288,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     }
     pendingImageRef.current = undefined;
     setSnapshotState(state => discardSnapshotHandoff(state, pending.handoffId));
-    releaseDownloadedMedia(pending.path).catch(() => undefined);
+    releaseDownloadedMediaSafely(pending.path);
   }, []);
   const livePlaying = useCallback(() => {
     if (firstFrameExpired.current) {
@@ -264,7 +405,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       pendingImageRef.current = pending;
       setSnapshotState(state => queueSnapshotHandoff(state, pending));
       if (previousPending) {
-        await releaseDownloadedMedia(previousPending.path);
+        await Promise.resolve(releaseDownloadedMedia(previousPending.path));
       }
     } catch (error) {
       SecureLogger.logError(error as Error, 'loading-live-preview');
@@ -281,8 +422,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       const pending = pendingImageRef.current;
       pendingImageRef.current = undefined;
       setSnapshotState({});
-      releaseDownloadedMedia(path).catch(() => undefined);
-      releaseDownloadedMedia(pending?.path).catch(() => undefined);
+      releaseDownloadedMediaSafely(path);
+      releaseDownloadedMediaSafely(pending?.path);
       return;
     }
     if (decoded) {
@@ -412,6 +553,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      cancelTransientOverlay();
       requestId.current += 1;
       if (interval.current) {
         clearInterval(interval.current);
@@ -420,16 +562,33 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       const pending = pendingImageRef.current;
       currentPath.current = undefined;
       pendingImageRef.current = undefined;
-      releaseDownloadedMedia(path).catch(() => undefined);
-      releaseDownloadedMedia(pending?.path).catch(() => undefined);
+      releaseDownloadedMediaSafely(path);
+      releaseDownloadedMediaSafely(pending?.path);
     };
-  }, []);
+  }, [cancelTransientOverlay]);
+
+  const fallbackMessageId = fallbackReason
+    ? `cameraPreview.fallback.${fallbackReason}`
+    : 'cameraPreview.fallback.message';
+  const fallbackDetailedText = intl.formatMessage({
+    id: fallbackMessageId,
+    defaultMessage:
+      'Live unavailable; protected snapshots are shown instead.',
+  });
+  const fallbackVisibleText = landscape
+    ? intl.formatMessage({
+        id: 'cameraPreview.fallback.landscape',
+        defaultMessage: 'Live unavailable — showing snapshots',
+      })
+    : fallbackDetailedText;
 
   return (
     <View style={styles.container}>
       <View
         testID="camera-preview-media"
         style={styles.mediaFrame}
+        onLayout={handleMediaLayout}
+        onTouchEnd={revealTransientOverlays}
       >
       {!decoded && snapshotState.displayed && (
         <ZoomableImage
@@ -473,7 +632,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             setSnapshotState(state =>
               commitSnapshotHandoff(state, pending.handoffId),
             );
-            releaseDownloadedMedia(previousPath).catch(() => undefined);
+            releaseDownloadedMediaSafely(previousPath);
           }}
           onError={() => {
             const pending = pendingImageRef.current;
@@ -487,7 +646,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             setSnapshotState(state =>
               discardSnapshotHandoff(state, pending.handoffId),
             );
-            releaseDownloadedMedia(pending.path).catch(() => undefined);
+            releaseDownloadedMediaSafely(pending.path);
           }}
         />
       )}
@@ -523,13 +682,28 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         )}
       {playbackActive &&
         (livePhase === 'degraded' || livePhase === 'fallback') && (
-          <View style={styles.fallbackPanel}>
-            <Text style={styles.fallbackText}>
-              {intl.formatMessage({
-                id: fallbackReason
-                  ? `cameraPreview.fallback.${fallbackReason}`
-                  : 'cameraPreview.fallback.message',
-              })}
+          <Animated.View
+            accessibilityElementsHidden={!transientOverlayVisible}
+            importantForAccessibility={
+              transientOverlayVisible ? 'yes' : 'no-hide-descendants'
+            }
+            accessibilityLiveRegion="assertive"
+            pointerEvents={transientOverlayVisible ? 'box-none' : 'none'}
+            style={[
+              styles.fallbackPanel,
+              landscape && styles.fallbackLandscape,
+              {opacity: overlayOpacity},
+            ]}
+          >
+            <Text
+              accessibilityRole="alert"
+              accessibilityLabel={fallbackDetailedText}
+              style={[
+                styles.fallbackText,
+                landscape && styles.fallbackLandscapeText,
+              ]}
+            >
+              {fallbackVisibleText}
             </Text>
             <Pressable
               style={styles.retryButton}
@@ -543,9 +717,22 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 {intl.formatMessage({id: 'cameraPreview.retry'})}
               </Text>
             </Pressable>
-          </View>
+          </Animated.View>
         )}
-        <LiveStatusBadge state={livePhase} transport={transport} />
+        <Animated.View
+          accessibilityElementsHidden={!transientOverlayVisible}
+          importantForAccessibility={
+            transientOverlayVisible ? 'yes' : 'no-hide-descendants'
+          }
+          pointerEvents="none"
+          style={{opacity: overlayOpacity}}
+        >
+          <LiveStatusBadge
+            state={livePhase}
+            transport={transport}
+            viewportWidth={mediaWidth}
+          />
+        </Animated.View>
         {decoded && (transport === 'rtsp' || transport === 'webrtc') && (
           <LiveAudioControl
             muted={muted}

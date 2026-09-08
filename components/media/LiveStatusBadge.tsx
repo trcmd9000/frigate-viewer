@@ -1,6 +1,12 @@
 import {IconOutline} from '@ant-design/icons-react-native';
 import React, {FC} from 'react';
-import {ActivityIndicator, Text, TextStyle, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Text,
+  TextStyle,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {useIntl} from 'react-intl';
 import {useStyles} from '../../helpers/colors';
 import {livePreviewStatus} from '../../helpers/livePreviewStatus';
@@ -12,6 +18,7 @@ import type {
 interface LiveStatusBadgeProps {
   state: LivePreviewState;
   transport?: LivePreviewTransport;
+  viewportWidth?: number;
 }
 
 const defaultStatusMessages: Record<string, string> = {
@@ -29,16 +36,18 @@ const defaultStatusMessages: Record<string, string> = {
 export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
   state,
   transport,
+  viewportWidth,
 }) => {
+  const {width: windowWidth} = useWindowDimensions();
   const styles = useStyles(({theme: palette}) => ({
     badge: {
       position: 'absolute',
       top: 12,
-      left: '52%',
       right: 12,
       zIndex: 3,
       flexDirection: 'row',
       alignItems: 'center',
+      alignSelf: 'flex-end',
       minWidth: 0,
       overflow: 'hidden',
       paddingHorizontal: 8,
@@ -63,6 +72,21 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     id: status.messageId,
     defaultMessage: defaultStatusMessages[status.messageId],
   });
+  const compactLabel =
+    state === 'live' && transport
+      ? transport === 'webrtc'
+        ? 'WebRTC'
+        : 'RTSP'
+      : label;
+  const isLongLabel = compactLabel.length > 18;
+  const width =
+    typeof viewportWidth === 'number' &&
+    Number.isFinite(viewportWidth) &&
+    viewportWidth > 0
+      ? viewportWidth
+      : windowWidth;
+  const badgeMaxWidth = Math.max(1, width - 24);
+  const textMaxWidth = Math.max(1, width - 59);
   const connecting =
     state === 'preparing' ||
     state === 'connecting' ||
@@ -73,7 +97,8 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
       accessible
       accessibilityRole="text"
       accessibilityLabel={label}
-      style={styles.badge}
+      testID="live-status-badge"
+      style={{...styles.badge, maxWidth: badgeMaxWidth}}
     >
       {connecting ? (
         <ActivityIndicator
@@ -92,7 +117,15 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
           style={styles.icon}
         />
       )}
-      <Text style={styles.text}>{label}</Text>
+      <Text
+        style={
+          isLongLabel
+            ? {...styles.text, maxWidth: textMaxWidth}
+            : styles.text
+        }
+      >
+        {compactLabel}
+      </Text>
     </View>
   );
 };

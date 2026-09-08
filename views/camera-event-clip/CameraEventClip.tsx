@@ -9,11 +9,14 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Platform,
   Pressable,
+  StyleSheet,
   Text,
   ToastAndroid,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import {useIntl} from 'react-intl';
 import {NavigationFunctionComponent} from 'react-native-navigation';
@@ -78,6 +81,20 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   fileName = 'clip.mp4',
   initiallyPaused = false,
 }) => {
+  const {width: windowWidth} = useWindowDimensions();
+  const overflowMenuAnchorLeft = 48;
+  const overflowMenuMargin = 8;
+  const overflowMenuWidth = Math.max(1, Math.min(280, windowWidth - 16));
+  const overflowMenuLeft = Math.max(
+    overflowMenuMargin - overflowMenuAnchorLeft,
+    Math.min(
+      0,
+      windowWidth -
+        overflowMenuMargin -
+        overflowMenuWidth -
+        overflowMenuAnchorLeft,
+    ),
+  );
   const styles = useStyles(({theme}) => ({
     wrapper: {
       backgroundColor: theme.mediaBackground,
@@ -114,11 +131,12 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       position: 'absolute',
       left: 0,
       top: 0,
-      zIndex: 1,
+      zIndex: 3,
       elevation: 2,
       flexDirection: 'row',
       alignItems: 'flex-start',
       backgroundColor: theme.mediaOverlay,
+      overflow: 'visible',
     },
     toolButton: {
       minWidth: 48,
@@ -128,6 +146,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     },
     speedMenuAnchor: {
       position: 'relative',
+      zIndex: 5,
     },
     speedMenu: {
       position: 'absolute',
@@ -138,7 +157,8 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       backgroundColor: theme.surface,
     },
     speedMenuItem: {
-      minHeight: 44,
+      minHeight: 48,
+      flexDirection: 'row',
       paddingHorizontal: 16,
       alignItems: 'center',
       justifyContent: 'center',
@@ -147,17 +167,24 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       backgroundColor: theme.highlighted,
     },
     speedMenuText: {
+      flexShrink: 1,
       color: theme.text,
       fontSize: 14,
+      marginLeft: 12,
     },
     overflowMenu: {
       position: 'absolute',
-      right: 0,
       top: 48,
-      minWidth: 180,
+      minWidth: 1,
       paddingVertical: 4,
       backgroundColor: theme.surface,
       borderRadius: 8,
+      zIndex: 20,
+      elevation: 8,
+    },
+    menuDismiss: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 1,
     },
     mediaTap: {
       position: 'absolute',
@@ -181,11 +208,11 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const intl = useIntl();
   const shareLabel = intl.formatMessage({
     id: 'cameraEventClip.share',
-    defaultMessage: 'Share protected event clip',
+    defaultMessage: 'Share clip',
   });
   const shareHint = intl.formatMessage({
     id: 'cameraEventClip.shareHint',
-    defaultMessage: 'Opens sharing options',
+    defaultMessage: 'Shares the clip using another app',
   });
   const moreLabel = intl.formatMessage({
     id: 'cameraEventClip.more',
@@ -201,11 +228,11 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   });
   const downloadLabel = intl.formatMessage({
     id: 'cameraEventClip.download',
-    defaultMessage: 'Download event clip',
+    defaultMessage: 'Save to device',
   });
   const downloadHint = intl.formatMessage({
     id: 'cameraEventClip.downloadHint',
-    defaultMessage: 'Downloads the event clip',
+    defaultMessage: 'Saves a copy of the clip on this device',
   });
   const toggleControlsLabel = intl.formatMessage({
     id: 'cameraEventClip.toggleControls',
@@ -226,6 +253,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const [progressInfo, setProgressInfo] = useState<MediaProgress>();
   const player = useRef<MediaPlayerHandle>(null);
   const [sharing, setSharing] = useState(false);
+  const sharingRef = useRef(false);
   const [playerError, setPlayerError] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -249,6 +277,25 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     setSpeedMenuOpen(false);
     setOverflowMenuOpen(false);
   }, [active, media?.uri]);
+
+  useEffect(() => {
+    if (!controlsVisible) {
+      setSpeedMenuOpen(false);
+      setOverflowMenuOpen(false);
+    }
+  }, [controlsVisible]);
+
+  useEffect(() => {
+    if (!speedMenuOpen && !overflowMenuOpen) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSpeedMenuOpen(false);
+      setOverflowMenuOpen(false);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [overflowMenuOpen, speedMenuOpen]);
 
   useEffect(() => {
     const becameActive = active && !wasActive.current;
@@ -321,10 +368,12 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const share = async () => {
-    if (sharing) {
+    if (sharing || sharingRef.current) {
       return;
     }
+    sharingRef.current = true;
     setSharing(true);
+    setOverflowMenuOpen(false);
     let path: string | undefined;
     try {
       path = await downloadMedia(server, shareUrl);
@@ -343,8 +392,14 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         Alert.alert(message);
       }
     } finally {
-      await releaseDownloadedMedia(path, 'share');
-      setSharing(false);
+      try {
+        await releaseDownloadedMedia(path, 'share');
+      } catch {
+        // Cleanup must not leave the action locked if cache release fails.
+      } finally {
+        sharingRef.current = false;
+        setSharing(false);
+      }
     }
   };
 
@@ -366,10 +421,12 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const download = useCallback(async () => {
-    if (sharing) {
+    if (sharing || sharingRef.current) {
       return;
     }
+    sharingRef.current = true;
     setSharing(true);
+    setOverflowMenuOpen(false);
     let path: string | undefined;
     try {
       path = await downloadMedia(server, shareUrl);
@@ -389,9 +446,14 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         Alert.alert(message);
       }
     } finally {
-      await releaseDownloadedMedia(path, 'share');
-      setSharing(false);
-      setOverflowMenuOpen(false);
+      try {
+        await releaseDownloadedMedia(path, 'share');
+      } catch {
+        // Cleanup must not leave the action locked if cache release fails.
+      } finally {
+        sharingRef.current = false;
+        setSharing(false);
+      }
     }
   }, [fileName, server, shareUrl, sharing]);
 
@@ -490,6 +552,17 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
           onSkip={skip}
         />
       )}
+      {(overflowMenuOpen || speedMenuOpen) && (
+        <Pressable
+          testID="event-player-menu-dismiss"
+          accessibilityElementsHidden
+          onPress={() => {
+            setSpeedMenuOpen(false);
+            setOverflowMenuOpen(false);
+          }}
+          style={styles.menuDismiss}
+        />
+      )}
       {controlsVisible && (
         <View style={styles.tools}>
           <AudioToggle
@@ -498,72 +571,76 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
             muted={muted}
             onToggle={() => setMuted(current => !current)}
           />
-          <Pressable
-            style={styles.toolButton}
-            accessibilityRole="button"
-            accessibilityLabel={shareLabel}
-            accessibilityHint={shareHint}
-            hitSlop={12}
-            onPress={share}
-          >
-            <IconOutline
-              accessible={false}
-              name="share-alt"
-              color={theme.mediaText}
-              size={20}
-            />
-          </Pressable>
           {progressInfo && (
             <>
-              <Pressable
-                style={styles.toolButton}
-                accessibilityRole="button"
-                accessibilityLabel={moreLabel}
-                accessibilityHint={moreHint}
-                accessibilityState={{expanded: overflowMenuOpen}}
-                hitSlop={12}
-                onPress={() => {
-                  setSpeedMenuOpen(false);
-                  setOverflowMenuOpen(open => !open);
-                }}
-                testID="event-player-overflow"
-              >
-                <IconOutline
-                  accessible={false}
-                  name="ellipsis"
-                  color={theme.mediaText}
-                  size={20}
-                />
-              </Pressable>
-              {overflowMenuOpen && (
-                <View
-                  accessibilityRole="menu"
-                  accessibilityLabel={moreMenuLabel}
-                  style={styles.overflowMenu}
-                  testID="event-player-overflow-menu"
+              <View style={styles.speedMenuAnchor}>
+                <Pressable
+                  style={styles.toolButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={moreLabel}
+                  accessibilityHint={moreHint}
+                  accessibilityState={{expanded: overflowMenuOpen}}
+                  hitSlop={12}
+                  onPress={() => {
+                    setSpeedMenuOpen(false);
+                    setOverflowMenuOpen(open => !open);
+                  }}
+                  testID="event-player-overflow"
                 >
-                  <Pressable
-                    accessibilityRole="menuitem"
-                    accessibilityLabel={shareLabel}
-                    accessibilityHint={shareHint}
-                    onPress={share}
-                    style={styles.speedMenuItem}
-                    testID="event-player-share"
+                  <IconOutline
+                    accessible={false}
+                    name="ellipsis"
+                    color={theme.mediaText}
+                    size={20}
+                  />
+                </Pressable>
+                {overflowMenuOpen && (
+                  <View
+                    accessibilityRole="menu"
+                    accessibilityLabel={moreMenuLabel}
+                    style={[
+                      styles.overflowMenu,
+                      {left: overflowMenuLeft, width: overflowMenuWidth},
+                    ]}
+                    testID="event-player-overflow-menu"
                   >
-                    <Text style={styles.speedMenuText}>{shareLabel}</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="menuitem"
-                    accessibilityLabel={downloadLabel}
-                    accessibilityHint={downloadHint}
-                    onPress={download}
-                    style={styles.speedMenuItem}
-                    testID="event-player-download"
-                  >
-                    <Text style={styles.speedMenuText}>{downloadLabel}</Text>
-                  </Pressable>
-                </View>
-              )}
+                    <Pressable
+                      accessibilityRole="menuitem"
+                      accessibilityLabel={shareLabel}
+                      accessibilityHint={shareHint}
+                      disabled={sharing}
+                      onPress={share}
+                      style={styles.speedMenuItem}
+                      testID="event-player-share"
+                    >
+                      <IconOutline
+                        accessible={false}
+                        name="share-alt"
+                        color={theme.text}
+                        size={20}
+                      />
+                      <Text style={styles.speedMenuText}>{shareLabel}</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="menuitem"
+                      accessibilityLabel={downloadLabel}
+                      accessibilityHint={downloadHint}
+                      disabled={sharing}
+                      onPress={download}
+                      style={styles.speedMenuItem}
+                      testID="event-player-download"
+                    >
+                      <IconOutline
+                        accessible={false}
+                        name="download"
+                        color={theme.text}
+                        size={20}
+                      />
+                      <Text style={styles.speedMenuText}>{downloadLabel}</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
             </>
           )}
           {canChangePlaybackSpeed && progressInfo && (

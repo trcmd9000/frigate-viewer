@@ -1,10 +1,12 @@
-import {format, formatDistance, formatRelative} from 'date-fns';
+import {format, formatRelative} from 'date-fns';
 import React, {FC, useMemo} from 'react';
 import {StyleProp, Text, View, ViewStyle} from 'react-native';
+import {useIntl} from 'react-intl';
 import {formatVideoTime, useDateLocale} from '../../helpers/locale';
 import {selectLocaleDatesDisplay} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
 import {useDesignTokens} from '../../helpers/designTokens';
+import {messages} from './messages';
 
 interface IEventTitleProps {
   startTime: number;
@@ -20,30 +22,30 @@ export const EventTitle: FC<IEventTitleProps> = ({
   retained,
   style,
 }) => {
+  const intl = useIntl();
   const dateLocale = useDateLocale();
   const datesDisplay = useAppSelector(selectLocaleDatesDisplay);
 
-  const isInProgress = useMemo(() => !endTime, [endTime]);
+  const hasValidStartTime = Number.isFinite(startTime) && startTime >= 0;
+  const hasValidEndTime = Number.isFinite(endTime) && endTime > 0;
+  const hasDuration =
+    hasValidStartTime && hasValidEndTime && endTime > startTime;
+  const safeStartTime = hasValidStartTime ? startTime : 0;
+  const isInProgress = !hasDuration;
 
   const startDate = useMemo(
     () =>
       datesDisplay === 'descriptive'
-        ? formatRelative(new Date(startTime * 1000), new Date(), {
+        ? formatRelative(new Date(safeStartTime * 1000), new Date(), {
             locale: dateLocale,
           })
-        : format(new Date(startTime * 1000), 'Pp', {locale: dateLocale}),
-    [startTime, dateLocale, datesDisplay],
+        : format(new Date(safeStartTime * 1000), 'Pp', {locale: dateLocale}),
+    [dateLocale, datesDisplay, safeStartTime],
   );
 
   const duration = useMemo(
-    () =>
-      datesDisplay === 'descriptive'
-        ? formatDistance(new Date(endTime * 1000), new Date(startTime * 1000), {
-            includeSeconds: true,
-            locale: dateLocale,
-          })
-        : formatVideoTime(Math.round(endTime * 1000 - startTime * 1000)),
-    [startTime, endTime, dateLocale, datesDisplay],
+    () => formatVideoTime(hasDuration ? endTime - startTime : 0),
+    [endTime, hasDuration, startTime],
   );
 
   const tokens = useDesignTokens();
@@ -67,7 +69,13 @@ export const EventTitle: FC<IEventTitleProps> = ({
           color: tokens.colors.textSecondary,
           flexShrink: 1,
         }}
-        accessibilityLabel={`${startDate}${!isInProgress ? `, duration ${duration}` : ''}`}
+        accessibilityLabel={`${startDate}${
+          !isInProgress
+            ? `, ${intl.formatMessage(messages['labels.duration'], {
+                duration,
+              })}`
+            : ''
+        }`}
       >
         {startDate} {!isInProgress && <Text>({duration})</Text>}
       </Text>
