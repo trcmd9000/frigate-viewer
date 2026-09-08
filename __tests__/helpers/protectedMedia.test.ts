@@ -18,8 +18,10 @@ jest.mock('react-native', () => ({
 import type {Server} from '../../store/settings';
 import {
   eventVodPath,
+  invalidateProtectedMediaProfile,
   isProtectedMediaUri,
   normalizeProtectedMediaPath,
+  protectedMediaProfileId,
   protectedMediaUri,
   localRtspMediaUri,
   resetProtectedMediaProfiles,
@@ -85,6 +87,15 @@ describe('protected media URI registration', () => {
 
     expect(mockRegisterMediaProfile).toHaveBeenCalledTimes(1);
     expect(mockCreateMediaUri).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops the cached profile handle when a profile is retired', async () => {
+    const configured = server();
+    await protectedMediaProfileId(configured);
+    invalidateProtectedMediaProfile(configured);
+    await protectedMediaProfileId(configured);
+
+    expect(mockRegisterMediaProfile).toHaveBeenCalledTimes(2);
   });
 
   it('rotates the native profile key when local security settings change', async () => {

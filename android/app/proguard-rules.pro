@@ -8,3 +8,15 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# VLC 3.2.6 calls these callback entry points from libvlcjni by name rather
+# than through a Java call. Keep only the JNI dispatch class and methods; do
+# not keep the whole org.videolan.libvlc package.
+-keepnames class org.videolan.libvlc.VLCObject
+-keepnames class org.videolan.libvlc.LibVLC
+-keepnames class org.videolan.libvlc.Media
+-keepnames class org.videolan.libvlc.MediaPlayer
+-keepclassmembers class org.videolan.libvlc.VLCObject {
+    void dispatchEventFromNative(int, long, long, float, java.lang.String);
+    void dispatchEventFromWeakNative(java.lang.Object, int, long, long, float, java.lang.String);
+}
