@@ -107,8 +107,6 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
    */
   private static final Map<String, NativeClientSession> clientSessions =
     new ConcurrentHashMap<>();
-  private static final Map<String, String> activeAuthenticationScopes =
-    new ConcurrentHashMap<>();
 
   public ClientCertModule(ReactApplicationContext reactContext) {
     super(reactContext);
@@ -136,6 +134,8 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   public void invalidate() {
     protectedLiveSockets.forEach((socketId, liveSocket) -> liveSocket.close());
     protectedLiveSockets.clear();
+    MediaProfileRegistry.get(reactContext).invalidateAll();
+    retireAllClientSessions();
     reactContext.removeLifecycleEventListener(this);
     if (connectivityManager != null) {
       try {
@@ -185,6 +185,38 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       auth,
       username,
       password
+    );
+  }
+
+  @ReactMethod
+  public void invalidateServerSession(
+    String serverIdentity,
+    String auth,
+    String username,
+    String password
+  ) {
+    if (serverIdentity == null || serverIdentity.trim().isEmpty()) {
+      return;
+    }
+    String scopedIdentity = serverIdentity.contains("\u0000auth\u0000")
+      ? serverIdentity
+      : authenticationScopedServerIdentity(
+        serverIdentity,
+        auth,
+        username,
+        password
+      );
+    retireClientSessionsForIdentity(scopedIdentity);
+  }
+
+  @ReactMethod
+  public void invalidateMediaProfile(String profileKey) {
+    if (profileKey == null || profileKey.trim().isEmpty()) {
+      return;
+    }
+    MediaProfileRegistry.get(reactContext).unregister(
+      profileKey,
+      this::closeProtectedLiveSocketsForProfile
     );
   }
 
@@ -480,7 +512,24 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
 
   @ReactMethod
   public void registerMediaProfile(ReadableMap config, Promise promise) {
-    executor.execute(() -> {
+    final MediaProfileRegistry registry = MediaProfileRegistry.get(reactContext);
+    final String profileKey =
+      config == null ? "" : mapString(config, "profileKey");
+    final MediaProfileRegistry.RegistrationToken registrationToken;
+    try {
+      registrationToken = profileKey.trim().isEmpty()
+        ? null
+        : registry.reserveRegistration(profileKey);
+    } catch (RuntimeException error) {
+      promise.reject(
+        "MEDIA_PROFILE_INVALID",
+        "The protected media profile is invalid",
+        error
+      );
+      return;
+    }
+    try {
+      executor.execute(() -> {
       try {
         if (config == null) {
           promise.reject("MEDIA_PROFILE_REQUIRED", "A protected media profile is required");
@@ -499,6 +548,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             mapString(config, "password"),
             mapString(config, "clientCertAlias"),
             mapBoolean(config, "allowSelfSignedServer"),
+            mapBoolean(config, "allowInsecureRemoteHttp"),
             mapBoolean(config, "localRoutingEnabled"),
             mapString(config, "localProtocol"),
             mapString(config, "localHost"),
@@ -511,10 +561,10 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             mapInt(config, "rtspPort"),
             mapBoolean(config, "allowInsecureCredentials")
           );
-        MediaProfileRegistry registry = MediaProfileRegistry.get(reactContext);
         String profileId = registry.register(
           profileConfig,
-          this::closeProtectedLiveSocketsForProfile
+          this::closeProtectedLiveSocketsForProfile,
+          registrationToken
         );
         protectedLiveSockets.forEach((socketId, liveSocket) -> {
           if (
@@ -527,8 +577,18 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         promise.resolve(profileId);
       } catch (Exception error) {
         promise.reject("MEDIA_PROFILE_INVALID", "The protected media profile is invalid", error);
+      } finally {
+        registry.completeRegistration(registrationToken);
       }
-    });
+      });
+    } catch (RuntimeException error) {
+      registry.completeRegistration(registrationToken);
+      promise.reject(
+        "MEDIA_PROFILE_INVALID",
+        "The protected media profile is invalid",
+        error
+      );
+    }
   }
 
   private void closeProtectedLiveSocketsForProfile(String profileId) {
@@ -648,6 +708,17 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     if (liveSocket != null) {
       liveSocket.close();
     }
+  }
+
+  @ReactMethod
+  public void probeMediaCodecCapabilities(Promise promise) {
+    executor.execute(() -> {
+      try {
+        promise.resolve(MediaCodecCapabilityProbe.probe());
+      } catch (RuntimeException error) {
+        promise.reject("CODEC_CAPABILITY_PROBE_FAILED", "Codec capability discovery is unavailable");
+      }
+    });
   }
 
   private void emitLiveSocketState(
@@ -844,17 +915,19 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     synchronized (clientSessions) {
       String scopePrefix = authenticationScopePrefix(serverIdentity);
       if (scopePrefix != null) {
-        String activeScope = activeAuthenticationScopes.get(scopePrefix);
-        if (!serverIdentity.equals(activeScope)) {
-          clientSessions.forEach((key, session) -> {
-            if (key.startsWith(scopePrefix)) {
-              if (clientSessions.remove(key, session)) {
-                closeClientSession(session);
-              }
-            }
-          });
-          activeAuthenticationScopes.put(scopePrefix, serverIdentity);
-        }
+        clientSessions.forEach((key, session) -> {
+          if (
+            scopePrefix.equals(authenticationScopePrefix(session.serverIdentity)) &&
+            !(
+              serverIdentity.equals(session.serverIdentity) &&
+              allowSelfSignedServer == session.allowSelfSignedServer &&
+              (alias == null ? "" : alias).equals(session.alias == null ? "" : session.alias)
+            ) &&
+            clientSessions.remove(key, session)
+          ) {
+            closeClientSession(session);
+          }
+        });
       }
 
       NativeClientSession existing = clientSessions.get(clientKey);
@@ -880,6 +953,9 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       }
 
       NativeClientSession created = new NativeClientSession(
+        serverIdentity,
+        alias,
+        allowSelfSignedServer,
         clientBuilder
           .followRedirects(false)
           .followSslRedirects(false)
@@ -896,12 +972,11 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String serverIdentity,
     boolean allowSelfSignedServer
   ) {
-    String scopePrefix = authenticationScopePrefix(serverIdentity);
-    String identityKey = scopePrefix == null
-      ? serverIdentity
-      : scopePrefix + serverIdentity;
-    return identityKey + "\u0000" + (alias == null ? "" : alias) +
-      "\u0000" + allowSelfSignedServer;
+    String identityKey = serverIdentity == null ? "" : serverIdentity;
+    return opaqueFingerprint(
+      identityKey + "\u0000" + (alias == null ? "" : alias) +
+      "\u0000" + allowSelfSignedServer
+    );
   }
 
   static String authenticationScopedServerIdentity(
@@ -943,20 +1018,63 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String serverIdentity,
     boolean allowSelfSignedServer
   ) {
-    NativeClientSession removed;
+    List<NativeClientSession> removed = new ArrayList<>();
     synchronized (clientSessions) {
-      removed = clientSessions.remove(
-        clientSessionKey(alias, serverIdentity, allowSelfSignedServer)
-      );
+      String clientKey = clientSessionKey(alias, serverIdentity, allowSelfSignedServer);
+      NativeClientSession exact = clientSessions.remove(clientKey);
+      if (exact != null) {
+        removed.add(exact);
+      }
       String scopePrefix = authenticationScopePrefix(serverIdentity);
       if (scopePrefix != null) {
-        activeAuthenticationScopes.remove(scopePrefix, serverIdentity);
+        clientSessions.forEach((key, session) -> {
+          if (scopePrefix.equals(authenticationScopePrefix(session.serverIdentity)) &&
+              clientSessions.remove(key, session)) {
+            removed.add(session);
+          }
+        });
       }
     }
-    if (removed == null) {
-      return;
+    removed.forEach(ClientCertModule::closeClientSession);
+  }
+
+  private static void retireClientSessionsForIdentity(String serverIdentity) {
+    List<NativeClientSession> removed = new ArrayList<>();
+    synchronized (clientSessions) {
+      String scopePrefix = authenticationScopePrefix(serverIdentity);
+      clientSessions.forEach((key, session) -> {
+        boolean matches = scopePrefix == null
+          ? serverIdentity.equals(session.serverIdentity)
+          : scopePrefix.equals(authenticationScopePrefix(session.serverIdentity));
+        if (matches && clientSessions.remove(key, session)) {
+          removed.add(session);
+        }
+      });
     }
-    closeClientSession(removed);
+    removed.forEach(ClientCertModule::closeClientSession);
+  }
+
+  private static void retireAllClientSessions() {
+    List<NativeClientSession> removed;
+    synchronized (clientSessions) {
+      removed = new ArrayList<>(clientSessions.values());
+      clientSessions.clear();
+    }
+    removed.forEach(ClientCertModule::closeClientSession);
+  }
+
+  private static String opaqueFingerprint(String value) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+      StringBuilder fingerprint = new StringBuilder(bytes.length * 2);
+      for (byte item : bytes) {
+        fingerprint.append(String.format(Locale.US, "%02x", item & 0xff));
+      }
+      return "session-" + fingerprint;
+    } catch (NoSuchAlgorithmException error) {
+      throw new IllegalStateException("SHA-256 is unavailable", error);
+    }
   }
 
   private static String authenticationScopePrefix(String serverIdentity) {
@@ -1370,12 +1488,23 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
 
   static final class NativeClientSession {
     final OkHttpClient client;
+    final String serverIdentity;
+    final String alias;
+    final boolean allowSelfSignedServer;
     final Object loginLock = new Object();
     long sessionGeneration = 0L;
     boolean loginInFlight = false;
     IOException loginFailure;
 
-    NativeClientSession(OkHttpClient client) {
+    NativeClientSession(
+      String serverIdentity,
+      String alias,
+      boolean allowSelfSignedServer,
+      OkHttpClient client
+    ) {
+      this.serverIdentity = serverIdentity;
+      this.alias = alias;
+      this.allowSelfSignedServer = allowSelfSignedServer;
       this.client = client;
     }
   }

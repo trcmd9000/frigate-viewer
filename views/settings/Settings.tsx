@@ -9,6 +9,7 @@ import {Label} from '../../components/forms/Label';
 import {Card, SectionHeader} from '../../components/primitives';
 import {useStyles, useTheme} from '../../helpers/colors';
 import {handleError} from '../../helpers/errorHandler';
+import {invalidateServerSession} from '../../helpers/rest';
 import {SecureLogger} from '../../helpers/secureLogger';
 import {
   emptyServer,
@@ -175,6 +176,9 @@ export const Settings: NavigationFunctionComponent = () => {
             onSubmit: (submittedServer: Server) => {
               const profileId = submittedServer.profileId || emptyServer().profileId;
               const normalizedServer = {...submittedServer, profileId};
+              if (server) {
+                invalidateServerSession(server);
+              }
               const index = servers.findIndex(
                 item => item.profileId === server?.profileId,
               );
@@ -255,7 +259,7 @@ export const Settings: NavigationFunctionComponent = () => {
                   // resetGenericPassword is idempotent when a profile has no
                   // credentials. Keep state until this completes so a secure
                   // storage failure cannot orphan a Keychain entry.
-                  await deleteServerProfile(profileId, dispatch);
+                  await deleteServerProfile(profileId, dispatch, server);
                 } catch (error) {
                   await handleError(error, 'settings.delete-server', {
                     showToUser: true,

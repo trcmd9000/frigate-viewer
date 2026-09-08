@@ -147,6 +147,9 @@ export const stripCredentialsFromPersistence = (
         ...server,
         credentials: {username: '', password: ''},
         mtlsEnabled,
+        allowInsecureRemoteHttp:
+          server.protocol === 'http' &&
+          server.allowInsecureRemoteHttp === true,
       };
       const localEndpoint = persistedLocalEndpoint(server.localEndpoint);
       const localRoutingEnabled =

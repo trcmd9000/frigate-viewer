@@ -26,6 +26,7 @@ import {
 } from '../../store/settings';
 import {messages} from './messages';
 import {InlineState} from '../../components/primitives';
+import {normalizeRemoteHttpConsent} from '../../helpers/remoteHttpPolicy';
 
 interface ServerProps {
   server?: Server;
@@ -136,13 +137,17 @@ const containsControlCharacter = (value: string): boolean =>
     return code < 32 || code === 127;
   });
 
-const submittedServer = (server: Server): Server => {
+const submittedServer = (server: Server, previousServer?: Server): Server => {
   const mtlsEnabled = server.mtlsEnabled === true;
   const serverToSubmit = {
     ...server,
     profileId: server.profileId?.trim() || generateServerProfileId(),
     mtlsEnabled,
   };
+  Object.assign(
+    serverToSubmit,
+    normalizeRemoteHttpConsent(serverToSubmit, previousServer),
+  );
   if (!mtlsEnabled) {
     delete serverToSubmit.clientCertConfig;
   }
@@ -306,65 +311,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
   const [certificateSelectionPending, setCertificateSelectionPending] =
     useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const initialExpandedSections = useMemo(() => {
-    const localEndpoint = initialServerState.localEndpoint as
-      | LocalEndpoint
-      | undefined;
-    const localTls = initialServerState.localTls as
-      | RouteTlsSettings
-      | undefined;
-    const rtsp = initialServerState.rtsp as RtspSettings | undefined;
-    const localEndpointComplete =
-      Boolean(localEndpoint?.host?.trim()) &&
-      Number.isSafeInteger(localEndpoint?.port) &&
-      Number(localEndpoint?.port) > 0 &&
-      Number(localEndpoint?.port) <= 65535 &&
-      !(/[?#]/.test(localEndpoint?.basePath || '') ||
-        containsControlCharacter(localEndpoint?.basePath || ''));
-    const localRouteNeedsAttention =
-      initialServerState.localRoutingEnabled === true &&
-      (!localEndpointComplete ||
-        isDeterminablyPublicLocalHost(localEndpoint?.host || ''));
-    const localTlsNeedsAttention =
-      initialServerState.localRoutingEnabled === true &&
-      localTls?.mtlsEnabled === true &&
-      (localEndpoint?.protocol !== 'https' ||
-        !localTls.clientCertConfig?.alias?.trim());
-    const rtspNeedsAttention =
-      rtsp?.enabled === true &&
-      (!localRouteNeedsAttention &&
-      initialServerState.localRoutingEnabled === true
-        ? initialServerState.auth !== 'none' &&
-          rtsp.allowInsecureCredentials !== true
-        : true);
-    const externalNeedsAttention =
-      !initialServerState.protocol ||
-      !initialServerState.host?.trim() ||
-      (initialServerState.mtlsEnabled === true &&
-        (initialServerState.protocol !== 'https' ||
-          !initialServerState.clientCertConfig?.alias?.trim())) ||
-      (initialServerState.auth !== 'none' &&
-        (!initialServerState.credentials?.username?.trim() ||
-          !initialServerState.credentials?.password));
-    return {
-      external: externalNeedsAttention,
-      auth:
-        initialServerState.auth !== 'none' &&
-        !(
-          initialServerState.credentials?.username?.trim() &&
-          initialServerState.credentials?.password
-        ),
-      certificate:
-        initialServerState.mtlsEnabled === true &&
-        !initialServerState.clientCertConfig?.alias?.trim(),
-      local: localRouteNeedsAttention,
-      localCertificate: localTlsNeedsAttention,
-      rtsp: rtspNeedsAttention,
-    };
-  }, [initialServerState]);
-  const [expandedSections, setExpandedSections] = useState<
-    Record<string, boolean>
-  >(initialExpandedSections);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const intl = useIntl();
 
   useEffect(() => {
@@ -393,6 +340,9 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
     const consentRequiredError = intl.formatMessage(
       messages['server.rtsp.credentialsConsentRequired'],
     );
+    const remoteHttpConsentRequiredError = intl.formatMessage(
+      messages['server.external.httpConsentRequired'],
+    );
     const localRouteRequiredError = intl.formatMessage(
       messages['server.rtsp.localRouteRequired'],
     );
@@ -408,6 +358,18 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
             this.createError({message: httpsError})
           );
         }),
+      allowInsecureRemoteHttp: yup
+        .boolean()
+        .required(requiredError)
+        .test(
+          'remote-http-consent',
+          remoteHttpConsentRequiredError,
+          function (value) {
+            return (
+              this.from?.[1]?.value?.protocol !== 'http' || value === true
+            );
+          },
+        ),
       host: yup.string().required(requiredError),
       port: yup.number().nullable(),
       path: yup.string(),
@@ -542,7 +504,17 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
       saveInFlight.current = true;
       helpers.setStatus(undefined);
       try {
-        const serverToSubmit = submittedServer(modifiedServer);
+        const serverToSubmit = submittedServer(modifiedServer, server);
+        if (
+          serverToSubmit.protocol === 'http' &&
+          serverToSubmit.allowInsecureRemoteHttp !== true
+        ) {
+          throw new Error(
+            intl.formatMessage(
+              messages['server.external.httpConsentRequired'],
+            ),
+          );
+        }
         if (serverToSubmit.auth !== 'none' && serverToSubmit.credentials) {
           if (!serverToSubmit.profileId) {
             throw new Error('Server profile identifier is unavailable');
@@ -577,78 +549,22 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         }
       }
     },
-    [componentId, onSubmit],
+    [componentId, intl, onSubmit, server],
   );
-
-  const sectionForPath = (path?: string) => {
-    if (!path) {
-      return 'external';
-    }
-    if (path.startsWith('credentials') || path === 'auth') {
-      return 'auth';
-    }
-    if (path.startsWith('clientCertConfig') || path === 'mtlsEnabled') {
-      return 'certificate';
-    }
-    if (
-      path.startsWith('localTls') ||
-      path.startsWith('localEndpoint') ||
-      path === 'localRoutingEnabled'
-    ) {
-      return 'local';
-    }
-    if (path.startsWith('rtsp')) {
-      return 'rtsp';
-    }
-    return 'external';
-  };
 
   const validateBeforeSubmit = useCallback(
     (values: Server) => {
       if (submitRequested.current) {
         try {
           settingsValidationSchema.validateSync(values, {abortEarly: false});
-        } catch (error) {
-          const validationError = error as yup.ValidationError;
-          const paths = validationError.inner
-            ?.map(validation => validation.path)
-            .filter((path): path is string => Boolean(path));
-          const hasPath = (prefix: string) =>
-            paths?.some(path => path === prefix || path.startsWith(`${prefix}.`));
-          let section = sectionForPath(paths?.[0]);
-          if (
-            values.mtlsEnabled === true &&
-            values.protocol !== 'https' &&
-            hasPath('protocol')
-          ) {
-            section = 'certificate';
-          } else if (hasPath('localTls')) {
-            section = 'localCertificate';
-          } else if (hasPath('rtsp')) {
-            section = 'rtsp';
-          }
-          setTimeout(() => {
-            if (mounted.current) {
-              setExpandedSections(current => ({
-                ...current,
-                [section]: true,
-                ...(section === 'localCertificate' ? {local: true} : {}),
-              }));
-            }
-          }, 0);
+        } catch {
+          // Formik renders the validation errors; ServerForm sections are always visible.
         }
       }
       return {};
     },
     [settingsValidationSchema],
   );
-
-  const toggleSection = useCallback((section: string) => {
-    setExpandedSections(current => ({
-      ...current,
-      [section]: !current[section],
-    }));
-  }, []);
 
   return (
     <Formik
@@ -706,6 +622,12 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         const rtsp = values.rtsp as RtspSettings | undefined;
         const formatSummary = (key: keyof typeof messages) =>
           intl.formatMessage(messages[key]);
+        const remoteHttpNeedsConsent =
+          values.protocol === 'http' &&
+          values.allowInsecureRemoteHttp !== true;
+        const remoteHttpConsentError = intl.formatMessage(
+          messages['server.external.httpConsentRequired'],
+        );
         const externalNeedsAttention = Boolean(errors.protocol || errors.host);
         const externalConfigured =
           Boolean(values.protocol) && Boolean(values.host?.trim());
@@ -907,16 +829,17 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                 header={intl.formatMessage(messages['server.external.header'])}
                 testID="server-section-external"
                 compact
-                expanded={expandedSections.external}
-                onToggle={() => toggleSection('external')}
+                alwaysExpanded
                 summary={
-                  externalNeedsAttention
+                  remoteHttpNeedsConsent
+                    ? formatSummary('server.summary.needsConsent')
+                    : externalNeedsAttention
                     ? formatSummary('server.summary.needsAttention')
                     : externalConfigured
                       ? formatSummary('server.summary.configured')
                       : formatSummary('server.summary.needsSetup')
                 }
-                invalid={externalNeedsAttention}
+                invalid={externalNeedsAttention || remoteHttpNeedsConsent}
               >
                 <Label
                   text={intl.formatMessage(messages['server.protocol.label'])}
@@ -933,7 +856,10 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     accessibilityLabel={intl.formatMessage(
                       messages['server.protocol.label'],
                     )}
-                    onValueChange={handleChange('protocol')}
+                    onValueChange={(protocol: 'http' | 'https') => {
+                      void setFieldValue('protocol', protocol);
+                      void setFieldValue('allowInsecureRemoteHttp', false);
+                    }}
                   />
                 </Label>
                 <Label
@@ -948,7 +874,10 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       messages['server.host.label'],
                     )}
                     onBlur={handleBlur('host')}
-                    onChangeText={handleChange('host')}
+                    onChangeText={(value: string) => {
+                      handleChange('host')(value);
+                      void setFieldValue('allowInsecureRemoteHttp', false);
+                    }}
                     keyboardType="default"
                   />
                 </Label>
@@ -963,9 +892,10 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       messages['server.port.label'],
                     )}
                     onBlur={handleBlur('port')}
-                    onChangeText={(value: string) =>
-                      setFieldValue('port', parseFloat(value) || null)
-                    }
+                    onChangeText={(value: string) => {
+                      void setFieldValue('port', parseFloat(value) || null);
+                      void setFieldValue('allowInsecureRemoteHttp', false);
+                    }}
                     keyboardType="numeric"
                   />
                 </Label>
@@ -984,6 +914,51 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     keyboardType="default"
                   />
                 </Label>
+                {values.protocol === 'http' && (
+                  <>
+                    <InlineState
+                      icon="warning"
+                      tone="warning"
+                      title={intl.formatMessage(
+                        messages['server.external.httpWarning'],
+                      )}
+                      testID="server-remote-http-warning"
+                    />
+                    <Label
+                      text={intl.formatMessage(
+                        messages['server.external.httpConsent'],
+                      )}
+                      touched={Boolean(
+                        touched.allowInsecureRemoteHttp ||
+                          (submitAttempted && remoteHttpNeedsConsent),
+                      )}
+                      error={
+                        (errors.allowInsecureRemoteHttp as string) ||
+                        (submitAttempted && remoteHttpNeedsConsent
+                          ? remoteHttpConsentError
+                          : undefined)
+                      }
+                    >
+                      <Switch
+                        testID="server-remote-http-consent-toggle"
+                        value={values.allowInsecureRemoteHttp === true}
+                        accessibilityRole="switch"
+                        accessibilityLabel={intl.formatMessage(
+                          messages['server.external.httpConsent'],
+                        )}
+                        accessibilityState={{
+                          checked: values.allowInsecureRemoteHttp === true,
+                        }}
+                        onValueChange={(allowInsecureRemoteHttp: boolean) => {
+                          void setFieldValue(
+                            'allowInsecureRemoteHttp',
+                            allowInsecureRemoteHttp,
+                          );
+                        }}
+                      />
+                    </Label>
+                  </>
+                )}
               </Section>
               <Section
                 header={intl.formatMessage(
@@ -991,8 +966,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                 )}
                 testID="server-section-auth"
                 compact
-                expanded={expandedSections.auth}
-                onToggle={() => toggleSection('auth')}
+                alwaysExpanded
                 summary={
                   authNeedsAttention
                     ? formatSummary('server.summary.needsAttention')
@@ -1036,12 +1010,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     )}
                     onValueChange={(value: string) => {
                       handleChange('auth')(value);
-                      if (value !== 'none') {
-                        setExpandedSections(current => ({
-                          ...current,
-                          auth: true,
-                        }));
-                      }
                     }}
                   />
                 </Label>
@@ -1063,6 +1031,8 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                         onBlur={handleBlur('credentials.username')}
                         onChangeText={handleChange('credentials.username')}
                         keyboardType="default"
+                        textContentType="username"
+                        autoComplete="username"
                       />
                     </Label>
                     <Label
@@ -1083,6 +1053,8 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                           onBlur={handleBlur('credentials.password')}
                           onChangeText={handleChange('credentials.password')}
                           keyboardType="default"
+                          textContentType="password"
+                          autoComplete="password"
                           secureTextEntry={!passwordVisible}
                         />
                         <Pressable
@@ -1118,8 +1090,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                   )}
                   testID="server-section-certificate"
                   compact
-                  expanded={expandedSections.certificate}
-                  onToggle={() => toggleSection('certificate')}
+                  alwaysExpanded
                   summary={
                     !values.mtlsEnabled
                       ? formatSummary('server.summary.disabled')
@@ -1147,12 +1118,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       }}
                       onValueChange={(enabled: boolean) => {
                         void setFieldValue('mtlsEnabled', enabled);
-                        if (enabled) {
-                          setExpandedSections(current => ({
-                            ...current,
-                            certificate: true,
-                          }));
-                        }
                         if (!enabled) {
                           void setFieldValue('clientCertConfig', undefined);
                         }
@@ -1310,6 +1275,11 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       <Text style={styles.tip}>
                         {intl.formatMessage(messages['server.mtls.help'])}
                       </Text>
+                      <Text style={styles.tip}>
+                        {intl.formatMessage(
+                          messages['server.mtls.selfSigned.warning'],
+                        )}
+                      </Text>
                     </>
                   )}
                 </Section>
@@ -1320,8 +1290,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                 )}
                 testID="server-section-local"
                 compact
-                expanded={expandedSections.local}
-                onToggle={() => toggleSection('local')}
+                alwaysExpanded
                 summary={localSummary}
                 invalid={localNeedsAttention}
               >
@@ -1338,12 +1307,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     )}
                     onValueChange={(enabled: boolean) => {
                       void setFieldValue('localRoutingEnabled', enabled);
-                      if (enabled) {
-                        setExpandedSections(current => ({
-                          ...current,
-                          local: true,
-                        }));
-                      }
                       if (enabled && !values.localEndpoint) {
                         void setFieldValue('localEndpoint', {
                           protocol: 'https',
@@ -1476,8 +1439,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       )}
                       testID="server-section-local-trust"
                       compact
-                      expanded={expandedSections.localCertificate}
-                      onToggle={() => toggleSection('localCertificate')}
+                      alwaysExpanded
                       summary={
                         localTlsSummary
                       }
@@ -1505,12 +1467,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                               ...(localTls || {}),
                               mtlsEnabled: enabled,
                             });
-                            if (enabled) {
-                              setExpandedSections(current => ({
-                                ...current,
-                                localCertificate: true,
-                              }));
-                            }
                           }}
                         />
                       </Label>
@@ -1670,6 +1626,11 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                               messages['server.local.mtls.help'],
                             )}
                           </Text>
+                          <Text style={styles.tip}>
+                            {intl.formatMessage(
+                              messages['server.local.mtls.selfSigned.warning'],
+                            )}
+                          </Text>
                         </>
                       )}
                     </Section>
@@ -1680,8 +1641,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     )}
                     testID="server-section-rtsp"
                     compact
-                    expanded={expandedSections.rtsp}
-                    onToggle={() => toggleSection('rtsp')}
+                    alwaysExpanded
                     summary={rtspSummary}
                     invalid={rtspNeedsAttention}
                   >
@@ -1703,12 +1663,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                             ...(rtsp || {port: 8554}),
                             enabled,
                           });
-                          if (enabled) {
-                            setExpandedSections(current => ({
-                              ...current,
-                              rtsp: true,
-                            }));
-                          }
                         }}
                       />
                     </Label>
@@ -1808,14 +1762,24 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     messages[server ? 'action.saveChanges' : 'action.add'],
                   )}
                   size={Button.sizes.xSmall}
-                  color={theme.link}
+                  color={
+                    isSubmitting || saveInFlight.current
+                      ? theme.textSecondary
+                      : theme.textInverse
+                  }
+                  backgroundColor={theme.link}
+                  disabledBackgroundColor={theme.highlighted}
                   style={styles.footerButton}
                   accessibilityLabel={intl.formatMessage(
                     messages[server ? 'action.saveChanges' : 'action.add'],
                   )}
+                  accessibilityState={{
+                    disabled: isSubmitting || saveInFlight.current,
+                  }}
                   testID="server-form-submit"
                   disabled={isSubmitting || saveInFlight.current}
                   onPress={() => {
+                    setSubmitAttempted(true);
                     submitRequested.current = true;
                     void formRef.current?.handleSubmit();
                     setTimeout(() => {

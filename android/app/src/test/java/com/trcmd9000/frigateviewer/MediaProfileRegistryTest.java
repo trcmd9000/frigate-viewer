@@ -44,6 +44,7 @@ public class MediaProfileRegistryTest {
 
   @After
   public void tearDown() throws IOException {
+    registry.invalidateAll();
     server.shutdown();
   }
 
@@ -79,6 +80,28 @@ public class MediaProfileRegistryTest {
   }
 
   @Test
+  public void rejectsUnconsentedRemoteHttpProfiles() throws Exception {
+    try {
+      registry.register(new MediaProfileRegistry.MediaProfileConfig(
+        "unconsented-http-" + server.getPort(),
+        "http",
+        "127.0.0.1",
+        server.getPort(),
+        "",
+        "none",
+        "",
+        "",
+        "",
+        false
+      ));
+    } catch (IOException expected) {
+      assertTrue(expected.getMessage().contains("consent"));
+      return;
+    }
+    throw new AssertionError("Expected remote HTTP consent to be required");
+  }
+
+  @Test
   public void prependsConfiguredServerBasePathToApiMediaResources() throws Exception {
     server.enqueue(new MockResponse().setResponseCode(200).setBody("m3u8"));
     String profileId = registry.register(
@@ -92,7 +115,8 @@ public class MediaProfileRegistryTest {
         "",
         "",
         "",
-        false
+        false,
+        true
       )
     );
     DataSource source = new ProtectedMediaDataSource(registry);
@@ -117,7 +141,8 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false
+        false,
+        true
       )
     );
 
@@ -174,7 +199,8 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false
+        false,
+        true
       )
     );
 
@@ -287,7 +313,8 @@ public class MediaProfileRegistryTest {
         "",
         "",
         "",
-        false
+        false,
+        true
       )
     );
     registry.register(
@@ -500,7 +527,8 @@ public class MediaProfileRegistryTest {
       "first-user",
       "first-password",
       "",
-      false
+      false,
+      true
     ));
     AtomicReference<String> retiredProfile = new AtomicReference<>();
     String second = registry.register(new MediaProfileRegistry.MediaProfileConfig(
@@ -514,7 +542,8 @@ public class MediaProfileRegistryTest {
       "second-user",
       "second-password",
       "",
-      false
+      false,
+      true
     ), retiredProfile::set);
 
     assertTrue(!first.equals(second));
@@ -532,6 +561,107 @@ public class MediaProfileRegistryTest {
       return;
     }
     throw new AssertionError("Expected the old logical profile configuration to retire");
+  }
+
+  @Test
+  public void unregisterRetiresOnlyTheRequestedProfileAndIsIdempotent() throws Exception {
+    MediaProfileRegistry.MediaProfileConfig firstConfig =
+      profileConfig("unregister-first", "alice", "first-password");
+    MediaProfileRegistry.MediaProfileConfig secondConfig =
+      profileConfig("unregister-second", "bob", "second-password");
+    String first = registry.register(firstConfig);
+    String second = registry.register(secondConfig);
+
+    registry.unregister(firstConfig.profileKey, null);
+    registry.unregister(firstConfig.profileKey, null);
+
+    assertTrue(!registry.hasProfile(first));
+    assertTrue(registry.hasProfile(second));
+  }
+
+  @Test
+  public void invalidationWinsOverDelayedRegistrationWithoutTouchingOtherProfiles()
+    throws Exception {
+    MediaProfileRegistry.MediaProfileConfig delayedConfig =
+      profileConfig("delayed-registration", "alice", "delayed-password");
+    MediaProfileRegistry.MediaProfileConfig otherConfig =
+      profileConfig("delayed-registration-other", "bob", "other-password");
+    MediaProfileRegistry.RegistrationToken delayed =
+      registry.reserveRegistration(delayedConfig.profileKey);
+    String other = registry.register(otherConfig);
+
+    registry.unregister(delayedConfig.profileKey, null);
+
+    try {
+      registry.register(delayedConfig, null, delayed);
+    } catch (IOException expected) {
+      assertTrue(expected.getMessage().contains("retired"));
+      assertTrue(!registry.hasProfile(delayedConfig.profileKey));
+      assertTrue(registry.hasProfile(other));
+      registry.completeRegistration(delayed);
+      // The delayed key is cleaned up, while the unrelated active profile
+      // intentionally keeps its own generation entry alive.
+      assertEquals(1, registry.registrationGenerationEntryCount());
+      assertEquals(0, registry.pendingRegistrationEntryCount());
+      registry.unregister(otherConfig.profileKey, null);
+      assertEquals(0, registry.registrationGenerationEntryCount());
+      String restored = registry.register(delayedConfig);
+      assertTrue(registry.hasProfile(restored));
+      return;
+    }
+    throw new AssertionError("Expected the delayed registration to be retired");
+  }
+
+  @Test
+  public void repeatedRegisterDeleteCyclesReturnRegistrationMapsToBaseline() throws Exception {
+    assertEquals(0, registry.registrationGenerationEntryCount());
+    assertEquals(0, registry.pendingRegistrationEntryCount());
+
+    for (int index = 0; index < 40; index += 1) {
+      MediaProfileRegistry.MediaProfileConfig config =
+        profileConfig("cycle-" + index, "viewer", "cycle-password");
+      String profileId = registry.register(config);
+      assertTrue(registry.hasProfile(profileId));
+      registry.unregister(config.profileKey, null);
+      assertTrue(!registry.hasProfile(profileId));
+      assertEquals(0, registry.registrationGenerationEntryCount());
+      assertEquals(0, registry.pendingRegistrationEntryCount());
+    }
+  }
+
+  @Test
+  public void invalidateAllClearsPendingTokensAndRejectsLateLifecycleTasks()
+    throws Exception {
+    MediaProfileRegistry.MediaProfileConfig config =
+      profileConfig("shutdown-pending", "viewer", "shutdown-password");
+    MediaProfileRegistry.RegistrationToken token =
+      registry.reserveRegistration(config.profileKey);
+
+    assertEquals(1, registry.registrationGenerationEntryCount());
+    assertEquals(1, registry.pendingRegistrationEntryCount());
+    registry.invalidateAll();
+    assertEquals(0, registry.registrationGenerationEntryCount());
+    assertEquals(0, registry.pendingRegistrationEntryCount());
+    try {
+      registry.reserveRegistration("late-after-shutdown");
+    } catch (IllegalStateException expected) {
+      // Lifecycle invalidation permanently closes this registry instance.
+      // Continue with the stale token assertion below.
+    }
+    if (registry.registrationGenerationEntryCount() != 0) {
+      throw new AssertionError("Lifecycle invalidation reopened registration state");
+    }
+
+    try {
+      registry.register(config, null, token);
+    } catch (IOException expected) {
+      assertTrue(expected.getMessage().contains("retired"));
+      registry.completeRegistration(token);
+      assertEquals(0, registry.registrationGenerationEntryCount());
+      assertEquals(0, registry.pendingRegistrationEntryCount());
+      return;
+    }
+    throw new AssertionError("Expected the lifecycle task to be retired");
   }
 
   @Test
@@ -690,7 +820,8 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false
+        false,
+        true
       )
     );
   }
@@ -702,6 +833,7 @@ public class MediaProfileRegistryTest {
   ) {
     return new MediaProfileRegistry.MediaProfileConfig(
       profileKey,
+      profileKey,
       "http",
       "127.0.0.1",
       server.getPort(),
@@ -710,7 +842,8 @@ public class MediaProfileRegistryTest {
       username,
       password,
       "",
-      false
+      false,
+      true
     );
   }
 
@@ -722,6 +855,7 @@ public class MediaProfileRegistryTest {
   ) {
     return new MediaProfileRegistry.MediaProfileConfig(
       profileKey,
+      profileKey,
       "http",
       "127.0.0.1",
       server.getPort(),
@@ -730,7 +864,8 @@ public class MediaProfileRegistryTest {
       username,
       password,
       "",
-      false
+      false,
+      true
     );
   }
 
@@ -739,6 +874,7 @@ public class MediaProfileRegistryTest {
     String password
   ) {
     return new MediaProfileRegistry.MediaProfileConfig(
+      profileKey,
       profileKey,
       "http",
       "127.0.0.1",
@@ -749,6 +885,7 @@ public class MediaProfileRegistryTest {
       password,
       "",
       false,
+      true,
       true,
       "http",
       "127.0.0.1",

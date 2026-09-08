@@ -4,6 +4,7 @@ import {
   navigationThemeOptions,
   resolveColorScheme,
 } from '../../helpers/colors';
+import {Platform} from 'react-native';
 
 const channel = (value: string) => parseInt(value, 16) / 255;
 const luminance = (color: string) => {
@@ -97,5 +98,22 @@ describe('adaptive color scheme', () => {
     expect(
       navigationThemeOptions(theme, scheme, 'media').navigationBar.visible,
     ).toBe(false);
+  });
+
+  it('hides only the event status bar on Android', () => {
+    const originalPlatform = Platform.OS;
+    (Platform as {OS: string}).OS = 'android';
+
+    expect(
+      navigationThemeOptions(lightTheme, 'light', 'event').statusBar.visible,
+    ).toBe(false);
+    expect(
+      navigationThemeOptions(lightTheme, 'light', 'event').navigationBar.visible,
+    ).toBe(false);
+    expect(
+      navigationThemeOptions(lightTheme, 'light', 'media').statusBar.visible,
+    ).toBe(true);
+
+    (Platform as {OS: string}).OS = originalPlatform;
   });
 });

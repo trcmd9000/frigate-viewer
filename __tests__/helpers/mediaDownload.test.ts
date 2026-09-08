@@ -56,6 +56,11 @@ jest.doMock('../../helpers/httpWithClientCert', () => ({
 jest.doMock('../../helpers/rest', () => ({
   authorizationHeader: jest.fn(() => ({})),
   loginServer: mockLoginServer,
+  profileTransportOptions: jest.fn(() => ({
+    profileAuth: 'none',
+    profileUsername: '',
+    profilePassword: '',
+  })),
 }));
 
 const {
@@ -236,19 +241,13 @@ describe('mediaDownload', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('restores authenticated file downloads on iOS without Android native transport', async () => {
+  it('uses the profile transport for authenticated iOS media', async () => {
     require('react-native').Platform.OS = 'ios';
-    const request = Promise.resolve({
-      info: () => ({
-        status: 200,
-        headers: {'Content-Type': 'video/mp4'},
-      }),
+    mockNativeDownloadWithoutCert.mockResolvedValue({
+      statusCode: 200,
+      path: '/private/cache/frigate-media/download-ios.part',
+      contentType: 'video/mp4',
     });
-    Object.assign(request, {
-      progress: jest.fn(() => request),
-      cancel: jest.fn(() => request),
-    });
-    mockBlobFetch.mockReturnValue(request);
 
     await expect(
       downloadMedia(server(), 'https://example.invalid/events/1/clip.mp4'),
@@ -256,49 +255,29 @@ describe('mediaDownload', () => {
       /^\/private\/cache\/frigate-media\/media-[a-z0-9-]+\.mp4$/,
     );
 
-    expect(mockConfig).toHaveBeenCalledWith(
+    expect(mockNativeDownloadWithoutCert).toHaveBeenCalledWith(
+      'https://example.invalid/events/1/clip.mp4',
       expect.objectContaining({
-        fileCache: true,
-        path: expect.stringMatching(
-          /^\/private\/cache\/frigate-media\/download-\d+-ios-\d+-[a-z0-9]+\.part$/,
-        ),
+        profileAuth: 'none',
+        profileUsername: '',
+        profilePassword: '',
       }),
     );
-    expect(mockBlobFetch).toHaveBeenCalledWith(
-      'GET',
-      'https://example.invalid/events/1/clip.mp4',
-      {},
-    );
     expect(mockNativeDownload).not.toHaveBeenCalled();
-    expect(mockNativeDownloadWithoutCert).not.toHaveBeenCalled();
+    expect(mockBlobFetch).not.toHaveBeenCalled();
   });
 
-  it('cancels an iOS download before it exceeds its reservation', async () => {
+  it('fails closed when the iOS profile media bridge rejects a download', async () => {
     require('react-native').Platform.OS = 'ios';
-    const request = Promise.reject(new Error('cancelled'));
-    const cancel = jest.fn(() => request);
-    Object.assign(request, {
-      progress: jest.fn(
-        (
-          _config: {interval: number},
-          callback: (received: number, total: number) => void,
-        ) => {
-          callback(MAX_MEDIA_BYTES + 1, -1);
-          return request;
-        },
-      ),
-      cancel,
-    });
-    mockBlobFetch.mockReturnValue(request);
+    mockNativeDownloadWithoutCert.mockRejectedValue(
+      new Error('Profile-isolated native media download is unavailable'),
+    );
 
     await expect(
       downloadMedia(server(), 'https://example.invalid/events/1/clip.mp4'),
-    ).rejects.toThrow('reserved byte budget');
+    ).rejects.toThrow('Profile-isolated native media download is unavailable');
 
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(mockUnlink).toHaveBeenCalledWith(
-      expect.stringMatching(/\/download-\d+-ios-\d+-[a-z0-9]+\.part$/),
-    );
+    expect(mockBlobFetch).not.toHaveBeenCalled();
   });
 
   it('protects a visible native temporary output until JS finalization', async () => {
@@ -392,6 +371,22 @@ describe('mediaDownload', () => {
     expect(mockUnlink).toHaveBeenCalledWith(finalPath);
     expect(getMediaReservationCount()).toBe(0);
     expect(getReservedMediaBytes()).toBe(0);
+  });
+
+  it('removes a native managed file when its content type is an error response', async () => {
+    const temporaryPath =
+      '/private/cache/frigate-media/download-7-error.part';
+    mockNativeDownloadWithoutCert.mockResolvedValueOnce({
+      statusCode: 200,
+      path: temporaryPath,
+      contentType: 'text/html',
+    });
+
+    await expect(
+      downloadMedia(server(), 'https://example.invalid/error-body'),
+    ).rejects.toThrow('unexpected content type');
+    expect(mockUnlink).toHaveBeenCalledWith(temporaryPath);
+    expect(getMediaReservationCount()).toBe(0);
   });
 
   it('rejects non-success non-mTLS responses and removes the managed file', async () => {

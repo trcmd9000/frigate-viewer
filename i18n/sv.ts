@@ -2,17 +2,7 @@ export default {
   'api.frigateAuth.wrongCredentials':
     'Auktoriseringsfel, kontrollera dina uppgifter.',
   'api.error.unauthorized': 'Felaktiga uppgifter vid försök att nå {url}.',
-  'author.topBar.title': 'Författare',
-  'author.info.authorLabel': 'Författare',
-  'author.info.contactLabel': 'Kontakt',
-  'author.info.opensourceLabel': 'Projektet är öppen källkod.',
-  'author.info.githubLabel': 'Se på github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Projektet skapades för inlärningsändamål och jag har inte för avsikt att dra nytta av att bevilja licenser.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Gillar du den här applikationen',
-  'author.buyMeCoffee.sayThankYouLabel': 'och vill säga ”tack”?',
-  'author.buyMeCoffee.buttonText': 'Köp mig en kaffe',
-  'author.usedLibs.header': 'Lista över använda bibliotek:',
+  'author.topBar.title': 'Om appen',
   'author.error.cantOpenLink':
     'Det går inte att hitta någon app för att öppna den här länken.',
   'camerasList.topBar.title': 'Lista över kameror',
@@ -43,7 +33,7 @@ export default {
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Loggar',
   'menu.item.settings.label': 'Inställningar',
-  'menu.item.author.label': 'Författare',
+  'menu.item.author.label': 'Om appen',
   'menu.item.report.label': 'Rapportera problem',
   'report.topBar.title': 'Rapportera problem',
   'report.introduction.info':

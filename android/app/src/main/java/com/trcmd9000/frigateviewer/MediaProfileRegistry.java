@@ -35,6 +35,10 @@ final class MediaProfileRegistry {
   private final Map<String, MediaProfile> profiles = new ConcurrentHashMap<>();
   private final Map<String, String> profileIdsByLogicalId = new ConcurrentHashMap<>();
   private final Map<String, RtspMediaHandle> rtspHandles = new ConcurrentHashMap<>();
+  private final Map<String, Long> registrationGenerations = new ConcurrentHashMap<>();
+  private final Map<String, Integer> pendingRegistrations = new ConcurrentHashMap<>();
+  private long globalRegistrationGeneration;
+  private boolean acceptingRegistrations = true;
 
   MediaProfileRegistry(Context context) {
     this.context = context.getApplicationContext();
@@ -65,6 +69,35 @@ final class MediaProfileRegistry {
     rtspHandles.clear();
   }
 
+  synchronized void unregister(
+    String profileKey,
+    ProfileRetirementListener retirementListener
+  ) {
+    if (profileKey == null || profileKey.isEmpty()) {
+      return;
+    }
+    bumpRegistrationGeneration(profileKey);
+    profiles.values().forEach(profile -> {
+      if (profileKey.equals(profile.profileKey)) {
+        retireProfile(profile, retirementListener);
+      }
+    });
+    cleanupRegistrationStateLocked(profileKey);
+  }
+
+  synchronized void invalidateAll() {
+    globalRegistrationGeneration += 1L;
+    acceptingRegistrations = false;
+    profiles.values().forEach(profile -> retireProfile(profile, null));
+    rtspHandles.clear();
+    profileIdsByLogicalId.clear();
+    // Advance the global tombstone before clearing the maps. Any task that
+    // was already queued carries the previous generation and cannot register
+    // after lifecycle invalidation, even if shutdownNow races with execution.
+    registrationGenerations.clear();
+    pendingRegistrations.clear();
+  }
+
   synchronized String register(MediaProfileConfig config) throws Exception {
     return register(config, null);
   }
@@ -73,7 +106,41 @@ final class MediaProfileRegistry {
     MediaProfileConfig config,
     ProfileRetirementListener retirementListener
   ) throws Exception {
+    RegistrationToken token = reserveRegistrationLocked(
+      config == null ? null : config.profileKey
+    );
+    try {
+      return register(config, retirementListener, token);
+    } finally {
+      completeRegistrationLocked(token);
+    }
+  }
+
+  synchronized RegistrationToken reserveRegistration(String profileKey) {
+    return reserveRegistrationLocked(profileKey);
+  }
+
+  synchronized void completeRegistration(RegistrationToken token) {
+    completeRegistrationLocked(token);
+  }
+
+  synchronized int registrationGenerationEntryCount() {
+    return registrationGenerations.size();
+  }
+
+  synchronized int pendingRegistrationEntryCount() {
+    return pendingRegistrations.size();
+  }
+
+  synchronized String register(
+    MediaProfileConfig config,
+    ProfileRetirementListener retirementListener,
+    RegistrationToken token
+  ) throws Exception {
     MediaProfile.validateConfig(config);
+    if (!isCurrentRegistrationLocked(token, config.profileKey)) {
+      throw new IOException("The protected media profile registration was retired");
+    }
     String logicalProfileId = config.logicalProfileId;
     String existingId = profileIdsByLogicalId.get(logicalProfileId);
     if (existingId != null) {
@@ -99,6 +166,71 @@ final class MediaProfileRegistry {
     return profile.id;
   }
 
+  private RegistrationToken reserveRegistrationLocked(String profileKey) {
+    if (!acceptingRegistrations) {
+      throw new IllegalStateException(
+        "The protected media profile registry is unavailable"
+      );
+    }
+    if (profileKey == null || profileKey.isEmpty()) {
+      return null;
+    }
+    long generation = registrationGenerations.getOrDefault(profileKey, 0L) + 1L;
+    registrationGenerations.put(profileKey, generation);
+    pendingRegistrations.merge(profileKey, 1, Integer::sum);
+    return new RegistrationToken(
+      profileKey,
+      generation,
+      globalRegistrationGeneration
+    );
+  }
+
+  private boolean isCurrentRegistrationLocked(
+    RegistrationToken token,
+    String profileKey
+  ) {
+    return token != null &&
+      token.profileKey.equals(profileKey) &&
+      token.globalGeneration == globalRegistrationGeneration &&
+      registrationGenerations.getOrDefault(profileKey, 0L) == token.generation;
+  }
+
+  private void completeRegistrationLocked(RegistrationToken token) {
+    if (token == null) {
+      return;
+    }
+    pendingRegistrations.computeIfPresent(
+      token.profileKey,
+      (key, count) -> count <= 1 ? null : count - 1
+    );
+    cleanupRegistrationStateLocked(token.profileKey);
+  }
+
+  private void cleanupRegistrationStateLocked(String profileKey) {
+    if (
+      !pendingRegistrations.containsKey(profileKey) &&
+      !hasProfileKey(profileKey)
+    ) {
+      registrationGenerations.remove(profileKey);
+    }
+  }
+
+  private boolean hasProfileKey(String profileKey) {
+    for (MediaProfile profile : profiles.values()) {
+      if (profileKey.equals(profile.profileKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void bumpRegistrationGeneration(String profileKey) {
+    registrationGenerations.put(
+      profileKey,
+      registrationGenerations.getOrDefault(profileKey, 0L) + 1L
+    );
+  }
+
   private void retireProfile(
     MediaProfile profile,
     ProfileRetirementListener retirementListener
@@ -120,8 +252,25 @@ final class MediaProfileRegistry {
     void onProfileRetired(String profileId);
   }
 
+  static final class RegistrationToken {
+    final String profileKey;
+    final long generation;
+    final long globalGeneration;
+
+    RegistrationToken(
+      String profileKey,
+      long generation,
+      long globalGeneration
+    ) {
+      this.profileKey = profileKey;
+      this.generation = generation;
+      this.globalGeneration = globalGeneration;
+    }
+  }
+
   String createMediaUri(String profileId, String resourcePath) throws IOException {
     MediaProfile profile = profileFor(profileId);
+    profile.requireRemoteHttpConsent();
     Uri resource = parseResourcePath(resourcePath);
     String path = normalizePath(resource.getEncodedPath(), true);
     if ("/".equals(path)) {
@@ -225,6 +374,7 @@ final class MediaProfileRegistry {
         throw new IOException("The protected media URI authority is invalid");
       }
       MediaProfile profile = profileFor(requestUri.getHost());
+      profile.requireRemoteHttpConsent();
       String profilePath = normalizePath(requestUri.getEncodedPath(), true);
       HttpUrl url = profile.toServerUrl(
         profilePath,
@@ -305,6 +455,7 @@ final class MediaProfileRegistry {
       throw new IOException("The protected live stream name is invalid");
     }
     MediaProfile profile = profileFor(profileId);
+    profile.requireRemoteHttpConsent();
     return new LiveSocketRequest(
       profile,
       authenticatedRequest(profile, profile.liveSocketUrl(streamName)).build(),
@@ -556,6 +707,7 @@ final class MediaProfileRegistry {
     final String password;
     final String alias;
     final boolean allowSelfSignedServer;
+    final boolean allowInsecureRemoteHttp;
     final boolean localRoutingEnabled;
     final String localProtocol;
     final String localHost;
@@ -584,7 +736,29 @@ final class MediaProfileRegistry {
       this(
         logicalProfileId, profileKey, protocol, host, port, basePath, auth,
         username, password,
-        alias, allowSelfSignedServer, false, "", "", 0, "", false, "", false,
+        alias, allowSelfSignedServer, false, false, "", "", 0, "", false, "", false,
+        false, RtspMediaPolicy.DEFAULT_PORT, false
+      );
+    }
+
+    MediaProfileConfig(
+      String logicalProfileId,
+      String profileKey,
+      String protocol,
+      String host,
+      int port,
+      String basePath,
+      String auth,
+      String username,
+      String password,
+      String alias,
+      boolean allowSelfSignedServer,
+      boolean allowInsecureRemoteHttp
+    ) {
+      this(
+        logicalProfileId, profileKey, protocol, host, port, basePath, auth,
+        username, password, alias, allowSelfSignedServer,
+        allowInsecureRemoteHttp, false, "", "", 0, "", false, "", false,
         false, RtspMediaPolicy.DEFAULT_PORT, false
       );
     }
@@ -605,6 +779,77 @@ final class MediaProfileRegistry {
         profileKey, profileKey, protocol, host, port, basePath, auth, username,
         password, alias, allowSelfSignedServer
       );
+    }
+
+    MediaProfileConfig(
+      String profileKey,
+      String protocol,
+      String host,
+      int port,
+      String basePath,
+      String auth,
+      String username,
+      String password,
+      String alias,
+      boolean allowSelfSignedServer,
+      boolean allowInsecureRemoteHttp
+    ) {
+      this(
+        profileKey, profileKey, protocol, host, port, basePath, auth, username,
+        password, alias, allowSelfSignedServer, allowInsecureRemoteHttp
+      );
+    }
+
+    MediaProfileConfig(
+      String logicalProfileId,
+      String profileKey,
+      String protocol,
+      String host,
+      int port,
+      String basePath,
+      String auth,
+      String username,
+      String password,
+      String alias,
+      boolean allowSelfSignedServer,
+      boolean allowInsecureRemoteHttp,
+      boolean localRoutingEnabled,
+      String localProtocol,
+      String localHost,
+      int localPort,
+      String localBasePath,
+      boolean localMtlsEnabled,
+      String localClientCertAlias,
+      boolean localAllowSelfSignedServer,
+      boolean rtspEnabled,
+      int rtspPort,
+      boolean allowInsecureCredentials
+    ) {
+      this.logicalProfileId = logicalProfileId == null || logicalProfileId.isEmpty()
+        ? profileKey
+        : logicalProfileId;
+      this.profileKey = profileKey;
+      this.protocol = protocol;
+      this.host = host;
+      this.port = port;
+      this.basePath = basePath;
+      this.auth = auth;
+      this.username = username;
+      this.password = password;
+      this.alias = alias;
+      this.allowSelfSignedServer = allowSelfSignedServer;
+      this.allowInsecureRemoteHttp = allowInsecureRemoteHttp;
+      this.localRoutingEnabled = localRoutingEnabled;
+      this.localProtocol = localProtocol;
+      this.localHost = localHost;
+      this.localPort = localPort;
+      this.localBasePath = localBasePath;
+      this.localMtlsEnabled = localMtlsEnabled;
+      this.localClientCertAlias = localClientCertAlias;
+      this.localAllowSelfSignedServer = localAllowSelfSignedServer;
+      this.rtspEnabled = rtspEnabled;
+      this.rtspPort = rtspPort;
+      this.allowInsecureCredentials = allowInsecureCredentials;
     }
 
     MediaProfileConfig(
@@ -631,30 +876,13 @@ final class MediaProfileRegistry {
       int rtspPort,
       boolean allowInsecureCredentials
     ) {
-      this.logicalProfileId = logicalProfileId == null || logicalProfileId.isEmpty()
-        ? profileKey
-        : logicalProfileId;
-      this.profileKey = profileKey;
-      this.protocol = protocol;
-      this.host = host;
-      this.port = port;
-      this.basePath = basePath;
-      this.auth = auth;
-      this.username = username;
-      this.password = password;
-      this.alias = alias;
-      this.allowSelfSignedServer = allowSelfSignedServer;
-      this.localRoutingEnabled = localRoutingEnabled;
-      this.localProtocol = localProtocol;
-      this.localHost = localHost;
-      this.localPort = localPort;
-      this.localBasePath = localBasePath;
-      this.localMtlsEnabled = localMtlsEnabled;
-      this.localClientCertAlias = localClientCertAlias;
-      this.localAllowSelfSignedServer = localAllowSelfSignedServer;
-      this.rtspEnabled = rtspEnabled;
-      this.rtspPort = rtspPort;
-      this.allowInsecureCredentials = allowInsecureCredentials;
+      this(
+        logicalProfileId, profileKey, protocol, host, port, basePath, auth,
+        username, password, alias, allowSelfSignedServer, false,
+        localRoutingEnabled, localProtocol, localHost, localPort, localBasePath,
+        localMtlsEnabled, localClientCertAlias, localAllowSelfSignedServer,
+        rtspEnabled, rtspPort, allowInsecureCredentials
+      );
     }
 
     MediaProfileConfig(
@@ -682,7 +910,7 @@ final class MediaProfileRegistry {
     ) {
       this(
         profileKey, profileKey, protocol, host, port, basePath, auth, username,
-        password, alias, allowSelfSignedServer, localRoutingEnabled,
+        password, alias, allowSelfSignedServer, false, localRoutingEnabled,
         localProtocol, localHost, localPort, localBasePath, localMtlsEnabled,
         localClientCertAlias, localAllowSelfSignedServer, rtspEnabled, rtspPort,
         allowInsecureCredentials
@@ -752,6 +980,7 @@ final class MediaProfileRegistry {
     String password;
     String alias;
     boolean allowSelfSignedServer;
+    boolean allowInsecureRemoteHttp;
     boolean localRoutingEnabled;
     String localProtocol;
     String localHost;
@@ -810,6 +1039,7 @@ final class MediaProfileRegistry {
       password = config.password == null ? "" : config.password;
       alias = nextAlias;
       allowSelfSignedServer = config.allowSelfSignedServer;
+      allowInsecureRemoteHttp = config.allowInsecureRemoteHttp;
       localRoutingEnabled = config.localRoutingEnabled;
       localProtocol = config.localProtocol == null ? "" : config.localProtocol;
       localHost = config.localHost == null ? "" : config.localHost;
@@ -854,6 +1084,7 @@ final class MediaProfileRegistry {
         basePath.equals(nextBasePath) &&
         alias.equals(nextAlias) &&
         allowSelfSignedServer == config.allowSelfSignedServer &&
+        allowInsecureRemoteHttp == config.allowInsecureRemoteHttp &&
         auth.equals(nextAuth) &&
         username.equals(nextUsername) &&
         password.equals(nextPassword) &&
@@ -887,6 +1118,11 @@ final class MediaProfileRegistry {
         : config.protocol.toLowerCase(Locale.US);
       if (!"https".equals(protocol) && !"http".equals(protocol)) {
         throw new IOException("The protected media profile protocol is invalid");
+      }
+      if ("http".equals(protocol) &&
+        !config.allowInsecureRemoteHttp &&
+        !(config.localRoutingEnabled && config.rtspEnabled)) {
+        throw new IOException("Remote HTTP requires explicit consent");
       }
       String host = normalizeHost(config.host);
       if (host.isEmpty()) {
@@ -975,6 +1211,13 @@ final class MediaProfileRegistry {
       String path = normalizePath(url.encodedPath(), true);
       if (!isMediaPath(path, basePath)) {
         throw new IOException("The protected media path is not approved");
+      }
+      requireRemoteHttpConsent();
+    }
+
+    void requireRemoteHttpConsent() throws IOException {
+      if ("http".equalsIgnoreCase(protocol) && !allowInsecureRemoteHttp) {
+        throw new IOException("Remote HTTP requires explicit consent");
       }
     }
 

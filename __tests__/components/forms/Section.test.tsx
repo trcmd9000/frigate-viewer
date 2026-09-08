@@ -1,5 +1,6 @@
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
+import {Text} from 'react-native';
 import {Section} from '../../../components/forms/Section';
 
 jest.mock('../../../helpers/colors', () => ({
@@ -48,5 +49,30 @@ describe('Section', () => {
     );
 
     fireEvent.press(getByText('External connection'));
+  });
+
+  it('supports an always-expanded non-interactive presentation', () => {
+    const onToggle = jest.fn();
+    const {getByTestId, getByText, queryByText} = render(
+      <Section
+        header="Server settings"
+        summary="Configured"
+        testID="always-expanded-section"
+        expanded={false}
+        onToggle={onToggle}
+        alwaysExpanded
+      >
+        <Text>All controls</Text>
+      </Section>,
+    );
+
+    expect(getByText('All controls')).toBeTruthy();
+    expect(getByTestId('always-expanded-section').props.accessibilityState).toBe(
+      undefined,
+    );
+    expect(queryByText('+')).toBeNull();
+    expect(queryByText('−')).toBeNull();
+    fireEvent.press(getByText('Server settings'));
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });

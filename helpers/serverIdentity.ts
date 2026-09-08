@@ -128,6 +128,9 @@ export const serverRouteIdentity = (
       route === 'local' ? server.localRoutingEnabled === true : true,
     endpoint: encodeURIComponent(endpoint?.scopeEndpoint || ''),
     auth: server.auth,
+    ...(route === 'remote'
+      ? {allowInsecureRemoteHttp: server.allowInsecureRemoteHttp === true}
+      : {}),
     mtlsEnabled: tls.mtlsEnabled === true,
     allowSelfSignedServer,
     clientCertAlias: encodeURIComponent(String(alias || '')),

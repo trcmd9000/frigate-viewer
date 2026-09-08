@@ -5,6 +5,7 @@ import {
   serverProfileIdentity,
   serverUsesClientCertificate,
 } from './serverIdentity';
+import {assertRemoteHttpConsent} from './remoteHttpPolicy';
 
 export const MEDIA_URI_SCHEME = 'frigate-media';
 
@@ -30,6 +31,7 @@ interface NativeMediaProfileConfig {
   password: string;
   clientCertAlias: string;
   allowSelfSignedServer: boolean;
+  allowInsecureRemoteHttp: boolean;
   localRoutingEnabled: boolean;
   localProtocol: Server['protocol'];
   localHost: string;
@@ -134,6 +136,7 @@ const registerProfile = (server: Server): Promise<string> => {
     profileId: server.profileId?.trim() || serverProfileIdentity(server),
     profileKey: serverProfileIdentity(server),
     protocol: server.protocol,
+    allowInsecureRemoteHttp: server.allowInsecureRemoteHttp === true,
     host: server.host,
     port: server.port || 0,
     path: server.path || '',
@@ -187,6 +190,10 @@ export const protectedMediaProfileId = (server: Server): Promise<string> => {
   return profilePromise;
 };
 
+export const invalidateProtectedMediaProfile = (server: Server): void => {
+  profileIds.delete(server);
+};
+
 export const protectedMediaUri = async (
   server: Server,
   resourcePath: string,
@@ -198,6 +205,7 @@ export const protectedMediaUri = async (
     );
   }
   const path = normalizeProtectedMediaPath(resourcePath);
+  assertRemoteHttpConsent(server);
   const profileId = await protectedMediaProfileId(server);
   const uri = await native.createMediaUri(profileId, path);
   if (typeof uri !== 'string' || !isProtectedMediaUri(uri)) {

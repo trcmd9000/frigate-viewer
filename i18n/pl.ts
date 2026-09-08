@@ -3,17 +3,7 @@ export default {
     'Błąd autoryzacji, sprawdź swoje dane logowania.',
   'api.error.unauthorized':
     'Nieprawidłowe dane logowania podczas próby dotarcia do {url}.',
-  'author.topBar.title': 'Autor',
-  'author.info.authorLabel': 'Autor',
-  'author.info.contactLabel': 'Kontakt',
-  'author.info.opensourceLabel': 'To jest projekt otwarto-źródłowy.',
-  'author.info.githubLabel': 'Zobacz na githubie',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Ten projekt został stworzony w celu nauki i nie zamierzam czerpać korzyści ze sprzedaży licencji.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Lubisz tę aplikację',
-  'author.buyMeCoffee.sayThankYouLabel': 'i chcesz podziękować?',
-  'author.buyMeCoffee.buttonText': 'Kup mi kawę',
-  'author.usedLibs.header': 'Użyte biblioteki:',
+  'author.topBar.title': 'O aplikacji',
   'author.error.cantOpenLink':
     'Nie można znaleźć żadnej aplikacji, aby otworzyć ten link.',
   'camerasList.topBar.title': 'Lista kamer',
@@ -44,7 +34,7 @@ export default {
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Dzienniki',
   'menu.item.settings.label': 'Ustawienia',
-  'menu.item.author.label': 'Autor',
+  'menu.item.author.label': 'O aplikacji',
   'menu.item.report.label': 'Zgłoś problem',
   'report.topBar.title': 'Zgłoś problem',
   'report.introduction.info':

@@ -3,18 +3,17 @@ export default {
     'Autorisierungsfehler, überprüfen Sie Ihre Anmeldedaten.',
   'api.error.unauthorized':
     'Falsche Anmeldedaten beim Versuch, {url} zu erreichen.',
-  'author.topBar.title': 'Autor',
-  'author.info.authorLabel': 'Autor',
-  'author.info.contactLabel': 'Kontakt',
-  'author.info.privacyPolicyLabel': 'Datenschutzrichtlinie',
-  'author.info.opensourceLabel': 'Diese App ist ein Open Source Projekt',
-  'author.info.githubLabel': 'Auf GitHub sehen',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Das Projekt wurde zu Lernzwecken erstellt und ich habe nicht die Absicht, von der Erteilung von Lizenzen zu profitieren.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Mögen Sie diese Anwendung',
-  'author.buyMeCoffee.sayThankYouLabel': 'und wollen "Danke" sagen?',
-  'author.buyMeCoffee.buttonText': 'Kauf mir einen Kaffee',
-  'author.usedLibs.header': 'Liste der verwendeten Bibliotheken:',
+  'author.topBar.title': 'Über die App',
+  'author.identity': 'Frigate Viewer',
+  'author.maintainer': 'Betreut von trcmd9000',
+  'author.contact': 'Maintainer kontaktieren',
+  'author.privacy': 'Datenschutzrichtlinie',
+  'author.source': 'Quellcode und Lizenz',
+  'author.disclaimer':
+    'Frigate Viewer ist ein unabhängiger, mit Frigate kompatibler Client. Es besteht keine Verbindung zum Frigate-Projekt und keine Billigung durch dieses Projekt.',
+  'author.upstream': 'Ursprüngliche Upstream-Zuordnung',
+  'author.upstreamDescription':
+    'Ursprünglich basierend auf sp-engineering/frigate-viewer. Diese Zuordnung bedeutet keine Billigung.',
   'author.error.cantOpenLink':
     'Ich kann keine App finden, um diesen Link zu öffnen.',
   'camerasList.topBar.title': 'Liste der Kameras',
@@ -43,6 +42,7 @@ export default {
   'cameraEvents.topBar.specificCamera.title': 'Ereignisse der {cameraName}',
   'cameraEvents.noEvents': 'Keine ereignisse',
   'cameraEvents.labels.inProgressLabel': 'In Arbeit',
+  'cameraEvents.labels.duration': 'Dauer {duration}',
   'cameraEvents.action.delete': 'Löschen',
   'cameraEvents.action.retain': 'Behalten',
   'cameraEvents.action.unretain': 'Zurückhalten',
@@ -59,16 +59,16 @@ export default {
   'cameraEventClip.error':
     'Geschützte Medien konnten nicht abgespielt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
   'cameraEventClip.retry': 'Geschützte Medien erneut versuchen',
-  'cameraEventClip.share': 'Geschützten Ereignisclip teilen',
-  'cameraEventClip.shareHint': 'Öffnet die Freigabeoptionen',
+  'cameraEventClip.share': 'Clip teilen',
+  'cameraEventClip.shareHint': 'Teilt den Clip mit einer anderen App',
   'cameraEventClip.playbackSpeed': 'Wiedergabegeschwindigkeit',
   'cameraEventClip.playbackSpeedHint': 'Wiedergabegeschwindigkeit auswählen',
   'cameraEventClip.playbackSpeedMenu': 'Optionen für Wiedergabegeschwindigkeit',
   'cameraEventClip.more': 'Weitere Ereignisaktionen',
   'cameraEventClip.moreHint': 'Öffnet weitere Ereignisaktionen',
   'cameraEventClip.moreMenu': 'Ereignisaktionen',
-  'cameraEventClip.download': 'Ereignisclip herunterladen',
-  'cameraEventClip.downloadHint': 'Lädt den Ereignisclip herunter',
+  'cameraEventClip.download': 'Auf Gerät speichern',
+  'cameraEventClip.downloadHint': 'Speichert eine Kopie des Clips auf diesem Gerät',
   'cameraEventClip.toggleControls':
     'Player-Steuerelemente ein- oder ausblenden',
   'cameraEventClip.toggleControlsHint':
@@ -89,6 +89,8 @@ export default {
   'cameraPreview.audio.mute': 'Audio ausschalten',
   'cameraPreview.fallback.message':
     'Live-Stream nicht verfügbar. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.landscape':
+    'Live-Stream nicht verfügbar – Standbilder',
   'cameraPreview.fallback.codec':
     'Der Live-Stream verwendet keinen kompatiblen Videocodec. Stattdessen werden geschützte Standbilder angezeigt.',
   'cameraPreview.fallback.ice':
@@ -147,7 +149,7 @@ export default {
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Protokolle',
   'menu.item.settings.label': 'Einstellungen',
-  'menu.item.author.label': 'Autor',
+  'menu.item.author.label': 'Über die App',
   'menu.item.report.label': 'Problem melden',
   'report.topBar.title': 'Problem melden',
   'report.introduction.info':
@@ -170,6 +172,12 @@ export default {
   'settings.server.header': 'Server',
   'settings.server.address.header': 'Adresse',
   'settings.server.external.header': 'Externe Verbindung',
+  'settings.server.external.httpWarning':
+    'Diese Verbindung verwendet unverschlüsseltes HTTP. Ein Man-in-the-Middle kann Frigate-Anmeldedaten, Cookies, Bilder und Videos mitlesen oder verändern.',
+  'settings.server.external.httpConsent':
+    'Ich verstehe das Risiko und stimme zu, Anmeldedaten, Cookies, Bilder und Videos über unverschlüsseltes Remote-HTTP zu übertragen',
+  'settings.server.external.httpConsentRequired':
+    'Vor der Verwendung eines Remote-HTTP-Endpunkts ist eine ausdrückliche Zustimmung erforderlich.',
   'settings.server.auth.header': 'Autorisierung',
   'settings.server.auth.progressiveHeader': 'Frigate-Authentifizierung',
   'settings.server.mtls.progressiveHeader':
@@ -244,6 +252,8 @@ export default {
   'settings.server.mtls.certificate.remove.confirm': 'Entfernen',
   'settings.server.mtls.selfSigned.label':
     'Selbstsigniertes Serverzertifikat zulassen',
+  'settings.server.mtls.selfSigned.warning':
+    'Zertifikatskette, Aussteller und Gültigkeit des Serverzertifikats werden nicht geprüft; die Hostnamenprüfung bleibt aktiv.',
   'settings.server.mtls.help':
     'Verwenden Sie dies, wenn Ihr Frigate-Server eine gegenseitige TLS-Authentifizierung (mTLS) erfordert. Das Zertifikat muss auf Ihrem Gerät installiert sein.',
   'settings.server.local.header': 'Lokale Route',
@@ -278,6 +288,8 @@ export default {
   'settings.server.local.mtls.certificate.remove.confirm': 'Entfernen',
   'settings.server.local.mtls.selfSigned.label':
     'Selbstsigniertes lokales Serverzertifikat zulassen',
+  'settings.server.local.mtls.selfSigned.warning':
+    'Zertifikatskette, Aussteller und Gültigkeit des Serverzertifikats werden nicht geprüft; die Hostnamenprüfung bleibt aktiv.',
   'settings.server.local.mtls.help':
     'Die Identität des externen Servers wird, falls vorhanden, vorausgewählt. Nur der KeyChain-Alias wird gespeichert; Zertifikat und privater Schlüssel bleiben im KeyChain.',
   'settings.server.rtsp.header': 'RTSP-Erreichbarkeit',

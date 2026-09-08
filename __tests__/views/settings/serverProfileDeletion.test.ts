@@ -1,9 +1,15 @@
 import {deleteServerProfile} from '../../../views/settings/serverProfileDeletion';
 import {removeCredentials} from '../../../helpers/secureStorage';
+import {invalidateServerSession} from '../../../helpers/rest';
 import {removeServerProfile} from '../../../store/settings';
+import type {Server} from '../../../store/settings';
 
 jest.mock('../../../helpers/secureStorage', () => ({
   removeCredentials: jest.fn(),
+}));
+
+jest.mock('../../../helpers/rest', () => ({
+  invalidateServerSession: jest.fn(),
 }));
 
 describe('server profile deletion transaction', () => {
@@ -33,6 +39,23 @@ describe('server profile deletion transaction', () => {
     expect(dispatch).toHaveBeenCalledWith(
       removeServerProfile('profile-without-credentials'),
     );
+  });
+
+  it('retires the profile cookie session before secure deletion', async () => {
+    const server: Server = {
+      profileId: 'profile-with-cookies',
+      protocol: 'https',
+      host: 'example.test',
+      port: 443,
+      path: '',
+      auth: 'frigate',
+      credentials: {username: 'viewer', password: 'secret'},
+    };
+
+    await deleteServerProfile('profile-with-cookies', dispatch, server);
+
+    expect(invalidateServerSession).toHaveBeenCalledWith(server);
+    expect(removeCredentials).toHaveBeenCalledWith(server.profileId);
   });
 
   it('keeps the profile when secure deletion fails', async () => {

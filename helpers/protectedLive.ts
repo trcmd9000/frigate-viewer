@@ -7,6 +7,7 @@ import {
 import type {Server} from '../store/settings';
 import {protectedMediaProfileId} from './protectedMedia';
 import {localRtspMediaUri} from './protectedMedia';
+import {assertRemoteHttpConsent} from './remoteHttpPolicy';
 import type {PlayableMedia} from '../components/media/PlayableMedia';
 
 interface NativeProtectedLiveModule {
@@ -166,6 +167,7 @@ export const openProtectedLiveSocket = async (
     throw new Error('The protected live stream name is invalid');
   }
 
+  assertRemoteHttpConsent(server);
   const profileId = await protectedMediaProfileId(server);
   const emitter = new NativeEventEmitter(NativeModules.ClientCertModule);
   let socketId: string | undefined;

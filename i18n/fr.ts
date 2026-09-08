@@ -3,17 +3,7 @@ export default {
     "Erreur d'autorisation, vérifiez vos identifiants.",
   'api.error.unauthorized':
     "Identifiants incorrects lors de la tentative d'atteindre {url}.",
-  'author.topBar.title': 'Auteur',
-  'author.info.authorLabel': 'Auteur',
-  'author.info.contactLabel': 'Contact',
-  'author.info.opensourceLabel': 'Ce projet est open source.',
-  'author.info.githubLabel': 'Voir sur github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Le projet a été créé à des fins d’apprentissage et je n’ai pas l’intention de profiter de l’octroi de licences.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Vous aimez cette application',
-  'author.buyMeCoffee.sayThankYouLabel': 'et voulez dire "merci"?',
-  'author.buyMeCoffee.buttonText': 'Achète-moi un café',
-  'author.usedLibs.header': 'Liste des bibliothèques utilisées:',
+  'author.topBar.title': 'À propos',
   'author.error.cantOpenLink':
     'Impossible de trouver une application pour ouvrir ce lien.',
   'camerasList.topBar.title': 'Liste des caméras',
@@ -44,7 +34,7 @@ export default {
   'menu.item.system.label': 'Système',
   'menu.item.logs.label': 'Journaux',
   'menu.item.settings.label': 'Paramètres',
-  'menu.item.author.label': 'Auteur',
+  'menu.item.author.label': 'À propos',
   'menu.item.report.label': 'Signaler un problème',
   'report.topBar.title': 'Signaler un problème',
   'report.introduction.info':

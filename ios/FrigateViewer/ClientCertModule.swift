@@ -1,6 +1,7 @@
 import Foundation
 import React
 import Security
+import CommonCrypto
 
 /**
  * React Native module for accessing client certificates from iOS Keychain.
@@ -8,10 +9,28 @@ import Security
  */
 @objc(ClientCertModule)
 class ClientCertModule: NSObject, URLSessionDelegate {
+  private let profileSessions = ProfileSessionStore()
   
   @objc
   static func requiresMainQueueSetup() -> Bool {
     return false
+  }
+
+  @objc
+  func invalidateServerSession(
+    _ serverIdentity: String,
+    auth: String,
+    username: String,
+    password: String
+  ) {
+    profileSessions.invalidate(
+      profileSessionKey(
+        serverIdentity: serverIdentity,
+        auth: auth,
+        username: username,
+        password: password
+      )
+    )
   }
   
   /**
@@ -60,6 +79,9 @@ class ClientCertModule: NSObject, URLSessionDelegate {
       reject("KEYCHAIN_ERROR", "Error accessing certificate", error)
     }
   }
+
+  @objc
+  func checkCertificateAvailability(_ identity: String, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
     do {
       let available = try isCertificateAvailable(identity: identity)
       resolve([
@@ -164,9 +186,145 @@ class ClientCertModule: NSObject, URLSessionDelegate {
       reject("KEYCHAIN_ERROR", "Error accessing certificate: \(error.localizedDescription)", error)
     }
   }
-  
+
+  /**
+   * Perform a profile-scoped request with an ephemeral URLSession.
+   * The session key is already credential-scoped and is never logged.
+   */
+  @objc
+  func performIsolatedHttpRequest(
+    _ urlString: String,
+    serverIdentity: String,
+    auth: String,
+    username: String,
+    password: String,
+    method: String,
+    headers: [[String: String]],
+    body: String?,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let url = profileURL(urlString) else {
+      reject("INVALID_URL", "Invalid profile request URL", nil)
+      return
+    }
+    guard !serverIdentity.isEmpty else {
+      reject("PROFILE_SESSION_REQUIRED", "A profile session is required", nil)
+      return
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = method
+    applyHeaders(headers, to: &request)
+    if let body = body {
+      request.httpBody = body.data(using: .utf8)
+    }
+
+    let context = profileSessions.context(
+      for: profileSessionKey(
+        serverIdentity: serverIdentity,
+        auth: auth,
+        username: username,
+        password: password
+      ),
+      url: url
+    )
+    let pending = ProfileTask(kind: .request(resolve, reject))
+    let task = context.session.dataTask(with: request)
+    context.delegate.register(task, pending: pending)
+    task.resume()
+  }
+
+  /**
+   * Download profile-scoped media through the same bounded, ephemeral session.
+   * The JS reservation remains the admission control; this native limit prevents
+   * an oversized response from being accumulated in memory.
+   */
+  @objc
+  func downloadFileWithProfile(
+    _ urlString: String,
+    serverIdentity: String,
+    auth: String,
+    username: String,
+    password: String,
+    headers: [[String: String]],
+    maxBytes: Int,
+    mediaReservationId: Int,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let url = profileURL(urlString) else {
+      reject("INVALID_URL", "Invalid profile download URL", nil)
+      return
+    }
+    guard !serverIdentity.isEmpty else {
+      reject("PROFILE_SESSION_REQUIRED", "A profile session is required", nil)
+      return
+    }
+    guard maxBytes > 0, mediaReservationId > 0 else {
+      reject("MEDIA_RESERVATION_REQUIRED", "A media reservation is required", nil)
+      return
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    applyHeaders(headers, to: &request)
+
+    let context = profileSessions.context(
+      for: profileSessionKey(
+        serverIdentity: serverIdentity,
+        auth: auth,
+        username: username,
+        password: password
+      ),
+      url: url
+    )
+    let pending = ProfileTask(
+      kind: .download(resolve, reject, maxBytes, mediaReservationId)
+    )
+    let task = context.session.dataTask(with: request)
+    context.delegate.register(task, pending: pending)
+    task.resume()
+  }
+
   // MARK: - Private Helper Methods
-  
+
+  private func profileSessionKey(
+    serverIdentity: String,
+    auth: String,
+    username: String,
+    password: String
+  ) -> String {
+    let material = [
+      serverIdentity,
+      auth,
+      username,
+      password
+    ].joined(separator: "\u{0}")
+    return "\(serverIdentity)\u{0}auth\u{0}\(sha256Hex(material))"
+  }
+
+  private func profileURL(_ value: String) -> URL? {
+    guard let url = URL(string: value),
+          let scheme = url.scheme?.lowercased(),
+          (scheme == "http" || scheme == "https"),
+          url.host != nil else {
+      return nil
+    }
+    return url
+  }
+
+  private func applyHeaders(
+    _ headers: [[String: String]],
+    to request: inout URLRequest
+  ) {
+    for header in headers {
+      if let key = header["key"], let value = header["value"] {
+        request.setValue(value, forHTTPHeaderField: key)
+      }
+    }
+  }
+
   /**
    * Retrieve all certificates from the Keychain that can be used for client authentication.
    */
@@ -396,6 +554,258 @@ class ClientCertModule: NSObject, URLSessionDelegate {
   }
 }
 
+private func sha256Hex(_ value: String) -> String {
+  let data = Data(value.utf8)
+  var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+  data.withUnsafeBytes { buffer in
+    _ = CC_SHA256(buffer.baseAddress, CC_LONG(buffer.count), &digest)
+  }
+  return digest.map { String(format: "%02x", $0) }.joined()
+}
+
+private final class ProfileTask {
+  enum Kind {
+    case request(RCTPromiseResolveBlock, RCTPromiseRejectBlock)
+    case download(RCTPromiseResolveBlock, RCTPromiseRejectBlock, Int, Int)
+  }
+
+  let kind: Kind
+  var data = Data()
+  var response: HTTPURLResponse?
+  var exceededLimit = false
+  let mediaReservationId: Int
+
+  init(kind: Kind) {
+    self.kind = kind
+    if case .download(_, _, _, let reservationId) = kind {
+      mediaReservationId = reservationId
+    } else {
+      mediaReservationId = 0
+    }
+  }
+
+  var maxBytes: Int? {
+    if case .download(_, _, let limit, _) = kind {
+      return limit
+    }
+    return nil
+  }
+}
+
+private final class ProfileURLSessionDelegate: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
+  private let allowedScheme: String
+  private let allowedHost: String
+  private let allowedPort: Int
+  private let lock = NSLock()
+  private var tasks: [Int: ProfileTask] = [:]
+
+  init(url: URL) {
+    allowedScheme = url.scheme?.lowercased() ?? ""
+    allowedHost = url.host?.lowercased() ?? ""
+    allowedPort = url.port ?? (url.scheme?.lowercased() == "https" ? 443 : 80)
+    super.init()
+  }
+
+  func register(_ task: URLSessionDataTask, pending: ProfileTask) {
+    lock.lock()
+    tasks[task.taskIdentifier] = pending
+    lock.unlock()
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse,
+    newRequest request: URLRequest,
+    completionHandler: @escaping (URLRequest?) -> Void
+  ) {
+    guard let url = request.url,
+          let scheme = url.scheme?.lowercased(),
+          scheme == "http" || scheme == "https",
+          (allowedScheme == "http" || scheme == "https"),
+          url.host?.lowercased() == allowedHost,
+          (url.port ?? (url.scheme?.lowercased() == "https" ? 443 : 80)) == allowedPort else {
+      completionHandler(nil)
+      return
+    }
+    completionHandler(request)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    dataTask: URLSessionDataTask,
+    didReceive response: URLResponse,
+    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+  ) {
+    guard let pending = task(for: dataTask.taskIdentifier) else {
+      completionHandler(.cancel)
+      return
+    }
+    pending.response = response as? HTTPURLResponse
+    if let maxBytes = pending.maxBytes,
+       response.expectedContentLength >= 0,
+       response.expectedContentLength > Int64(maxBytes) {
+      pending.exceededLimit = true
+      completionHandler(.cancel)
+      return
+    }
+    completionHandler(.allow)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    dataTask: URLSessionDataTask,
+    didReceive data: Data
+  ) {
+    guard let pending = task(for: dataTask.taskIdentifier) else {
+      dataTask.cancel()
+      return
+    }
+    if let maxBytes = pending.maxBytes,
+       pending.data.count > maxBytes - data.count {
+      pending.exceededLimit = true
+      dataTask.cancel()
+      return
+    }
+    pending.data.append(data)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    didCompleteWithError error: Error?
+  ) {
+    guard let pending = removeTask(task.taskIdentifier) else {
+      return
+    }
+    if pending.exceededLimit {
+      reject(pending, code: "MEDIA_RESPONSE_TOO_LARGE", message: "Profile-isolated media exceeded its byte limit")
+      return
+    }
+    if error != nil || pending.response == nil {
+      reject(pending, code: "PROFILE_HTTP_ERROR", message: "Profile-isolated request failed")
+      return
+    }
+
+    switch pending.kind {
+    case .request(let resolve, _):
+      let response = pending.response!
+      resolve([
+        "statusCode": response.statusCode,
+        "body": String(data: pending.data, encoding: .utf8) ?? "",
+        "headers": responseHeaders(response)
+      ])
+    case .download(let resolve, _, _, _):
+      let response = pending.response!
+      guard response.statusCode >= 200, response.statusCode < 300 else {
+        resolve([
+          "statusCode": response.statusCode,
+          "path": "",
+          "contentType": contentType(response)
+        ])
+        return
+      }
+      do {
+        let cacheDirectory = FileManager.default.urls(
+          for: .cachesDirectory,
+          in: .userDomainMask
+        )[0].appendingPathComponent("frigate-media", isDirectory: true)
+        try FileManager.default.createDirectory(
+          at: cacheDirectory,
+          withIntermediateDirectories: true
+        )
+        let path = cacheDirectory.appendingPathComponent(
+          "download-\(pending.mediaReservationId)-\(UUID().uuidString).part"
+        )
+        try pending.data.write(to: path, options: .atomic)
+        resolve([
+          "statusCode": response.statusCode,
+          "path": path.path,
+          "contentType": contentType(response)
+        ])
+      } catch {
+        reject(pending, code: "PROFILE_MEDIA_WRITE_FAILED", message: "Profile-isolated media could not be stored")
+      }
+    }
+  }
+
+  private func task(for identifier: Int) -> ProfileTask? {
+    lock.lock()
+    defer { lock.unlock() }
+    return tasks[identifier]
+  }
+
+  private func removeTask(_ identifier: Int) -> ProfileTask? {
+    lock.lock()
+    defer { lock.unlock() }
+    return tasks.removeValue(forKey: identifier)
+  }
+
+  private func reject(_ pending: ProfileTask, code: String, message: String) {
+    switch pending.kind {
+    case .request(_, let reject), .download(_, let reject, _, _):
+      reject(code, message, nil)
+    }
+  }
+
+  private func responseHeaders(_ response: HTTPURLResponse) -> [String: String] {
+    response.allHeaderFields.reduce(into: [String: String]()) { result, entry in
+      if let key = entry.key as? String, let value = entry.value as? String {
+        result[key] = value
+      }
+    }
+  }
+
+  private func contentType(_ response: HTTPURLResponse) -> String {
+    response.value(forHTTPHeaderField: "Content-Type") ?? ""
+  }
+}
+
+private final class ProfileSessionContext {
+  let delegate: ProfileURLSessionDelegate
+  let cookieStorage: HTTPCookieStorage
+  let session: URLSession
+
+  init(url: URL) {
+    delegate = ProfileURLSessionDelegate(url: url)
+    cookieStorage = HTTPCookieStorage()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.httpCookieStorage = cookieStorage
+    configuration.httpShouldSetCookies = true
+    configuration.urlCredentialStorage = nil
+    configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+    session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+  }
+
+  func invalidate() {
+    session.invalidateAndCancel()
+    cookieStorage.removeCookies(since: Date.distantPast)
+  }
+}
+
+private final class ProfileSessionStore {
+  private let lock = NSLock()
+  private var contexts: [String: ProfileSessionContext] = [:]
+
+  func context(for key: String, url: URL) -> ProfileSessionContext {
+    lock.lock()
+    defer { lock.unlock() }
+    if let context = contexts[key] {
+      return context
+    }
+    let context = ProfileSessionContext(url: url)
+    contexts[key] = context
+    return context
+  }
+
+  func invalidate(_ key: String) {
+    lock.lock()
+    let context = contexts.removeValue(forKey: key)
+    lock.unlock()
+    context?.invalidate()
+  }
+}
+
 /**
  * URLSessionDelegate that provides client certificates for mutual TLS authentication
  * and handles server certificate validation.
@@ -452,4 +862,3 @@ class ClientCertURLSessionDelegate: NSObject, URLSessionDelegate {
     completionHandler(.performDefaultHandling, nil)
   }
 }
-

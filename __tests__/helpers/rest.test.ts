@@ -1,13 +1,18 @@
 import {Buffer} from 'buffer';
+import {Platform} from 'react-native';
 import {
   buildServerUrl,
   buildServerApiUrl,
   authorizationHeader,
   executeServerRequest,
+  invalidateServerSession,
   useRest,
 } from '../../helpers/rest';
 import {httpClientWithCert} from '../../helpers/httpWithClientCert';
 import {Server} from '../../store/settings';
+
+const scopedIdentity = (identity: string): string =>
+  `${identity}\u0000auth\u0000${'a'.repeat(64)}`;
 
 jest.mock('@react-native-async-storage/async-storage');
 jest.mock('react-native-keychain', () => ({
@@ -40,7 +45,16 @@ jest.mock('../../helpers/rest.messages', () => ({
 jest.mock('../../helpers/httpWithClientCert', () => ({
   httpClientWithCert: {
     request: jest.fn(),
+    scopeServerIdentity: jest.fn(scopedIdentity),
+    invalidateServerSession: jest.fn(),
+    invalidateMediaProfile: jest.fn(),
   },
+  isScopedServerIdentity: jest.fn(
+    (identity: unknown, baseIdentity?: string) =>
+      typeof identity === 'string' &&
+      typeof baseIdentity === 'string' &&
+      identity === scopedIdentity(baseIdentity),
+  ),
 }));
 
 describe('REST API Helper', () => {
@@ -48,7 +62,17 @@ describe('REST API Helper', () => {
 
   beforeEach(() => {
     clientCertRequest.mockReset();
-    Reflect.deleteProperty(httpClientWithCert, 'scopeServerIdentity');
+    (httpClientWithCert.invalidateServerSession as jest.Mock).mockReset();
+    if (typeof httpClientWithCert.scopeServerIdentity !== 'function') {
+      Object.assign(httpClientWithCert, {
+        scopeServerIdentity: jest.fn(),
+      });
+    }
+    (httpClientWithCert.scopeServerIdentity as jest.Mock).mockReset();
+    (httpClientWithCert.scopeServerIdentity as jest.Mock).mockImplementation(
+      scopedIdentity,
+    );
+    (httpClientWithCert.invalidateMediaProfile as jest.Mock).mockReset();
     Reflect.deleteProperty(httpClientWithCert, 'resolveServerRoute');
   });
 
@@ -258,7 +282,14 @@ describe('REST API Helper', () => {
 
   describe('Client Certificate Integration', () => {
     it('scopes local requests by profile and credentials before native transport', async () => {
-      const scopeServerIdentity = jest.fn(() => 'opaque-local-session');
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const scopeServerIdentity = jest.fn((identity: string) =>
+        scopedIdentity(identity),
+      );
       Object.assign(httpClientWithCert, {
         scopeServerIdentity,
         resolveServerRoute: jest.fn().mockResolvedValue({
@@ -291,11 +322,18 @@ describe('REST API Helper', () => {
         },
       };
 
-      await executeServerRequest(
-        server,
-        'https://remote.example:443/api/config',
-        {method: 'GET'},
-      );
+      try {
+        await executeServerRequest(
+          server,
+          'https://remote.example:443/api/config',
+          {method: 'GET'},
+        );
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
 
       expect(scopeServerIdentity).toHaveBeenCalledWith(
         expect.stringContaining('"profileId":"local-profile"'),
@@ -306,8 +344,391 @@ describe('REST API Helper', () => {
       expect(clientCertRequest).toHaveBeenCalledWith(
         'https://192.168.1.20:8971/api/config',
         expect.objectContaining({
-          clientCertServerIdentity: 'opaque-local-session',
+          clientCertServerIdentity: expect.stringContaining('\u0000auth\u0000'),
         }),
+      );
+    });
+
+    it('scopes remote requests by profile and credentials before native transport', async () => {
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const scopeServerIdentity = jest.fn((identity: string) =>
+        scopedIdentity(identity),
+      );
+      Object.assign(httpClientWithCert, {scopeServerIdentity});
+      clientCertRequest.mockResolvedValue({
+        status: 200,
+        headers: {},
+        body: '{}',
+        json: async () => ({}),
+        text: async () => '{}',
+      });
+      const server: Server = {
+        profileId: 'remote-profile',
+        protocol: 'https',
+        host: 'remote.example',
+        port: 443,
+        path: '',
+        auth: 'basic',
+        credentials: {username: 'viewer', password: 'secret'},
+      };
+
+      try {
+        await executeServerRequest(
+          server,
+          'https://remote.example:443/api/config',
+          {method: 'GET'},
+        );
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
+
+      expect(scopeServerIdentity).toHaveBeenCalledWith(
+        expect.stringContaining('"profileId":"remote-profile"'),
+        'basic',
+        'viewer',
+        'secret',
+      );
+      expect(clientCertRequest).toHaveBeenCalledWith(
+        'https://remote.example:443/api/config',
+        expect.objectContaining({
+          clientCertServerIdentity: expect.stringContaining('\u0000auth\u0000'),
+        }),
+      );
+    });
+
+    it('fails closed for a missing Android scope bridge on remote requests', async () => {
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const scopeServerIdentity = httpClientWithCert.scopeServerIdentity;
+      Reflect.deleteProperty(httpClientWithCert, 'scopeServerIdentity');
+      const server: Server = {
+        profileId: 'remote-missing-scope',
+        protocol: 'https',
+        host: 'remote.example',
+        port: 443,
+        path: '',
+        auth: 'none',
+        credentials: {username: '', password: ''},
+      };
+
+      try {
+        await expect(
+          executeServerRequest(server, 'https://remote.example:443/api/config', {
+            method: 'GET',
+          }),
+        ).rejects.toThrow(
+          'Profile-scoped Android identity derivation is unavailable',
+        );
+      } finally {
+        Object.assign(httpClientWithCert, {scopeServerIdentity});
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
+      expect(clientCertRequest).not.toHaveBeenCalled();
+    });
+
+    it('fails closed for an invalid Android scope bridge on remote requests', async () => {
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const scopeServerIdentity = httpClientWithCert.scopeServerIdentity;
+      Object.assign(httpClientWithCert, {
+        scopeServerIdentity: jest.fn(() => 'invalid-remote-scope'),
+      });
+      const server: Server = {
+        profileId: 'remote-invalid-scope',
+        protocol: 'https',
+        host: 'remote.example',
+        port: 443,
+        path: '',
+        auth: 'none',
+        credentials: {username: '', password: ''},
+      };
+
+      try {
+        await expect(
+          executeServerRequest(server, 'https://remote.example:443/api/config', {
+            method: 'GET',
+          }),
+        ).rejects.toThrow(
+          'Profile-scoped Android identity derivation returned an invalid scope',
+        );
+      } finally {
+        Object.assign(httpClientWithCert, {scopeServerIdentity});
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
+      expect(clientCertRequest).not.toHaveBeenCalled();
+    });
+
+    it('fails closed for an invalid Android scope bridge on local requests', async () => {
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const scopeServerIdentity = httpClientWithCert.scopeServerIdentity;
+      Object.assign(httpClientWithCert, {
+        scopeServerIdentity: jest.fn(() => 'invalid-local-scope'),
+        resolveServerRoute: jest.fn().mockResolvedValue({
+          route: 'local',
+          baseUrl: 'https://192.168.1.20:8971/',
+          generation: 1,
+        }),
+      });
+      const server: Server = {
+        profileId: 'local-invalid-scope',
+        protocol: 'https',
+        host: 'remote.example',
+        port: 443,
+        path: '',
+        auth: 'none',
+        credentials: {username: '', password: ''},
+        localRoutingEnabled: true,
+        localEndpoint: {
+          protocol: 'https',
+          host: '192.168.1.20',
+          port: 8971,
+          basePath: '',
+        },
+      };
+
+      try {
+        await expect(
+          executeServerRequest(server, 'https://remote.example:443/api/config', {
+            method: 'GET',
+          }),
+        ).rejects.toThrow(
+          'Profile-scoped Android identity derivation returned an invalid scope',
+        );
+      } finally {
+        Object.assign(httpClientWithCert, {scopeServerIdentity});
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
+      expect(clientCertRequest).not.toHaveBeenCalled();
+    });
+
+    it('fails closed for a missing Android scope bridge on local requests', async () => {
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const scopeServerIdentity = httpClientWithCert.scopeServerIdentity;
+      Reflect.deleteProperty(httpClientWithCert, 'scopeServerIdentity');
+      Object.assign(httpClientWithCert, {
+        resolveServerRoute: jest.fn().mockResolvedValue({
+          route: 'local',
+          baseUrl: 'https://192.168.1.20:8971/',
+          generation: 1,
+        }),
+      });
+      const server: Server = {
+        profileId: 'local-missing-scope',
+        protocol: 'https',
+        host: 'remote.example',
+        port: 443,
+        path: '',
+        auth: 'none',
+        credentials: {username: '', password: ''},
+        localRoutingEnabled: true,
+        localEndpoint: {
+          protocol: 'https',
+          host: '192.168.1.20',
+          port: 8971,
+          basePath: '',
+        },
+      };
+
+      try {
+        await expect(
+          executeServerRequest(server, 'https://remote.example:443/api/config', {
+            method: 'GET',
+          }),
+        ).rejects.toThrow(
+          'Profile-scoped Android identity derivation is unavailable',
+        );
+      } finally {
+        Object.assign(httpClientWithCert, {scopeServerIdentity});
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
+      expect(clientCertRequest).not.toHaveBeenCalled();
+    });
+
+    it('passes profile credentials to the iOS transport for native scoping', async () => {
+      clientCertRequest.mockResolvedValue({
+        status: 200,
+        headers: {},
+        body: '{}',
+        json: async () => ({}),
+        text: async () => '{}',
+      });
+      const server: Server = {
+        profileId: 'remote-profile',
+        protocol: 'https',
+        host: 'remote.example',
+        port: 443,
+        path: '/frigate',
+        auth: 'basic',
+        credentials: {username: 'viewer', password: 'secret'},
+      };
+
+      await executeServerRequest(
+        server,
+        'https://remote.example:443/frigate/api/config',
+        {method: 'GET'},
+      );
+
+      expect(clientCertRequest).toHaveBeenCalledWith(
+        'https://remote.example:443/frigate/api/config',
+        expect.objectContaining({
+          clientCertServerIdentity: expect.stringContaining(
+            '"profileId":"remote-profile"',
+          ),
+          profileAuth: 'basic',
+          profileUsername: 'viewer',
+          profilePassword: 'secret',
+        }),
+      );
+    });
+
+    it('fails closed for remote HTTP without explicit consent', async () => {
+      const server: Server = {
+        protocol: 'http',
+        host: 'remote.example',
+        port: 80,
+        path: '',
+        auth: 'none',
+        credentials: {username: '', password: ''},
+        allowInsecureRemoteHttp: false,
+      };
+
+      await expect(
+        executeServerRequest(server, 'http://remote.example/api/config', {
+          method: 'GET',
+        }),
+      ).rejects.toMatchObject({code: 'REMOTE_HTTP_CONSENT_REQUIRED'});
+      expect(clientCertRequest).not.toHaveBeenCalled();
+    });
+
+    it('allows consented remote HTTP through the common transport', async () => {
+      clientCertRequest.mockResolvedValue({
+        status: 200,
+        headers: {},
+        body: '{}',
+        json: async () => ({}),
+        text: async () => '{}',
+      });
+      const server: Server = {
+        protocol: 'http',
+        host: 'remote.example',
+        port: 80,
+        path: '',
+        auth: 'none',
+        credentials: {username: '', password: ''},
+        allowInsecureRemoteHttp: true,
+      };
+
+      await expect(
+        executeServerRequest(server, 'http://remote.example/api/config', {
+          method: 'GET',
+        }),
+      ).resolves.toBeDefined();
+      expect(clientCertRequest).toHaveBeenCalled();
+    });
+
+    it('exposes targeted profile-session invalidation for logout and deletion', () => {
+      const server: Server = {
+        profileId: 'profile-a',
+        protocol: 'https',
+        host: 'same.example',
+        port: 443,
+        path: '/frigate',
+        auth: 'basic',
+        credentials: {username: 'alice', password: 'secret'},
+      };
+
+      invalidateServerSession(server);
+
+      expect(httpClientWithCert.invalidateServerSession).toHaveBeenCalledWith(
+        expect.stringContaining('"profileId":"profile-a"'),
+        'basic',
+        'alice',
+        'secret',
+      );
+      expect(httpClientWithCert.invalidateServerSession).toHaveBeenCalledTimes(2);
+      expect(httpClientWithCert.invalidateMediaProfile).toHaveBeenCalledWith(
+        expect.stringContaining('"profileId":"profile-a"'),
+      );
+    });
+
+    it('invalidates both previously scoped remote and local identities', () => {
+      const previousPlatform = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: 'android',
+      });
+      const server: Server = {
+        profileId: 'profile-rotation',
+        protocol: 'https',
+        host: 'same.example',
+        port: 443,
+        path: '/frigate',
+        auth: 'basic',
+        credentials: {username: 'alice', password: 'secret'},
+        localRoutingEnabled: true,
+        localEndpoint: {
+          protocol: 'https',
+          host: '192.168.1.20',
+          port: 8971,
+          basePath: '/local',
+        },
+      };
+
+      try {
+        invalidateServerSession(server);
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: previousPlatform,
+        });
+      }
+
+      const invalidated = (
+        httpClientWithCert.invalidateServerSession as jest.Mock
+      ).mock.calls.map(call => String(call[0]));
+      expect(invalidated).toHaveLength(2);
+      expect(new Set(invalidated).size).toBe(2);
+      expect(invalidated.every(identity => identity.includes('\u0000auth\u0000'))).toBe(
+        true,
+      );
+      expect(invalidated.some(identity => identity.includes('"route":"remote"'))).toBe(
+        true,
+      );
+      expect(invalidated.some(identity => identity.includes('"route":"local"'))).toBe(
+        true,
       );
     });
 

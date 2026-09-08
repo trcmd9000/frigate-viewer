@@ -9,9 +9,11 @@ import {
 import {
   authorizationHeader,
   loginServer,
+  profileTransportOptions,
   requestServerIdentity,
 } from './rest';
 import {serverIdentity, serverUsesClientCertificate} from './serverIdentity';
+import {assertRemoteHttpConsent} from './remoteHttpPolicy';
 
 export const MEDIA_CACHE_DIRECTORY = 'frigate-media';
 export const MAX_MEDIA_BYTES = 256 * 1024 * 1024;
@@ -564,6 +566,9 @@ const finalizeNativeMedia = async (
   pendingPaths.add(response.path);
   pendingPaths.add(finalPath);
   try {
+    if (isUnexpectedMediaContentType(response.contentType)) {
+      throw new Error('Media download returned an unexpected content type');
+    }
     if (!(await RNBlobUtil.fs.exists(response.path))) {
       throw new Error('Media download did not create a local file');
     }
@@ -694,6 +699,7 @@ const downloadMediaOnce = async (
     }
     const response = await httpClientWithCert.download(url, {
       headers: authorizationHeader(server),
+      ...profileTransportOptions(server),
       clientCertAlias: alias,
       clientCertServerIdentity: mediaServerIdentity(server),
       maxBytes: reservation.maxBytes,
@@ -707,6 +713,18 @@ const downloadMediaOnce = async (
   if (Platform.OS === 'android') {
     const response = await httpClientWithCert.downloadWithoutClientCert(url, {
       headers: authorizationHeader(server),
+      ...profileTransportOptions(server),
+      clientCertServerIdentity: mediaServerIdentity(server),
+      maxBytes: reservation.maxBytes,
+      mediaReservationId: reservation.id,
+    });
+    return finalizeNativeMedia(reservation, response);
+  }
+
+  if (Platform.OS === 'ios') {
+    const response = await httpClientWithCert.downloadWithoutClientCert(url, {
+      headers: authorizationHeader(server),
+      ...profileTransportOptions(server),
       clientCertServerIdentity: mediaServerIdentity(server),
       maxBytes: reservation.maxBytes,
       mediaReservationId: reservation.id,
@@ -731,6 +749,7 @@ export const downloadMedia = async (
   server: Server,
   url: string,
 ): Promise<string> => {
+  assertRemoteHttpConsent(server);
   await acquireDownloadSlot();
   let reservation: MediaReservation | undefined;
   try {

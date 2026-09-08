@@ -6,6 +6,7 @@ import {
   serverRouteIdentity,
   serverUsesClientCertificate,
 } from '../helpers/serverIdentity';
+import {normalizeRemoteHttpConsent} from '../helpers/remoteHttpPolicy';
 
 /**
  * STORE MODEL
@@ -107,6 +108,11 @@ export interface Server {
    */
   profileId?: string;
   protocol: 'http' | 'https';
+  /**
+   * Explicit approval to send credentials, cookies, images, and video over a
+   * remote cleartext HTTP endpoint. Missing legacy values are never consent.
+   */
+  allowInsecureRemoteHttp?: boolean;
   host: string;
   port: number;
   path: string;
@@ -165,6 +171,7 @@ export interface ISettings {
 export const emptyServer = (): Server => ({
   profileId: generateServerProfileId(),
   protocol: 'https',
+  allowInsecureRemoteHttp: false,
   host: '',
   port: 5000,
   path: '',
@@ -502,6 +509,8 @@ const migrateLocalRouting = (server: Server): Server => {
   const rtsp = normalizeRtsp(server.rtsp, localRoutingEnabled);
   return {
     ...server,
+    allowInsecureRemoteHttp:
+      server.protocol === 'http' && server.allowInsecureRemoteHttp === true,
     localRoutingEnabled,
     localEndpoint: localRoutingEnabled ? localEndpoint : undefined,
     localTls: localRoutingEnabled
@@ -586,7 +595,14 @@ export const settingsStore = createSlice({
   },
   reducers: {
     saveSettings: (state, action: PayloadAction<ISettings>) => {
-      state.v1 = settingsMigrations(action.payload);
+      const migrated = settingsMigrations(action.payload);
+      migrated.servers = migrated.servers.map(server => {
+        const previous = state.v1.servers.find(
+          candidate => candidate.profileId === server.profileId,
+        );
+        return normalizeRemoteHttpConsent(server, previous);
+      });
+      state.v1 = migrated;
     },
     setCameraPreviewHeight: (state, action: PayloadAction<number>) => {
       state.v1.cameras.previewHeight = action.payload;

@@ -2,17 +2,7 @@ export default {
   'api.frigateAuth.wrongCredentials':
     'Erro de autorização, verifique suas credenciais.',
   'api.error.unauthorized': 'Credenciais incorretas ao tentar acessar {url}.',
-  'author.topBar.title': 'Autor',
-  'author.info.authorLabel': 'Autor',
-  'author.info.contactLabel': 'Contato',
-  'author.info.opensourceLabel': 'Este projeto é de código aberto.',
-  'author.info.githubLabel': 'Ver no Github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'O projeto foi criado para fins de aprendizagem e não pretendo lucrar com a concessão de licenças.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Você gosta deste aplicativo',
-  'author.buyMeCoffee.sayThankYouLabel': 'e quer dizer "obrigado"?',
-  'author.buyMeCoffee.buttonText': 'Compre-me um café',
-  'author.usedLibs.header': 'Lista de bibliotecas usadas:',
+  'author.topBar.title': 'Sobre',
   'author.error.cantOpenLink':
     'Não consigo encontrar nenhum aplicativo para abrir este link.',
   'camerasList.topBar.title': 'Lista de câmeras',
@@ -43,7 +33,7 @@ export default {
   'menu.item.system.label': 'Sistema',
   'menu.item.logs.label': 'Registros',
   'menu.item.settings.label': 'Configurações',
-  'menu.item.author.label': 'Autor',
+  'menu.item.author.label': 'Sobre',
   'menu.item.report.label': 'Reportar problema',
   'report.topBar.title': 'Reportar problema',
   'report.introduction.info':

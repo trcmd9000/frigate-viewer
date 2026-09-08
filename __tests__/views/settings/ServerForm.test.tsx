@@ -54,14 +54,22 @@ jest.mock('react-native-ui-lib', () => ({
   View: ({children}: any) => <>{children}</>,
 }));
 
+let mockTheme = {
+  background: '#ffffff',
+  text: '#1f2933',
+  textSecondary: '#52606d',
+  textInverse: '#ffffff',
+  link: '#145dcc',
+  highlighted: '#f0f4f8',
+  surface: '#ffffff',
+  border: '#cbd2d9',
+  error: '#ba1a1a',
+};
+
 jest.mock('../../../helpers/colors', () => ({
-  useTheme: () => ({
-    background: '#fff',
-    text: '#000',
-    link: '#0066cc',
-  }),
+  useTheme: () => mockTheme,
   useStyles: (fn: any) =>
-    fn({theme: {background: '#fff', text: '#000', link: '#0066cc'}}),
+    fn({theme: mockTheme}),
 }));
 
 jest.mock('../../../helpers/secureStorage', () => ({
@@ -97,26 +105,23 @@ const GermanServerFormTestWrapper = (props: any) => (
   </IntlProvider>
 );
 
-const expandSection = (getByTestId: any, testID: string) => {
-  const section = getByTestId(testID);
-  if (!section.props.accessibilityState?.expanded) {
-    fireEvent.press(within(section).getAllByRole('button')[0]);
-  }
-};
-
-const collapseSection = (getByTestId: any, testID: string) => {
-  const section = getByTestId(testID);
-  if (section.props.accessibilityState?.expanded) {
-    fireEvent.press(within(section).getAllByRole('button')[0]);
-  }
-};
-
 describe('ServerForm Component', () => {
   const mockOnSubmit = jest.fn();
   const mockComponentId = 'test-component-id';
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTheme = {
+      background: '#ffffff',
+      text: '#1f2933',
+      textSecondary: '#52606d',
+      textInverse: '#ffffff',
+      link: '#145dcc',
+      highlighted: '#f0f4f8',
+      surface: '#ffffff',
+      border: '#cbd2d9',
+      error: '#ba1a1a',
+    };
     mockSaveCredentials.mockResolvedValue(undefined);
   });
 
@@ -180,20 +185,130 @@ describe('ServerForm Component', () => {
       expect(
         existingProfile.getByTestId('server-form-submit').props.accessibilityLabel,
       ).toBe('Save changes');
+
+      const germanNewProfile = render(
+        <GermanServerFormTestWrapper
+          componentId={mockComponentId}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+      expect(
+        germanNewProfile.getByTestId('server-form-submit').props
+          .accessibilityLabel,
+      ).toBe('Hinzufügen');
     });
 
-    it('starts a valid external server section collapsed', () => {
+    it('uses strong semantic colors and explicit enabled accessibility state', () => {
+      const light = render(
+        <ServerFormTestWrapper
+          componentId={mockComponentId}
+          server={{...emptyServer(), host: 'example.test'}}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+      const lightButton = light.getByTestId('server-form-submit');
+      expect(lightButton.props.backgroundColor).toBe('#145dcc');
+      expect(lightButton.props.color).toBe('#ffffff');
+      expect(lightButton.props.disabledBackgroundColor).toBe('#f0f4f8');
+      expect(lightButton.props.accessibilityState).toEqual({disabled: false});
+
+      mockTheme = {
+        ...mockTheme,
+        background: '#121212',
+        text: '#f5f7fa',
+        textSecondary: '#b8c0cc',
+        textInverse: '#111111',
+        link: '#8ab4ff',
+        highlighted: '#30363d',
+        surface: '#1e1e1e',
+        border: '#4b5563',
+        error: '#ff8a80',
+      };
+      const dark = render(
+        <ServerFormTestWrapper
+          componentId={mockComponentId}
+          server={{...emptyServer(), host: 'example.test'}}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+      const darkButton = dark.getByTestId('server-form-submit');
+      expect(darkButton.props.backgroundColor).toBe('#8ab4ff');
+      expect(darkButton.props.color).toBe('#111111');
+      expect(darkButton.props.disabledBackgroundColor).toBe('#30363d');
+    });
+
+    it('keeps the disabled primary action legible and accessible', async () => {
+      let resolveSubmit: (() => void) | undefined;
+      mockOnSubmit.mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            resolveSubmit = resolve;
+          }),
+      );
       const {getByTestId} = render(
         <ServerFormTestWrapper
           componentId={mockComponentId}
-          server={{...emptyServer(), host: 'frigate.local'}}
+          server={{...emptyServer(), host: 'example.test'}}
           onSubmit={mockOnSubmit}
         />,
       );
 
-      expect(
-        getByTestId('server-section-external').props.accessibilityState,
-      ).toEqual({expanded: false});
+      fireEvent.press(getByTestId('server-form-submit'));
+      await waitFor(() => {
+        const button = getByTestId('server-form-submit');
+        expect(button.props.accessibilityState).toEqual({disabled: true});
+        expect(button.props.color).toBe('#52606d');
+        expect(button.props.disabledBackgroundColor).toBe('#f0f4f8');
+        expect(button.props.accessibilityState).toEqual({disabled: true});
+      });
+      resolveSubmit?.();
+    });
+
+    it('shows all configured sections and controls without expansion controls', () => {
+      const {getByLabelText, getByTestId, queryByText} = render(
+        <ServerFormTestWrapper
+          componentId={mockComponentId}
+          server={{
+            ...emptyServer(),
+            host: 'frigate.local',
+            auth: 'basic',
+            credentials: {username: 'user', password: 'pass'},
+            mtlsEnabled: true,
+            clientCertConfig: {alias: 'external-cert'},
+            localRoutingEnabled: true,
+            localEndpoint: {
+              protocol: 'https',
+              host: '192.168.1.20',
+              port: 8971,
+              basePath: '',
+            },
+            localTls: {
+              mtlsEnabled: true,
+              clientCertConfig: {alias: 'local-cert'},
+            },
+            rtsp: {enabled: true, port: 8554, allowInsecureCredentials: false},
+          }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      for (const testID of [
+        'server-section-external',
+        'server-section-auth',
+        'server-section-certificate',
+        'server-section-local',
+        'server-section-local-trust',
+        'server-section-rtsp',
+      ]) {
+        expect(getByTestId(testID).props.accessibilityState).toBeUndefined();
+      }
+      expect(getByLabelText('Username')).toBeTruthy();
+      expect(getByTestId('server-mtls-toggle')).toBeTruthy();
+      expect(getByTestId('server-local-route-toggle')).toBeTruthy();
+      expect(getByTestId('server-local-mtls-toggle')).toBeTruthy();
+      expect(getByTestId('server-rtsp-toggle')).toBeTruthy();
+      expect(queryByText('+')).toBeNull();
+      expect(queryByText('−')).toBeNull();
     });
 
     it('localizes save wording for an existing German profile', () => {
@@ -261,7 +376,6 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expandSection(getByTestId, 'server-section-local');
       fireEvent(
         getByTestId('server-local-route-toggle'),
         'valueChange',
@@ -301,7 +415,6 @@ describe('ServerForm Component', () => {
           onSubmit={mockOnSubmit}
         />,
       );
-      expandSection(authenticated.getByTestId, 'server-section-auth');
       expect(authenticated.getByLabelText('Username')).toBeTruthy();
       expect(authenticated.getByLabelText('Type of authorization')).toBeTruthy();
     });
@@ -573,7 +686,6 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expandSection(getByTestId, 'server-section-certificate');
       const name = getByTestId('server-mtls-certificate-name');
       expect(name.props.children).toBe(alias);
       expect(name.props.numberOfLines).toBe(1);
@@ -756,29 +868,6 @@ describe('ServerForm Component', () => {
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
 
-    it('opens the first invalid progressive section after submit', async () => {
-      const {getByTestId, getByText} = render(
-        <ServerFormTestWrapper
-          componentId={mockComponentId}
-          onSubmit={mockOnSubmit}
-        />,
-      );
-
-      fireEvent.press(getByText('External connection'));
-      expect(
-        getByTestId('server-section-external').props.accessibilityState,
-      ).toEqual({
-        expanded: false,
-      });
-
-      fireEvent.press(getByTestId('server-form-submit'));
-      await waitFor(() => {
-        expect(
-          getByTestId('server-section-external').props.accessibilityState,
-        ).toEqual({expanded: true});
-      });
-    });
-
     it('shows secure-storage failures without submitting the server', async () => {
       mockSaveCredentials.mockRejectedValue(new Error('Storage unavailable'));
       const server: Server = {
@@ -865,12 +954,55 @@ describe('ServerForm Component', () => {
           onSubmit={mockOnSubmit}
         />,
       );
-      expandSection(getByTestId, 'server-section-auth');
+      expect(getByLabelText('Username').props.textContentType).toBe('username');
+      expect(getByLabelText('Username').props.autoComplete).toBe('username');
       const password = getByLabelText('Password');
       expect(password.props.secureTextEntry).toBe(true);
+      expect(password.props.textContentType).toBe('password');
+      expect(password.props.autoComplete).toBe('password');
 
       fireEvent.press(getByTestId('server-password-toggle'));
       expect(getByLabelText('Password').props.secureTextEntry).toBe(false);
+    });
+
+    it('requires and persists explicit consent for remote HTTP', async () => {
+      const server: Server = {
+        ...emptyServer(),
+        protocol: 'http',
+        host: 'example.com',
+        port: 80,
+      };
+      const {getByTestId, getByText} = render(
+        <ServerFormTestWrapper
+          componentId={mockComponentId}
+          server={server}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      expect(getByTestId('server-remote-http-warning')).toBeTruthy();
+      fireEvent.press(getByTestId('server-form-submit'));
+      await waitFor(() => {
+        expect(
+          getByText('Explicit consent is required before using a remote HTTP endpoint.'),
+        ).toBeTruthy();
+      });
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+
+      fireEvent(
+        getByTestId('server-remote-http-consent-toggle'),
+        'valueChange',
+        true,
+      );
+      fireEvent.press(getByTestId('server-form-submit'));
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            protocol: 'http',
+            allowInsecureRemoteHttp: true,
+          }),
+        );
+      });
     });
 
     it('validates HTTPS and certificate selection when mTLS is enabled', async () => {
@@ -897,98 +1029,6 @@ describe('ServerForm Component', () => {
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
 
-    it('opens the certificate section for stored mTLS over HTTP', async () => {
-      const {getByTestId, getByText} = render(
-        <ServerFormTestWrapper
-          componentId={mockComponentId}
-          server={{
-            ...emptyServer(),
-            protocol: 'http',
-            host: 'example.com',
-            mtlsEnabled: true,
-            clientCertConfig: {alias: 'stored-cert'},
-          }}
-          onSubmit={mockOnSubmit}
-        />,
-      );
-
-      collapseSection(getByTestId, 'server-section-certificate');
-      fireEvent.press(getByTestId('server-form-submit'));
-      await waitFor(() => {
-        expect(getByText('mTLS requires HTTPS.')).toBeTruthy();
-        expect(
-          getByTestId('server-section-certificate').props.accessibilityState,
-        ).toEqual({expanded: true});
-      });
-    });
-
-    it('opens RTSP for an invalid persisted port', async () => {
-      const {getByTestId, getByText} = render(
-        <ServerFormTestWrapper
-          componentId={mockComponentId}
-          server={{
-            ...emptyServer(),
-            host: 'example.com',
-            localRoutingEnabled: true,
-            localEndpoint: {
-              protocol: 'https',
-              host: '192.168.1.20',
-              port: 8971,
-              basePath: '',
-            },
-            rtsp: {enabled: true, port: 70000, allowInsecureCredentials: false},
-          }}
-          onSubmit={mockOnSubmit}
-        />,
-      );
-
-      collapseSection(getByTestId, 'server-section-rtsp');
-      fireEvent.press(getByTestId('server-form-submit'));
-      await waitFor(() => {
-        expect(getByText('Enter a port from 1 to 65535.')).toBeTruthy();
-        expect(getByTestId('server-section-rtsp').props.accessibilityState).toEqual(
-          {expanded: true},
-        );
-      });
-    });
-
-    it('opens local TLS and its parent for a local TLS validation error', async () => {
-      const {getByTestId, getByText} = render(
-        <ServerFormTestWrapper
-          componentId={mockComponentId}
-          server={{
-            ...emptyServer(),
-            host: 'example.com',
-            localRoutingEnabled: true,
-            localEndpoint: {
-              protocol: 'http',
-              host: '192.168.1.20',
-              port: 8971,
-              basePath: '',
-            },
-            localTls: {
-              mtlsEnabled: true,
-              clientCertConfig: {alias: 'stored-local-cert'},
-            },
-          }}
-          onSubmit={mockOnSubmit}
-        />,
-      );
-
-      collapseSection(getByTestId, 'server-section-local');
-      collapseSection(getByTestId, 'server-section-local-trust');
-      fireEvent.press(getByTestId('server-form-submit'));
-      await waitFor(() => {
-        expect(getByText('Local mTLS requires HTTPS.')).toBeTruthy();
-        expect(
-          getByTestId('server-section-local').props.accessibilityState,
-        ).toEqual({expanded: true});
-        expect(
-          getByTestId('server-section-local-trust').props.accessibilityState,
-        ).toEqual({expanded: true});
-      });
-    });
-
     it('configures a local route with RTSP defaults and a KeyChain identity', async () => {
       const server: Server = {
         ...emptyServer(),
@@ -1004,10 +1044,7 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expandSection(getByTestId, 'server-section-local');
       fireEvent(getByTestId('server-local-route-toggle'), 'valueChange', true);
-      expandSection(getByTestId, 'server-section-local-trust');
-      expandSection(getByTestId, 'server-section-rtsp');
       fireEvent.changeText(getByTestId('server-local-host'), '192.168.1.20');
       fireEvent(getByTestId('server-local-mtls-toggle'), 'valueChange', true);
       fireEvent.press(getByLabelText('Change local identity'));
@@ -1067,8 +1104,6 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expandSection(getByTestId, 'server-section-local');
-      expandSection(getByTestId, 'server-section-rtsp');
       expect(
         getByText(
           'HTTP is only used for RTSP reachability. The authenticated API remains external.',
@@ -1166,7 +1201,6 @@ describe('ServerForm Component', () => {
         .mockImplementation((_title, _message, buttons) => {
           buttons?.[1]?.onPress?.();
         });
-      expandSection(getByTestId, 'server-section-certificate');
       fireEvent.press(getByLabelText('Change certificate'));
       await waitFor(() => {
         expect(getByText('cert-1')).toBeTruthy();
@@ -1203,6 +1237,11 @@ describe('ServerForm Component', () => {
         />,
       );
 
+      expect(
+        getByText(
+          'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
+        ),
+      ).toBeTruthy();
       fireEvent(
         getByTestId('server-mtls-self-signed-toggle'),
         'valueChange',
@@ -1251,8 +1290,6 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expandSection(getByTestId, 'server-section-local');
-      expandSection(getByTestId, 'server-section-local-trust');
       fireEvent(
         getByTestId('server-local-mtls-self-signed-toggle'),
         'valueChange',

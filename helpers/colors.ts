@@ -1,10 +1,10 @@
-import {StyleSheet, useColorScheme} from 'react-native';
+import {Platform, StyleSheet, useColorScheme} from 'react-native';
 import {selectAppColorScheme} from '../store/settings';
 import {useAppSelector} from '../store/store';
 import {useMemo} from 'react';
 
 export type ColorScheme = 'light' | 'dark';
-export type NavigationSurface = 'app' | 'media';
+export type NavigationSurface = 'app' | 'media' | 'event';
 
 export type ColorName =
   | 'background'
@@ -21,6 +21,7 @@ export type ColorName =
   | 'overlay'
   | 'mediaBackground'
   | 'mediaOverlay'
+  | 'mediaOverlayPanel'
   | 'mediaText'
   | 'error'
   | 'warning'
@@ -58,6 +59,7 @@ export const lightTheme: Theme = {
   overlay: '#00000066',
   mediaBackground: '#000000',
   mediaOverlay: '#000000b8',
+  mediaOverlayPanel: '#00000099',
   mediaText: '#ffffff',
   error: '#ba1a1a',
   warning: '#8a5800',
@@ -86,6 +88,7 @@ export const darkTheme: Theme = {
   overlay: '#00000088',
   mediaBackground: '#000000',
   mediaOverlay: '#000000cc',
+  mediaOverlayPanel: '#000000aa',
   mediaText: '#ffffff',
   error: '#ff8a80',
   warning: '#ffd166',
@@ -144,12 +147,13 @@ export const navigationThemeOptions = (
   statusBar: {
     backgroundColor: theme.background,
     style: scheme === 'dark' ? ('light' as const) : ('dark' as const),
+    visible: Platform.OS !== 'android' || surface !== 'event',
     animate: true,
   },
   navigationBar: {
     backgroundColor:
-      surface === 'media' ? theme.mediaBackground : theme.background,
-    visible: surface !== 'media',
+      surface === 'app' ? theme.background : theme.mediaBackground,
+    visible: surface === 'app',
   },
   bottomTabs: {
     backgroundColor: theme.surface,

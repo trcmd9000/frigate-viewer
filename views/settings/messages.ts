@@ -14,6 +14,12 @@ export const messages = makeMessages('settings', {
   'server.header': 'Server',
   'server.address.header': 'Address',
   'server.external.header': 'External connection',
+  'server.external.httpWarning':
+    'This connection uses unencrypted HTTP. A man-in-the-middle can read or alter Frigate credentials, cookies, images, and video.',
+  'server.external.httpConsent':
+    'I understand and consent to sending credentials, cookies, images, and video over remote unencrypted HTTP',
+  'server.external.httpConsentRequired':
+    'Explicit consent is required before using a remote HTTP endpoint.',
   'server.auth.header': 'Authorization',
   'server.auth.progressiveHeader': 'Frigate authentication',
   'server.mtls.progressiveHeader': 'Client certificate and trust',
@@ -80,6 +86,8 @@ export const messages = makeMessages('settings', {
   'server.mtls.certificate.remove.cancel': 'Cancel',
   'server.mtls.certificate.remove.confirm': 'Remove',
   'server.mtls.selfSigned.label': 'Allow self-signed server certificate',
+  'server.mtls.selfSigned.warning':
+    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'server.mtls.help':
     'Use this if your Frigate server requires mutual TLS (mTLS) authentication. The certificate must be installed on your device.',
   'server.local.header': 'Local route',
@@ -111,6 +119,8 @@ export const messages = makeMessages('settings', {
   'server.local.mtls.certificate.remove.confirm': 'Remove',
   'server.local.mtls.selfSigned.label':
     'Allow self-signed local server certificate',
+  'server.local.mtls.selfSigned.warning':
+    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'server.local.mtls.help':
     'The external server identity is preselected when available. Only the KeyChain alias is stored; certificate and private-key material stay in the device KeyChain.',
   'server.rtsp.header': 'RTSP reachability',

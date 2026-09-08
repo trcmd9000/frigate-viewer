@@ -1,5 +1,5 @@
 import {Buffer} from 'buffer';
-import {ToastAndroid} from 'react-native';
+import {Platform, ToastAndroid} from 'react-native';
 import type {Server} from '../store/settings';
 import {useIntl} from 'react-intl';
 import {messages} from './rest.messages';
@@ -7,6 +7,7 @@ import {
   HttpRequestOptions,
   HttpResponse,
   httpClientWithCert,
+  isScopedServerIdentity,
 } from './httpWithClientCert';
 import {SecureLogger} from './secureLogger';
 import {
@@ -17,9 +18,12 @@ import {
 import {
   canonicalServerEndpoint,
   serverIdentity,
+  serverProfileIdentity,
   serverRouteIdentity,
   serverUsesClientCertificate,
 } from './serverIdentity';
+import {assertRemoteHttpConsent} from './remoteHttpPolicy';
+import {invalidateProtectedMediaProfile} from './protectedMedia';
 
 export const buildServerUrl = (server: Server) => {
   return canonicalServerEndpoint(server)?.requestBaseUrl;
@@ -45,6 +49,37 @@ export const requestServerIdentity = (server: Server): string => {
   return requestRouteIdentity(server, 'remote');
 };
 
+/**
+ * Retire only the native session for this profile and credential scope.
+ * Platforms without profile-scoped native networking safely no-op.
+ */
+export const invalidateServerSession = (server: Server): void => {
+  const username = server.auth === 'none' ? '' : server.credentials.username || '';
+  const password = server.auth === 'none' ? '' : server.credentials.password || '';
+  [requestRouteIdentity(server, 'remote'), requestRouteIdentity(server, 'local')].forEach(
+    identity =>
+      httpClientWithCert.invalidateServerSession(
+        identity,
+        server.auth,
+        username,
+        password,
+      ),
+  );
+  httpClientWithCert.invalidateMediaProfile?.(serverProfileIdentity(server));
+  invalidateProtectedMediaProfile(server);
+};
+
+export const profileTransportOptions = (
+  server: Server,
+): Pick<
+  HttpRequestOptions,
+  'profileAuth' | 'profileUsername' | 'profilePassword'
+> => ({
+  profileAuth: server.auth,
+  profileUsername: server.auth === 'none' ? '' : server.credentials.username || '',
+  profilePassword: server.auth === 'none' ? '' : server.credentials.password || '',
+});
+
 const requestRouteIdentity = (
   server: Server,
   route: 'remote' | 'local',
@@ -60,15 +95,26 @@ const requestRouteIdentity = (
               ? server.clientCertConfig?.alias
               : undefined,
           );
-  if (typeof httpClientWithCert.scopeServerIdentity !== 'function') {
+  if (Platform.OS !== 'android') {
     return identity;
   }
-  return httpClientWithCert.scopeServerIdentity(
+  if (typeof httpClientWithCert.scopeServerIdentity !== 'function') {
+    throw new Error(
+      'Profile-scoped Android identity derivation is unavailable',
+    );
+  }
+  const scopedIdentity = httpClientWithCert.scopeServerIdentity(
     identity,
     server.auth,
     server.credentials.username,
     server.credentials.password,
   );
+  if (!isScopedServerIdentity(scopedIdentity, identity)) {
+    throw new Error(
+      'Profile-scoped Android identity derivation returned an invalid scope',
+    );
+  }
+  return scopedIdentity;
 };
 
 const loginRequests = new Map<string, Promise<void>>();
@@ -94,7 +140,13 @@ export const executeServerRequest = async (
     options.method || 'GET',
   );
   const remoteBaseUrl = buildServerUrl(server) || '';
-  const useLocalRoute = route?.route === 'local';
+  const useLocalRoute =
+    route?.route === 'local' &&
+    Boolean(remoteBaseUrl) &&
+    url.startsWith(remoteBaseUrl);
+  if (!useLocalRoute) {
+    assertRemoteHttpConsent(server);
+  }
   const requestUrl = useLocalRoute
     ? routeRequestUrl(url, remoteBaseUrl, route.baseUrl)
     : url;
@@ -117,6 +169,7 @@ export const executeServerRequest = async (
   if (serverUsesClientCertificate(routeServer)) {
     return httpClientWithCert.request(requestUrl, {
       ...options,
+      ...profileTransportOptions(server),
       clientCertAlias: routeServer.clientCertConfig?.alias || '',
       clientCertServerIdentity:
         useLocalRoute
@@ -129,6 +182,7 @@ export const executeServerRequest = async (
 
   return httpClientWithCert.request(requestUrl, {
     ...options,
+    ...profileTransportOptions(server),
     clientCertServerIdentity: useLocalRoute
       ? requestRouteIdentity(server, 'local')
       : requestServerIdentity(server),

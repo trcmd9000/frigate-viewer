@@ -2,18 +2,17 @@ export default {
   'api.frigateAuth.wrongCredentials':
     'Authorization error, check your credentials.',
   'api.error.unauthorized': 'Wrong credentials when tried to reach {url}',
-  'author.topBar.title': 'Author',
-  'author.info.authorLabel': 'Author',
-  'author.info.contactLabel': 'Contact',
-  'author.info.privacyPolicyLabel': 'Privacy Policy',
-  'author.info.opensourceLabel': 'This project is open source.',
-  'author.info.githubLabel': 'See on github',
-  'author.buyMeCoffee.nonProfitLabel':
-    "The project was created for learning purposes and I don't intend to profit from granting licences.",
-  'author.buyMeCoffee.doYouLikeLabel': 'Do you like this application',
-  'author.buyMeCoffee.sayThankYouLabel': 'and want to say "thank you"?',
-  'author.buyMeCoffee.buttonText': 'Buy me a coffee',
-  'author.usedLibs.header': 'Used libraries:',
+  'author.topBar.title': 'About',
+  'author.identity': 'Frigate Viewer',
+  'author.maintainer': 'Maintained by trcmd9000',
+  'author.contact': 'Contact maintainer',
+  'author.privacy': 'Privacy policy',
+  'author.source': 'Source code and license',
+  'author.disclaimer':
+    'Frigate Viewer is an independent client compatible with Frigate. It is not affiliated with or endorsed by the Frigate project.',
+  'author.upstream': 'Original upstream attribution',
+  'author.upstreamDescription':
+    'Originally based on sp-engineering/frigate-viewer. This attribution does not imply endorsement.',
   'author.error.cantOpenLink': "Can't find any app to open this link.",
   'camerasList.topBar.title': 'List of cameras',
   'camerasList.noCameras': 'No cameras',
@@ -41,6 +40,7 @@ export default {
   'cameraEvents.noServer': 'Add a server to see events.',
   'cameraEvents.loading': 'Loading events',
   'cameraEvents.labels.inProgressLabel': 'In progress',
+  'cameraEvents.labels.duration': 'duration {duration}',
   'cameraEvents.action.delete': 'Delete',
   'cameraEvents.action.retain': 'Retain',
   'cameraEvents.action.unretain': 'Unretain',
@@ -57,16 +57,16 @@ export default {
   'cameraEventClip.error':
     'Unable to play protected media. Check your connection and try again.',
   'cameraEventClip.retry': 'Retry protected media',
-  'cameraEventClip.share': 'Share protected event clip',
-  'cameraEventClip.shareHint': 'Opens sharing options',
+  'cameraEventClip.share': 'Share clip',
+  'cameraEventClip.shareHint': 'Shares the clip using another app',
   'cameraEventClip.playbackSpeed': 'Playback speed',
   'cameraEventClip.playbackSpeedHint': 'Choose playback speed',
   'cameraEventClip.playbackSpeedMenu': 'Playback speed options',
   'cameraEventClip.more': 'More event actions',
   'cameraEventClip.moreHint': 'Opens more event actions',
   'cameraEventClip.moreMenu': 'Event actions',
-  'cameraEventClip.download': 'Download event clip',
-  'cameraEventClip.downloadHint': 'Downloads the event clip',
+  'cameraEventClip.download': 'Save to device',
+  'cameraEventClip.downloadHint': 'Saves a copy of the clip on this device',
   'cameraEventClip.toggleControls': 'Show or hide player controls',
   'cameraEventClip.toggleControlsHint': 'Shows or hides player controls',
   'cameraEventClip.play': 'Play video',
@@ -85,6 +85,8 @@ export default {
   'cameraPreview.audio.mute': 'Disable audio',
   'cameraPreview.fallback.message':
     'Live stream unavailable. Protected snapshots are shown instead.',
+  'cameraPreview.fallback.landscape':
+    'Live unavailable — showing snapshots',
   'cameraPreview.fallback.codec':
     'The live stream uses no compatible video codec. Protected snapshots are shown instead.',
   'cameraPreview.fallback.ice':
@@ -135,7 +137,7 @@ export default {
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Logs',
   'menu.item.settings.label': 'Settings',
-  'menu.item.author.label': 'Author',
+  'menu.item.author.label': 'About',
   'menu.item.report.label': 'Report problem',
   'report.topBar.title': 'Report problem',
   'report.introduction.info':
@@ -158,6 +160,12 @@ export default {
   'settings.server.header': 'Server',
   'settings.server.address.header': 'Address',
   'settings.server.external.header': 'External connection',
+  'settings.server.external.httpWarning':
+    'This connection uses unencrypted HTTP. A man-in-the-middle can read or alter Frigate credentials, cookies, images, and video.',
+  'settings.server.external.httpConsent':
+    'I understand and consent to sending credentials, cookies, images, and video over remote unencrypted HTTP',
+  'settings.server.external.httpConsentRequired':
+    'Explicit consent is required before using a remote HTTP endpoint.',
   'settings.server.auth.header': 'Authorization',
   'settings.server.auth.progressiveHeader': 'Frigate authentication',
   'settings.server.mtls.progressiveHeader': 'Client certificate and trust',
@@ -229,6 +237,8 @@ export default {
   'settings.server.mtls.certificate.remove.confirm': 'Remove',
   'settings.server.mtls.selfSigned.label':
     'Allow self-signed server certificate',
+  'settings.server.mtls.selfSigned.warning':
+    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'settings.server.mtls.help':
     'Use this if your Frigate server requires mutual TLS (mTLS) authentication. The certificate must be installed on your device.',
   'settings.server.local.header': 'Local route',
@@ -261,6 +271,8 @@ export default {
   'settings.server.local.mtls.certificate.remove.confirm': 'Remove',
   'settings.server.local.mtls.selfSigned.label':
     'Allow self-signed local server certificate',
+  'settings.server.local.mtls.selfSigned.warning':
+    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'settings.server.local.mtls.help':
     'The external server identity is preselected when available. Only the KeyChain alias is stored; certificate and private-key material stay in the device KeyChain.',
   'settings.server.rtsp.header': 'RTSP reachability',

@@ -3,17 +3,7 @@ export default {
     'Error de autorización, verifique sus credenciales.',
   'api.error.unauthorized':
     'Credenciales incorrectas al intentar acceder a {url}.',
-  'author.topBar.title': 'Autor',
-  'author.info.authorLabel': 'Autor',
-  'author.info.contactLabel': 'Contacto',
-  'author.info.opensourceLabel': 'Este proyecto es de código abierto.',
-  'author.info.githubLabel': 'Ver en github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'El proyecto fue creado con fines de aprendizaje y no tengo la intención de beneficiarse de la concesión de licencias.',
-  'author.buyMeCoffee.doYouLikeLabel': '¿Te gusta esta aplicación',
-  'author.buyMeCoffee.sayThankYouLabel': 'y quieres decir "gracias"?',
-  'author.buyMeCoffee.buttonText': 'Comprarme un café',
-  'author.usedLibs.header': 'Lista de bibliotecas usadas:',
+  'author.topBar.title': 'Acerca de',
   'author.error.cantOpenLink':
     'No se puede encontrar ninguna aplicación para abrir este enlace.',
   'camerasList.topBar.title': 'Lista de cámaras',
@@ -44,7 +34,7 @@ export default {
   'menu.item.system.label': 'Sistema',
   'menu.item.logs.label': 'Registros',
   'menu.item.settings.label': 'Configuración',
-  'menu.item.author.label': 'Autor',
+  'menu.item.author.label': 'Acerca de',
   'menu.item.report.label': 'Reportar problema',
   'report.topBar.title': 'Reportar problema',
   'report.introduction.info':

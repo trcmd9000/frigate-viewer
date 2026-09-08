@@ -10,6 +10,7 @@ export interface ISectionProps extends TextInputProps {
   testID?: string;
   invalid?: boolean;
   compact?: boolean;
+  alwaysExpanded?: boolean;
 }
 
 export const Section: FC<ISectionProps> = ({
@@ -21,6 +22,7 @@ export const Section: FC<ISectionProps> = ({
   testID,
   invalid,
   compact = false,
+  alwaysExpanded = false,
 }) => {
   const tokens = useDesignTokens();
   const headerContent = (
@@ -51,9 +53,9 @@ export const Section: FC<ISectionProps> = ({
     <View
       testID={testID}
       style={{marginVertical: compact ? tokens.spacing.sm : tokens.spacing.md}}
-      accessibilityState={onToggle ? {expanded} : undefined}
+      accessibilityState={onToggle && !alwaysExpanded ? {expanded} : undefined}
     >
-      {onToggle ? (
+      {onToggle && !alwaysExpanded ? (
         <Pressable
           onPress={onToggle}
           accessibilityRole="button"
@@ -80,7 +82,7 @@ export const Section: FC<ISectionProps> = ({
       ) : (
         headerContent
       )}
-      {expanded ? children : null}
+      {alwaysExpanded || expanded ? children : null}
     </View>
   );
 };
