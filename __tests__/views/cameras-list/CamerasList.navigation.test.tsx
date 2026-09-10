@@ -12,6 +12,11 @@ const state = {
 
 const mockGet = jest.fn();
 const mockDispatch = jest.fn();
+const mockStore = {getState: () => ({events: {scopeGeneration: 0}})};
+
+jest.mock('react-redux', () => ({
+  useStore: () => mockStore,
+}));
 
 jest.mock('react-native-navigation', () => ({
   Navigation: {
@@ -25,13 +30,12 @@ jest.mock('react-native-navigation', () => ({
 
 jest.mock('react-intl', () => ({
   useIntl: () => ({
-    formatMessage: ({id}: {id: string}) =>
-      ({
-        'camerasList.tab.cameras': 'Kamera',
-        'camerasList.tab.events': 'Ereignisse',
-        'camerasList.tab.settings': 'Einstellungen',
-        'camerasList.refresh': 'Aktualisieren',
-      }[id] || id),
+    formatMessage: ({id}: {id: string}) => {
+      const messages = (state.locale === 'en_US'
+        ? require('../../../i18n/en')
+        : require('../../../i18n/de')).default as Record<string, string>;
+      return messages[id] || id;
+    },
   }),
   defineMessages: (messages: unknown) => messages,
 }));
@@ -48,9 +52,8 @@ jest.mock('../../../store/events', () => ({
   selectAvailableCameras: 'cameras',
   selectAvailableLabels: 'labels',
   selectAvailableZones: 'zones',
-  setAvailableCameras: jest.fn(),
-  setAvailableLabels: jest.fn(),
-  setAvailableZones: jest.fn(),
+  selectServerScopeGeneration: () => 0,
+  setAvailableForScope: jest.fn(),
 }));
 
 jest.mock('../../../store/settings', () => ({
@@ -61,8 +64,10 @@ jest.mock('../../../store/settings', () => ({
 
 jest.mock('../../../store/store', () => ({
   useAppDispatch: () => mockDispatch,
-  useAppSelector: (selector: string) =>
-    state[selector as 'server' | 'cameras' | 'columns' | 'locale'],
+  useAppSelector: (selector: string | (() => number)) =>
+    typeof selector === 'function'
+      ? selector()
+      : state[selector as 'server' | 'cameras' | 'columns' | 'locale'],
 }));
 
 jest.mock('../../../views/menu/menuHelpers', () => ({
@@ -120,6 +125,18 @@ describe('CamerasList Settings navigation', () => {
     state.locale = 'de_DE';
     mockGet.mockReset();
     mockDispatch.mockReset();
+  });
+
+  it.each([
+    ['de_DE', 'Kameraübersicht'],
+    ['en_US', 'Camera overview'],
+  ])('uses the overview heading for %s', async (locale, title) => {
+    state.locale = locale;
+    render(<CamerasList componentId="cameras" componentName="CamerasList" />);
+    await waitFor(() => expect(Navigation.mergeOptions).toHaveBeenCalledWith(
+      'cameras',
+      expect.objectContaining({topBar: expect.objectContaining({title: {text: title}})}),
+    ));
   });
 
   it('opens no-server Configure as a modal and suppresses duplicate taps', async () => {

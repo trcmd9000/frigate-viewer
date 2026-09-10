@@ -8,21 +8,32 @@ export type ProtectedLiveFailureReason =
   | 'renderer'
   | 'timeout';
 
+export type ProtectedLiveDiagnosticsStage =
+  | 'answer'
+  | 'frame-ready'
+  | 'post-answer'
+  | 'post-frame'
+  | 'timeout';
+
 export interface ProtectedLiveDiagnostics {
   connectionState: string;
   iceConnectionState: string;
   videoTrackCount: number;
   mutedVideoTrackCount: number;
   endedVideoTrackCount: number;
+  acceptedAudio?: boolean;
+  receiverAudioTrackCount?: number;
+  streamAudioTrackCount?: number;
+  audioTrackCount?: number;
+  readyAudioTrackCount?: number;
+  mutedAudioTrackCount?: number;
+  enabledAudioTrackCount?: number;
+  endedAudioTrackCount?: number;
   inboundVideoPackets?: number;
   inboundVideoFrames?: number;
-  codec?: string;
-  candidateType?: string;
-  candidateProtocol?: string;
+  inboundAudioPackets?: number;
+  inboundAudioBytes?: number;
 }
-
-const safeState = (value: unknown): string =>
-  typeof value === 'string' && /^[a-z-]{1,32}$/i.test(value) ? value : 'unknown';
 
 const safeNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
@@ -69,14 +80,48 @@ export const classifyProtectedLiveTimeout = (
 
 export const formatProtectedLiveDiagnostics = (
   diagnostics: ProtectedLiveDiagnostics,
+  stage: ProtectedLiveDiagnosticsStage = 'timeout',
 ): string => {
   const fields = [
-    `connection=${safeState(diagnostics.connectionState)}`,
-    `ice=${safeState(diagnostics.iceConnectionState)}`,
-    `videoTracks=${diagnostics.videoTrackCount}`,
-    `mutedVideoTracks=${diagnostics.mutedVideoTrackCount}`,
-    `endedVideoTracks=${diagnostics.endedVideoTrackCount}`,
+    `stage=${stage}`,
+    `videoTracks=${safeNumber(diagnostics.videoTrackCount) ?? 0}`,
+    `mutedVideoTracks=${safeNumber(diagnostics.mutedVideoTrackCount) ?? 0}`,
+    `endedVideoTracks=${safeNumber(diagnostics.endedVideoTrackCount) ?? 0}`,
   ];
+  if (diagnostics.acceptedAudio !== undefined) {
+    fields.push(`acceptedAudio=${diagnostics.acceptedAudio}`);
+  }
+  const receiverAudioTracks = safeNumber(
+    diagnostics.receiverAudioTrackCount,
+  );
+  const streamAudioTracks = safeNumber(diagnostics.streamAudioTrackCount);
+  if (diagnostics.audioTrackCount !== undefined) {
+    fields.push(`audioTracks=${safeNumber(diagnostics.audioTrackCount) ?? 0}`);
+  }
+  if (receiverAudioTracks !== undefined) {
+    fields.push(`receiverAudioTracks=${receiverAudioTracks}`);
+  }
+  if (streamAudioTracks !== undefined) {
+    fields.push(`streamAudioTracks=${streamAudioTracks}`);
+  }
+  const readyAudioTracks = safeNumber(diagnostics.readyAudioTrackCount);
+  if (readyAudioTracks !== undefined) {
+    fields.push(`readyAudioTracks=${readyAudioTracks}`);
+  }
+  if (diagnostics.mutedAudioTrackCount !== undefined) {
+    fields.push(
+      `mutedAudioTracks=${safeNumber(diagnostics.mutedAudioTrackCount) ?? 0}`,
+    );
+  }
+  const enabledAudioTracks = safeNumber(diagnostics.enabledAudioTrackCount);
+  if (enabledAudioTracks !== undefined) {
+    fields.push(`enabledAudioTracks=${enabledAudioTracks}`);
+  }
+  if (diagnostics.endedAudioTrackCount !== undefined) {
+    fields.push(
+      `endedAudioTracks=${safeNumber(diagnostics.endedAudioTrackCount) ?? 0}`,
+    );
+  }
   const packets = safeNumber(diagnostics.inboundVideoPackets);
   const frames = safeNumber(diagnostics.inboundVideoFrames);
   if (packets !== undefined) {
@@ -85,14 +130,13 @@ export const formatProtectedLiveDiagnostics = (
   if (frames !== undefined) {
     fields.push(`videoFrames=${frames}`);
   }
-  if (diagnostics.codec) {
-    fields.push(`codec=${diagnostics.codec}`);
+  const audioPackets = safeNumber(diagnostics.inboundAudioPackets);
+  const audioBytes = safeNumber(diagnostics.inboundAudioBytes);
+  if (audioPackets !== undefined) {
+    fields.push(`audioPackets=${audioPackets}`);
   }
-  if (diagnostics.candidateType) {
-    fields.push(`candidateType=${diagnostics.candidateType}`);
-  }
-  if (diagnostics.candidateProtocol) {
-    fields.push(`candidateProtocol=${diagnostics.candidateProtocol}`);
+  if (audioBytes !== undefined) {
+    fields.push(`audioBytes=${audioBytes}`);
   }
   return fields.join(', ');
 };

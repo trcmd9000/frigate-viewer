@@ -10,8 +10,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * React Native package for ClientCertModule.
- * Registers the ClientCertModule for use in React Native.
+ * React Native package for the project-owned native bridges.
+ * Registers the certificate and protected-audio modules for React Native.
  */
 public class ClientCertPackage implements ReactPackage {
 
@@ -19,6 +19,7 @@ public class ClientCertPackage implements ReactPackage {
   public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
     List<NativeModule> modules = new ArrayList<>();
     modules.add(new ClientCertModule(reactContext));
+    modules.add(new ProtectedAudioModule(reactContext));
     return modules;
   }
 

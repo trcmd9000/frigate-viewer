@@ -7,6 +7,11 @@ import {CameraEvents} from '../../../views/camera-events/CameraEvents';
 const mockGet = jest.fn().mockResolvedValue([]);
 const mockServer = {host: 'frigate.test'};
 const mockEmptyFilters: string[] = [];
+const mockStore = {getState: () => ({events: {scopeGeneration: 0}})};
+
+jest.mock('react-redux', () => ({
+  useStore: () => mockStore,
+}));
 
 jest.mock('../../../helpers/rest', () => ({useRest: () => ({get: mockGet})}));
 jest.mock('../../../views/settings/useNoServer', () => ({useNoServer: jest.fn()}));
@@ -61,6 +66,7 @@ jest.mock('../../../store/settings', () => ({
   setEventSnapshotHeight: (value: number) => ({payload: value}),
 }));
 jest.mock('../../../store/events', () => ({
+  selectServerScopeGeneration: () => 0,
   selectFiltersCameras: () => mockEmptyFilters,
   selectFiltersLabels: () => mockEmptyFilters,
   selectFiltersZones: () => mockEmptyFilters,

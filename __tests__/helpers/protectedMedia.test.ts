@@ -1,5 +1,6 @@
 const mockRegisterMediaProfile = jest.fn();
 const mockCreateMediaUri = jest.fn();
+const mockCreateMseMediaUri = jest.fn();
 const mockCreateRtspMediaUri = jest.fn();
 
 jest.mock('react-native', () => ({
@@ -8,6 +9,8 @@ jest.mock('react-native', () => ({
       registerMediaProfile: (...args: unknown[]) =>
         mockRegisterMediaProfile(...args),
       createMediaUri: (...args: unknown[]) => mockCreateMediaUri(...args),
+      createMseMediaUri: (...args: unknown[]) =>
+        mockCreateMseMediaUri(...args),
       createRtspMediaUri: (...args: unknown[]) =>
         mockCreateRtspMediaUri(...args),
     },
@@ -22,6 +25,7 @@ import {
   isProtectedMediaUri,
   normalizeProtectedMediaPath,
   protectedMediaProfileId,
+  protectedMseMediaUri,
   protectedMediaUri,
   localRtspMediaUri,
   resetProtectedMediaProfiles,
@@ -56,6 +60,9 @@ describe('protected media URI registration', () => {
     );
     mockCreateRtspMediaUri.mockResolvedValue(
       'frigate-media://0123456789abcdef0123456789abcdef/rtsp/opaquehandle',
+    );
+    mockCreateMseMediaUri.mockResolvedValue(
+      'frigate-media://0123456789abcdef0123456789abcdef/mse/front%3Amain',
     );
   });
 
@@ -207,6 +214,22 @@ describe('protected media URI registration', () => {
     expect(mockCreateRtspMediaUri).toHaveBeenCalledWith(
       '0123456789abcdef0123456789abcdef',
       'front_main',
+    );
+  });
+
+  it('returns an opaque MSE handle without exposing the server', async () => {
+    const configured = server();
+    const uri = await protectedMseMediaUri(configured, 'front:main');
+
+    expect(uri).toContain('/mse/front%3Amain');
+    expect(uri).not.toContain(configured.host);
+    expect(uri).not.toContain(configured.credentials.password);
+    expect(mockCreateMseMediaUri).toHaveBeenCalledWith(
+      '0123456789abcdef0123456789abcdef',
+      'front:main',
+    );
+    await expect(protectedMseMediaUri(configured, '../front')).rejects.toThrow(
+      'stream name',
     );
   });
 

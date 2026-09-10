@@ -160,6 +160,87 @@ public class MediaProfileRegistryTest {
   }
 
   @Test
+  public void buildsFixedProtectedMseSocketRequestWithEncodedStream() throws Exception {
+    String profileId = registry.register(
+      new MediaProfileRegistry.MediaProfileConfig(
+        "mse-profile-" + server.getPort(),
+        "http",
+        "127.0.0.1",
+        server.getPort(),
+        "/frigate",
+        "basic",
+        "viewer",
+        "synthetic-password",
+        "",
+        false,
+        true
+      )
+    );
+
+    MediaProfileRegistry.LiveSocketRequest mse =
+      registry.mseSocketRequest(profileId, "front:main");
+
+    assertEquals(
+      "/frigate/live/mse/api/ws?src=front%3Amain",
+      mse.request.url().encodedPath() + "?" + mse.request.url().encodedQuery()
+    );
+    assertEquals(
+      Credentials.basic("viewer", "synthetic-password"),
+      mse.request.header("Authorization")
+    );
+  }
+
+  @Test
+  public void resolvesOpaqueProtectedMseMediaHandles() throws Exception {
+    String profileId = registry.register(
+      new MediaProfileRegistry.MediaProfileConfig(
+        "mse-handle-profile-" + server.getPort(),
+        "http",
+        "127.0.0.1",
+        server.getPort(),
+        "/frigate",
+        "basic",
+        "viewer",
+        "synthetic-password",
+        "",
+        false,
+        true
+      )
+    );
+    String handle = registry.createMseMediaUri(profileId, "front:main");
+
+    assertEquals(
+      "frigate-media://" + profileId + "/mse/front%3Amain",
+      handle
+    );
+    MediaProfileRegistry.LiveSocketRequest mse =
+      registry.mseSocketRequest(Uri.parse(handle));
+    assertEquals(
+      "/frigate/live/mse/api/ws?src=front%3Amain",
+      mse.request.url().encodedPath() + "?" + mse.request.url().encodedQuery()
+    );
+    assertEquals(
+      Credentials.basic("viewer", "synthetic-password"),
+      mse.request.header("Authorization")
+    );
+  }
+
+  @Test
+  public void rejectsInvalidProtectedMseMediaHandles() throws Exception {
+    String profileId = register("none");
+
+    try {
+      registry.mseSocketRequest(Uri.parse(
+        "frigate-media://" + profileId + "/vod/front"
+      ));
+    } catch (IOException expected) {
+      assertTrue(expected.getMessage().contains("MSE media handle"));
+      return;
+    }
+    throw new AssertionError("Expected an invalid MSE media handle to be rejected");
+  }
+
+  @Test
   public void rejectsInvalidProtectedLiveStreamNames() throws Exception {
     String profileId = register("none");
 

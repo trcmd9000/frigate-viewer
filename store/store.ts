@@ -16,6 +16,8 @@ import {TypedUseSelectorHook, useDispatch, useSelector} from 'react-redux';
 import {settingsMigrations, settingsStore} from './settings';
 import type {ISettings, Server, State as SettingsState} from './settings';
 import {eventsStore} from './events';
+import {createServerScopeReducer} from './serverScope';
+import type {ServerScopeState} from './serverScope';
 import {
   loadCredentials,
   migrateAsyncStorageCredentials,
@@ -109,10 +111,7 @@ const settingsReducer = persistReducer<SettingsState>(
 );
 
 export const store = configureStore({
-  reducer: {
-    settings: settingsReducer,
-    events: eventsStore.reducer,
-  },
+  reducer: createServerScopeReducer(settingsReducer, eventsStore.reducer),
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
       serializableCheck: {
@@ -121,7 +120,7 @@ export const store = configureStore({
     }).concat(captureRehydrationError),
 });
 
-export type RootState = ReturnType<typeof store.getState>;
+export type RootState = ServerScopeState<ReturnType<typeof settingsReducer>>;
 export type AppDispatch = typeof store.dispatch;
 export const useAppDispatch: () => AppDispatch = useDispatch;
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;

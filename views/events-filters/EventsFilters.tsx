@@ -1,4 +1,6 @@
-import React, {FC, useMemo} from 'react';
+import React, {useMemo} from 'react';
+import {ActionCreatorWithPayload} from '@reduxjs/toolkit';
+import {NavigationFunctionComponent} from 'react-native-navigation';
 import {useIntl} from 'react-intl';
 import {Pressable, ScrollView, Text, View} from 'react-native';
 import {
@@ -21,12 +23,21 @@ import {Section} from '../../components/forms/Section';
 import {FilterSwitch} from './FilterSwitch';
 import {useStyles} from '../../helpers/colors';
 import {useDesignTokens} from '../../helpers/designTokens';
+import {
+  ServerScopeScreenProps,
+  useServerScopeOwner,
+  withServerScopeScreen,
+} from '../../helpers/serverScopeScreen';
 
-interface IEventsFiltersProps {
+interface IEventsFiltersProps extends ServerScopeScreenProps {
   viewedCameraNames?: string[];
 }
 
-export const EventsFilters: FC<IEventsFiltersProps> = ({viewedCameraNames}) => {
+const EventsFiltersContent: NavigationFunctionComponent<IEventsFiltersProps> = ({
+  viewedCameraNames,
+  ownerScopeGeneration,
+}) => {
+  const {isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const styles = useStyles(({theme}) => ({
     wrapper: {
       backgroundColor: theme.background,
@@ -52,11 +63,27 @@ export const EventsFilters: FC<IEventsFiltersProps> = ({viewedCameraNames}) => {
     (filtersRetained ? 1 : 0);
 
   const clearFilters = () => {
+    if (!isCurrentScope()) {
+      return;
+    }
     dispatch(setFiltersCameras([]));
     dispatch(setFiltersLabels([]));
     dispatch(setFiltersZones([]));
     dispatch(setFiltersRetained(false));
   };
+
+  // Child controls dispatch action creators themselves. Keep their typed API,
+  // but make retained callbacks inert against the live store after a switch.
+  const scopedAction = <T,>(action: ActionCreatorWithPayload<T>) =>
+    Object.assign(
+      (payload: T) => {
+        const result = action(payload);
+        return isCurrentScope()
+          ? result
+          : {...result, type: 'events/ignoredStaleFilter'};
+      },
+      action,
+    );
 
   const cameras: IFilter[] = useMemo(
     () =>
@@ -126,17 +153,17 @@ export const EventsFilters: FC<IEventsFiltersProps> = ({viewedCameraNames}) => {
         header={intl.formatMessage(messages['cameras.title'])}
         items={cameras}
         disabled={viewedCameraNames !== undefined}
-        actionOnFilter={setFiltersCameras}
+        actionOnFilter={scopedAction(setFiltersCameras)}
       />
       <Filters
         header={intl.formatMessage(messages['labels.title'])}
         items={labels}
-        actionOnFilter={setFiltersLabels}
+        actionOnFilter={scopedAction(setFiltersLabels)}
       />
       <Filters
         header={intl.formatMessage(messages['zones.title'])}
         items={zones}
-        actionOnFilter={setFiltersZones}
+        actionOnFilter={scopedAction(setFiltersZones)}
       />
       <Section
         header={
@@ -148,9 +175,11 @@ export const EventsFilters: FC<IEventsFiltersProps> = ({viewedCameraNames}) => {
         <FilterSwitch
           label={intl.formatMessage(messages['miscellaneous.retained.label'])}
           value={filtersRetained}
-          actionOnChange={setFiltersRetained}
+          actionOnChange={scopedAction(setFiltersRetained)}
         />
       </Section>
     </ScrollView>
   );
 };
+
+export const EventsFilters = withServerScopeScreen(EventsFiltersContent);

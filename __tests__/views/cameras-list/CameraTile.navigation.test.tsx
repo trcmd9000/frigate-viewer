@@ -1,9 +1,11 @@
 import React from 'react';
-import {fireEvent, render} from '@testing-library/react-native';
+import {act, fireEvent, render} from '@testing-library/react-native';
 import {Navigation} from 'react-native-navigation';
+import {Pressable} from 'react-native';
 import {CameraTile} from '../../../views/cameras-list/CameraTile';
 
 const state = {
+  scopeGeneration: 0,
   server: {host: 'frigate.example'},
   refreshFrequency: 10,
   actionWhenPressed: 'preview' as 'events' | 'preview',
@@ -37,6 +39,7 @@ jest.mock('../../../store/settings', () => ({
 }));
 
 jest.mock('../../../store/store', () => ({
+  store: {getState: () => ({events: {scopeGeneration: state.scopeGeneration}})},
   useAppSelector: (selector: keyof typeof state) => state[selector],
 }));
 
@@ -87,13 +90,14 @@ jest.mock('../../../helpers/secureLogger', () => ({
 describe('CameraTile native navigation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    state.scopeGeneration = 0;
     state.actionWhenPressed = 'preview';
     (Navigation.showModal as jest.Mock).mockReturnValue(
       new Promise<void>(() => undefined),
     );
   });
 
-  it('navigates from the card container and ignores duplicate presses in flight', () => {
+  it('navigates from the card container and ignores duplicate presses in flight', async () => {
     const {getByTestId} = render(
       <CameraTile
         cameraName="lumus_pro"
@@ -116,21 +120,23 @@ describe('CameraTile native navigation', () => {
     );
     expect(nameScrim.props.children.props.numberOfLines).toBe(1);
 
-    fireEvent.press(card);
-    fireEvent.press(card);
+    await act(async () => {
+      fireEvent.press(card);
+      fireEvent.press(card);
+    });
 
     expect(Navigation.showModal).toHaveBeenCalledTimes(1);
     expect(Navigation.showModal).toHaveBeenCalledWith(
       expect.objectContaining({
         component: expect.objectContaining({
           name: 'CameraPreview',
-          passProps: {cameraName: 'lumus_pro'},
+          passProps: {cameraName: 'lumus_pro', ownerScopeGeneration: 0},
         }),
       }),
     );
   });
 
-  it('always opens the live preview regardless of retired camera preferences', () => {
+  it('always opens the live preview regardless of retired camera preferences', async () => {
     state.actionWhenPressed = 'events';
     const {getByTestId} = render(
       <CameraTile
@@ -140,9 +146,28 @@ describe('CameraTile native navigation', () => {
       />,
     );
 
-    fireEvent.press(getByTestId('camera-card-lumus_pro'));
+    await act(async () => {
+      fireEvent.press(getByTestId('camera-card-lumus_pro'));
+    });
 
     expect(Navigation.showModal).toHaveBeenCalledTimes(1);
     expect(Navigation.push).not.toHaveBeenCalled();
+  });
+
+  it('rejects old presses and queued navigation using the live generation', async () => {
+    const view = render(<CameraTile cameraName="same-name" active={false} />);
+    const press = view.UNSAFE_getAllByType(Pressable).find(
+      button => button.props.testID === 'camera-card-same-name',
+    )!.props.onPress;
+    await act(async () => {
+      press();
+      state.scopeGeneration += 1;
+    });
+    expect(Navigation.showModal).not.toHaveBeenCalled();
+    await act(async () => press());
+    expect(Navigation.showModal).not.toHaveBeenCalled();
+    view.unmount();
+    await act(async () => press());
+    expect(Navigation.showModal).not.toHaveBeenCalled();
   });
 });

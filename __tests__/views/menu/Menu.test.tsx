@@ -1,10 +1,18 @@
 import React from 'react';
 import {act, fireEvent, render} from '@testing-library/react-native';
 import {Navigation} from 'react-native-navigation';
-import {Menu, secondaryMenuSections} from '../../../views/menu/Menu';
+import {Menu, navigateToMenuItem, retainedMenuItem, secondaryMenuSections} from '../../../views/menu/Menu';
 import {openSecondaryMenu} from '../../../views/menu/menuHelpers';
 
 let mockLocale = 'en';
+let mockGeneration = 0;
+const mockUnsubscribe = jest.fn();
+jest.mock('../../../store/store', () => ({
+  store: {
+    getState: () => ({events: {scopeGeneration: mockGeneration}}),
+    subscribe: () => mockUnsubscribe,
+  },
+}));
 const germanMenuMessages: Record<string, string> = {
   'menu.title': 'Mehr',
   'menu.section.saved': 'Gespeichert',
@@ -69,12 +77,14 @@ jest.mock('react-native-navigation', () => ({
   Navigation: {
     dismissModal: jest.fn(() => Promise.resolve()),
     showModal: jest.fn(() => Promise.resolve()),
+    events: () => ({registerModalDismissedListener: () => ({remove: jest.fn()})}),
   },
 }));
 
 describe('secondary overflow menu', () => {
   beforeEach(() => {
     mockLocale = 'en';
+    mockGeneration = 0;
     jest.clearAllMocks();
   });
 
@@ -162,5 +172,38 @@ describe('secondary overflow menu', () => {
         }),
       },
     });
+  });
+
+  it('passes the captured generation for retained events and rejects old callbacks', async () => {
+    const navigate = navigateToMenuItem(retainedMenuItem);
+    await navigate();
+    expect(Navigation.showModal).toHaveBeenCalledWith({component: {
+      name: 'CameraEvents', passProps: {retained: true, ownerScopeGeneration: 0},
+    }});
+    mockGeneration = 1;
+    await navigate();
+    expect(Navigation.showModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not navigate after a menu dismissal delayed across a scope change', async () => {
+    let dismiss!: () => void;
+    (Navigation.dismissModal as jest.Mock).mockReturnValueOnce(new Promise<void>(resolve => { dismiss = resolve; }));
+    const view = render(<Menu componentId="menu" componentName="Menu" />);
+    fireEvent.press(view.getByRole('button', {name: 'Retained'}));
+    mockGeneration = 1;
+    await act(async () => dismiss());
+    expect(Navigation.showModal).not.toHaveBeenCalled();
+  });
+
+  it('continues same-scope navigation after the menu itself unmounts', async () => {
+    let dismiss!: () => void;
+    (Navigation.dismissModal as jest.Mock).mockReturnValueOnce(new Promise<void>(resolve => { dismiss = resolve; }));
+    const view = render(<Menu componentId="menu" componentName="Menu" />);
+    fireEvent.press(view.getByRole('button', {name: 'Retained'}));
+    view.unmount();
+    await act(async () => dismiss());
+    expect(Navigation.showModal).toHaveBeenCalledWith({component: {
+      name: 'CameraEvents', passProps: {retained: true, ownerScopeGeneration: 0},
+    }});
   });
 });

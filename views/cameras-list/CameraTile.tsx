@@ -20,6 +20,7 @@ import {
 import {buildServerApiUrl} from '../../helpers/rest';
 import {serverProfileIdentity} from '../../helpers/serverIdentity';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {useServerScopeOwner} from '../../helpers/serverScopeScreen';
 import {
   downloadMedia,
   fileUri,
@@ -127,6 +128,7 @@ export const CameraTile: FC<CameraTileProps> = ({
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const navigationInFlight = useRef(false);
+  const {generation, isCurrentScope} = useServerScopeOwner();
   const imageRequestId = useRef(0);
   const profileIdentity = serverProfileIdentity(server);
 
@@ -232,15 +234,18 @@ export const CameraTile: FC<CameraTileProps> = ({
   );
 
   const showCameraPreview = useCallback(() => {
-    if (navigationInFlight.current) {
+    if (!isCurrentScope() || navigationInFlight.current) {
       return;
     }
     navigationInFlight.current = true;
-    void Promise.resolve(
-      Navigation.showModal({
+    void Promise.resolve().then(() => {
+      if (!isCurrentScope()) {
+        return;
+      }
+      return Navigation.showModal({
         component: {
           name: 'CameraPreview',
-          passProps: {cameraName},
+          passProps: {cameraName, ownerScopeGeneration: generation},
           options: {
             layout: {
               orientation: [
@@ -249,15 +254,15 @@ export const CameraTile: FC<CameraTileProps> = ({
             },
           },
         },
-      }),
-    )
+      });
+    })
       .catch(error => {
-      SecureLogger.logError(toError(error), 'navigation.camera-preview');
+        SecureLogger.logError(toError(error), 'navigation.camera-preview');
       })
       .finally(() => {
         navigationInFlight.current = false;
       });
-  }, [cameraName, lockLandscapePlaybackOrientation]);
+  }, [cameraName, generation, isCurrentScope, lockLandscapePlaybackOrientation]);
 
   const onPress = showCameraPreview;
   const onPreviewLoad = useCallback((imageUrl: string) => {

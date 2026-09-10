@@ -54,6 +54,23 @@ authenticated snapshot remains visible until the first decoded WebRTC frame.
 After the retry budget, a visible snapshot fallback offers a manual retry.
 iOS retains authenticated snapshots in this stage.
 
+### Profile changes and audio feedback
+
+Changing the active profile or its connection/security settings clears the
+camera catalog, event filters, and visible lists in one runtime scope change.
+Returning to a previous profile creates a new scope rather than restoring stale
+results. Late requests cannot populate the new scope. Camera, clip, and filter
+modals retain their opening scope and close when it changes; owned playback
+resources are released without logging out unrelated profiles or wiping caches.
+
+The WebRTC audio control distinguishes the user's request from confirmed native
+activation. It shows a cancellable pending state, and a retry message on denied
+focus, native failure, or the five-second activation deadline. Late native
+results are released after cancellation. A stream without an accepted live
+audio track shows an unavailable hint; it is not made audible by toggling an icon.
+Confirmed activation is not an audibility measurement: speaker routing and
+actual sound still require physical-device validation for a release.
+
 ## Local RTSP adapter
 
 Local RTSP is opt-in and is prepared through the native profile registry. The

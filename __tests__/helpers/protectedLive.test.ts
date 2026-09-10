@@ -38,10 +38,13 @@ jest.mock('../../helpers/protectedMedia', () => ({
 
 import type {Server} from '../../store/settings';
 import {
+  hasAcceptedAudioMedia,
   hasAcceptedVideoMedia,
   openProtectedLiveSocket,
   selectProtectedLiveStream,
   selectProtectedLiveStreams,
+  summarizeAudioMedia,
+  summarizeVideoMedia,
 } from '../../helpers/protectedLive';
 
 const server = {} as Server;
@@ -82,6 +85,92 @@ describe('protected live signaling', () => {
       ),
     ).toBe(true);
     expect(hasAcceptedVideoMedia('v=0\r\nm=video\r\n')).toBe(false);
+  });
+
+  it('recognizes an accepted audio section separately from video', () => {
+    expect(
+      hasAcceptedAudioMedia(
+        'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n',
+      ),
+    ).toBe(true);
+    expect(
+      hasAcceptedAudioMedia(
+        'v=0\r\nm=audio 0 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n',
+      ),
+    ).toBe(false);
+    expect(
+      hasAcceptedAudioMedia(
+        'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=recvonly\r\n',
+      ),
+    ).toBe(false);
+    expect(
+      hasAcceptedAudioMedia(
+        'v=0\r\na=recvonly\r\nm=audio 9/2 UDP/TLS/RTP/SAVPF 111\r\n',
+      ),
+    ).toBe(false);
+    expect(
+      hasAcceptedAudioMedia(
+        'v=0\r\nm=audio 9/2 UDP/TLS/RTP/SAVPF 111\r\na=sendonly\r\n',
+      ),
+    ).toBe(true);
+  });
+
+  it('summarizes only safe audio SDP capability fields', () => {
+    expect(
+      summarizeAudioMedia(
+        'v=0\r\na=recvonly\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 0\r\na=rtpmap:111 opus/48000/2\r\na=rtpmap:0 PCMU/8000\r\n',
+      ),
+    ).toEqual({
+      present: true,
+      portAccepted: true,
+      direction: 'recvonly',
+      opus: true,
+      pcma: false,
+      pcmu: true,
+    });
+    expect(
+      summarizeAudioMedia(
+        'v=0\r\nm=audio 0 RTP/AVP 8\r\na=inactive\r\na=rtpmap:8 PCMA/8000\r\n',
+      ),
+    ).toEqual({
+      present: true,
+      portAccepted: false,
+      direction: 'inactive',
+      opus: false,
+      pcma: true,
+      pcmu: false,
+    });
+  });
+
+  it('summarizes only safe video SDP capability fields', () => {
+    expect(
+      summarizeVideoMedia(
+        'v=0\r\na=recvonly\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 98 100\r\na=rtpmap:96 H265/90000\r\na=rtpmap:98 H264/90000\r\na=rtpmap:100 VP9/90000\r\n',
+      ),
+    ).toEqual({
+      present: true,
+      portAccepted: true,
+      direction: 'recvonly',
+      h264: true,
+      h265: true,
+      vp8: false,
+      vp9: true,
+      av1: false,
+    });
+    expect(
+      summarizeVideoMedia(
+        'v=0\r\nm=video 0 RTP/AVP 96\r\na=inactive\r\na=rtpmap:96 VP8/90000\r\n',
+      ),
+    ).toEqual({
+      present: true,
+      portAccepted: false,
+      direction: 'inactive',
+      h264: false,
+      h265: false,
+      vp8: true,
+      vp9: false,
+      av1: false,
+    });
   });
 
   it('selects only configured go2rtc streams for the requested camera', () => {

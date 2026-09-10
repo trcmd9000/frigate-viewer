@@ -4,6 +4,11 @@ import {CameraPreview} from '../../../views/camera-preview/CameraPreview';
 
 jest.mock('react-native-navigation', () => ({}));
 
+jest.mock('../../../store/store', () => ({
+  store: {getState: () => ({events: {scopeGeneration: 0}})},
+  useAppSelector: () => 0,
+}));
+
 jest.mock('../../../views/camera-preview/LivePreview', () => ({
   ['LivePreview']: () => null,
 }));

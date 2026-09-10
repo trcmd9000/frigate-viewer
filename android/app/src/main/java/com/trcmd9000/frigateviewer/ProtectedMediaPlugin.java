@@ -35,6 +35,9 @@ final class ProtectedMediaPlugin implements RNVExoplayerPlugin {
       isRtspHandle(uri)) {
       return null;
     }
+    if (BuildConfig.ENABLE_PROTECTED_MSE_PROBE && isMseHandle(uri)) {
+      return new ProtectedMseLiveDataSource.Factory(registry);
+    }
     return new ProtectedMediaDataSource.Factory(registry);
   }
 
@@ -95,6 +98,13 @@ final class ProtectedMediaPlugin implements RNVExoplayerPlugin {
       ProtectedMediaPolicy.isOpaqueMediaUri(uri.toString()) &&
       uri.getPathSegments().size() == 2 &&
       "rtsp".equals(uri.getPathSegments().get(0));
+  }
+
+  private static boolean isMseHandle(Uri uri) {
+    return uri != null &&
+      ProtectedMediaPolicy.isOpaqueMediaUri(uri.toString()) &&
+      uri.getPathSegments().size() == 2 &&
+      "mse".equals(uri.getPathSegments().get(0));
   }
 
   @Override

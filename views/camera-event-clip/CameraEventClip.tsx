@@ -55,12 +55,18 @@ import {
   useFeatureEnabled,
 } from '../../helpers/entitlements';
 import {ProgressBar} from './ProgressBar';
+import {
+  ServerScopeScreenProps,
+  useServerScopeOwner,
+  withServerScopeScreen,
+} from '../../helpers/serverScopeScreen';
 
-interface ICameraEventClipProps {
+interface ICameraEventClipProps extends ServerScopeScreenProps {
   event: ICameraEvent;
 }
 
 interface IVideoPlayerProps {
+  ownerScopeGeneration: number;
   server: ReturnType<typeof selectServer>;
   active?: boolean;
   media?: PlayableMedia;
@@ -72,6 +78,7 @@ interface IVideoPlayerProps {
 }
 
 const VideoPlayer: FC<IVideoPlayerProps> = ({
+  ownerScopeGeneration,
   server,
   active = true,
   media,
@@ -81,6 +88,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   fileName = 'clip.mp4',
   initiallyPaused = false,
 }) => {
+  const {isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const {width: windowWidth} = useWindowDimensions();
   const overflowMenuAnchorLeft = 48;
   const overflowMenuMargin = 8;
@@ -368,7 +376,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const share = async () => {
-    if (sharing || sharingRef.current) {
+    if (!isCurrentScope() || sharing || sharingRef.current) {
       return;
     }
     sharingRef.current = true;
@@ -378,13 +386,22 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     try {
       path = await downloadMedia(server, shareUrl);
       retainDownloadedMedia(path, 'share');
+      if (!isCurrentScope()) {
+        return;
+      }
       await Share.open({
         url: fileUri(path),
         filename: fileName,
         type: 'video/mp4',
       });
     } catch (error) {
+      if (!isCurrentScope()) {
+        return;
+      }
       const appError = await handleError(error, 'CameraEventClip.share');
+      if (!isCurrentScope()) {
+        return;
+      }
       const message = getUserFriendlyMessage(appError);
       if (Platform.OS === 'android') {
         ToastAndroid.show(message, ToastAndroid.LONG);
@@ -398,7 +415,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         // Cleanup must not leave the action locked if cache release fails.
       } finally {
         sharingRef.current = false;
-        setSharing(false);
+        if (isCurrentScope()) {
+          setSharing(false);
+        }
       }
     }
   };
@@ -421,7 +440,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const download = useCallback(async () => {
-    if (sharing || sharingRef.current) {
+    if (!isCurrentScope() || sharing || sharingRef.current) {
       return;
     }
     sharingRef.current = true;
@@ -431,6 +450,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     try {
       path = await downloadMedia(server, shareUrl);
       retainDownloadedMedia(path, 'share');
+      if (!isCurrentScope()) {
+        return;
+      }
       await Share.open({
         url: fileUri(path),
         filename: fileName,
@@ -438,7 +460,13 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         saveToFiles: true,
       });
     } catch (error) {
+      if (!isCurrentScope()) {
+        return;
+      }
       const appError = await handleError(error, 'CameraEventClip.download');
+      if (!isCurrentScope()) {
+        return;
+      }
       const message = getUserFriendlyMessage(appError);
       if (Platform.OS === 'android') {
         ToastAndroid.show(message, ToastAndroid.LONG);
@@ -452,10 +480,12 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         // Cleanup must not leave the action locked if cache release fails.
       } finally {
         sharingRef.current = false;
-        setSharing(false);
+        if (isCurrentScope()) {
+          setSharing(false);
+        }
       }
     }
-  }, [fileName, server, shareUrl, sharing]);
+  }, [fileName, isCurrentScope, server, shareUrl, sharing]);
 
   if (mediaError || playerError) {
     const errorMessage = intl.formatMessage({
@@ -711,9 +741,10 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 };
 
-export const CameraEventClip: NavigationFunctionComponent<
+const CameraEventClipContent: NavigationFunctionComponent<
   ICameraEventClipProps
-> = ({event}) => {
+> = ({event, ownerScopeGeneration}) => {
+  const {generation, isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const server = useAppSelector(selectServer);
   const [preparedMedia, setPreparedMedia] = useState<{
     activationId: number;
@@ -738,16 +769,16 @@ export const CameraEventClip: NavigationFunctionComponent<
 
   const fileName = useMemo(() => clipFilename(event), [event]);
   const retryPreparation = useCallback(() => {
-    if (preparationInFlight.current) {
+    if (!isCurrentScope() || preparationInFlight.current) {
       return;
     }
     setPreparedMedia(undefined);
     setMediaError(false);
     setRetryAttempt(current => current + 1);
-  }, []);
+  }, [isCurrentScope]);
 
   useEffect(() => {
-    if (!playbackActive) {
+    if (!playbackActive || !isCurrentScope()) {
       return;
     }
     if (preparationInFlight.current) {
@@ -769,7 +800,10 @@ export const CameraEventClip: NavigationFunctionComponent<
       }
     };
     const prepareMedia = Promise.resolve().then(
-      async (): Promise<PlayableMedia> => {
+      async (): Promise<PlayableMedia | undefined> => {
+        if (!active || !isCurrentScope()) {
+          return undefined;
+        }
         if (Platform.OS === 'android') {
           const uri = await protectedMediaUri(
             server,
@@ -794,21 +828,24 @@ export const CameraEventClip: NavigationFunctionComponent<
 
     prepareMedia
       .then(uri => {
-        if (active) {
+        if (uri && active && isCurrentScope()) {
           setPreparedMedia({activationId, media: uri});
         } else {
           releaseDownloadedPath();
         }
       })
       .catch(async error => {
+        if (!active || !isCurrentScope()) {
+          return;
+        }
         await handleError(error, 'CameraEventClip.prepare');
-        if (active) {
+        if (active && isCurrentScope()) {
           setMediaError(true);
         }
       })
       .finally(() => {
         preparationInFlight.current = false;
-        if (preparationQueued.current && mounted.current) {
+        if (preparationQueued.current && mounted.current && isCurrentScope()) {
           preparationQueued.current = false;
           setRetryAttempt(current => current + 1);
         }
@@ -827,6 +864,7 @@ export const CameraEventClip: NavigationFunctionComponent<
     playbackActive,
     retryAttempt,
     server,
+    isCurrentScope,
   ]);
 
   useEffect(
@@ -838,6 +876,7 @@ export const CameraEventClip: NavigationFunctionComponent<
 
   return (
     <VideoPlayer
+      ownerScopeGeneration={generation}
       server={server}
       active={playbackActive}
       media={media}
@@ -849,3 +888,5 @@ export const CameraEventClip: NavigationFunctionComponent<
     />
   );
 };
+
+export const CameraEventClip = withServerScopeScreen(CameraEventClipContent);

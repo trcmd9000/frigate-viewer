@@ -36,6 +36,36 @@ const ToggleHarness = () => {
 };
 
 describe('LiveAudioControl', () => {
+  it.each([
+    {locale: 'en', messages: en, label: 'Cancel audio activation', hint: 'Activating audio… Tap to cancel.'},
+    {locale: 'de', messages: de, label: 'Audioaktivierung abbrechen', hint: 'Audio wird aktiviert… Zum Abbrechen tippen.'},
+    {locale: 'fr', messages: {}, label: 'Cancel audio activation', hint: 'Activating audio… Tap to cancel.'},
+  ])('localizes cancellable pending feedback for $locale', ({locale, messages, label, hint}) => {
+    const onToggle = jest.fn();
+    const view = render(
+      <IntlProvider locale={locale} messages={messages} onError={() => undefined}>
+        <LiveAudioControl muted disabled status={{state: 'pending'}} onToggle={onToggle} />
+      </IntlProvider>,
+    );
+    const button = view.getByRole('button', {name: label});
+    expect(button.props.accessibilityState).toEqual({checked: false, busy: true});
+    expect(button.props.accessibilityHint).toBe(hint);
+    expect(view.getByText(hint)).toBeTruthy();
+    fireEvent.press(button);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['focus-denied', 'native', 'timeout'] as const)('provides a retry and fallback hint for %s', reason => {
+    const view = render(
+      <IntlProvider locale="fr" messages={{}} onError={() => undefined}>
+        <LiveAudioControl muted status={{state: 'failed', reason}} onToggle={jest.fn()} />
+      </IntlProvider>,
+    );
+    const button = view.getByRole('button', {name: 'Retry audio'});
+    expect(button.props.accessibilityState).toEqual({checked: false});
+    expect(button.props.accessibilityHint).toBe(en[`cameraPreview.audio.failure.${reason}`]);
+  });
+
   it('uses the speaker icon with a slash only while muted', () => {
     const {getByRole, getByTestId, queryByText} = render(
       <IntlProvider locale="de" messages={de}>
@@ -108,6 +138,26 @@ describe('LiveAudioControl', () => {
     expect(audibleButton.props.accessibilityLabel).not.toContain(
       'cameraPreview.audio',
     );
+  });
+
+  it('communicates unavailable audio without presenting an active toggle', () => {
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LiveAudioControl
+          muted
+          disabled
+          onToggle={jest.fn()}
+        />
+      </IntlProvider>,
+    );
+    const button = view.getByRole('button', {name: 'Audio unavailable'});
+
+    expect(button.props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: true,
+    });
+    fireEvent.press(button);
+    expect(button.props.onPress).toBeUndefined();
   });
 
   it('keeps a compact centered pill above the gesture area', () => {

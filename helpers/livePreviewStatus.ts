@@ -1,6 +1,6 @@
 import type {OutlineGlyphMapType} from '@ant-design/icons-react-native';
 
-export type LivePreviewTransport = 'rtsp' | 'webrtc';
+export type LivePreviewTransport = 'rtsp' | 'webrtc' | 'mse';
 
 /**
  * The connection phase is deliberately separate from the transport being
@@ -55,6 +55,10 @@ const statusByState: Record<LivePreviewState, LivePreviewStatus> = {
   webrtc: {
     icon: 'video-camera',
     messageId: 'cameraPreview.status.webrtc',
+  },
+  mse: {
+    icon: 'video-camera',
+    messageId: 'cameraPreview.status.mse',
   },
   live: {
     icon: 'video-camera',

@@ -24,7 +24,11 @@ const mockProtectedMediaUri = jest.fn();
 const mockUseAppSelector = jest.fn(() => server);
 
 jest.mock('../../../store/store', () => ({
-  useAppSelector: () => mockUseAppSelector(),
+  store: {getState: () => ({events: {scopeGeneration: 0}})},
+  useAppSelector: (selector: unknown) =>
+    selector === require('../../../store/events').selectServerScopeGeneration
+      ? 0
+      : mockUseAppSelector(),
 }));
 jest.mock('../../../store/settings', () => ({selectServer: jest.fn()}));
 jest.mock('../../../helpers/playbackLifecycle', () => ({

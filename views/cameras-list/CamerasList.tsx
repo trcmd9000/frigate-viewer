@@ -8,14 +8,14 @@ import {
   View,
 } from 'react-native';
 import {useIntl} from 'react-intl';
+import {useStore} from 'react-redux';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {useRest} from '../../helpers/rest';
 import {handleError} from '../../helpers/errorHandler';
 import {
   selectAvailableCameras,
-  setAvailableCameras,
-  setAvailableLabels,
-  setAvailableZones,
+  selectServerScopeGeneration,
+  setAvailableForScope,
 } from '../../store/events';
 import {
   selectCamerasNumColumns,
@@ -23,6 +23,7 @@ import {
   selectServer,
 } from '../../store/settings';
 import {useAppDispatch, useAppSelector} from '../../store/store';
+import type {RootState} from '../../store/store';
 import {useMenu, menuButton} from '../menu/menuHelpers';
 import {CameraTile} from './CameraTile';
 import {messages} from './messages';
@@ -111,7 +112,16 @@ const CameraListSkeleton = ({
   );
 };
 
-export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
+export const CamerasList: NavigationFunctionComponent = props => {
+  const generation = useAppSelector(selectServerScopeGeneration);
+  return <CamerasListContent key={generation} {...props} generation={generation} />;
+};
+
+const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
+  componentId,
+  generation,
+}) => {
+  const store = useStore<RootState>();
   const dispatch = useAppDispatch();
   const intl = useIntl();
   const tokens = useDesignTokens();
@@ -127,6 +137,17 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
   const [error, setError] = useState(false);
   const [screenVisible, setScreenVisible] = useState(true);
 
+  const isCurrentScope = useCallback(
+    () =>
+      mounted.current &&
+      selectServerScopeGeneration(store.getState()) === generation,
+    [generation, store],
+  );
+  const isCurrentRequest = useCallback(
+    (id: number) => isCurrentScope() && id === refreshRequestId.current,
+    [isCurrentScope],
+  );
+
   useMenu(componentId, 'camerasList');
   useNoServer(componentId);
 
@@ -135,7 +156,7 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
   }, [get]);
 
   const refresh = useCallback(() => {
-    if (!mounted.current || !server.host) {
+    if (!isCurrentScope() || !server.host) {
       return;
     }
     const currentRequest = ++refreshRequestId.current;
@@ -143,7 +164,7 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
     setError(false);
     getRef.current<IConfigResponse>(server, 'config')
       .then(config => {
-        if (!mounted.current || currentRequest !== refreshRequestId.current) {
+        if (!isCurrentRequest(currentRequest)) {
           return;
         }
         const availableCameras = Object.keys(config.cameras);
@@ -157,48 +178,59 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
           ],
           [] as string[],
         );
-        dispatch(setAvailableCameras(availableCameras));
-        dispatch(setAvailableLabels(availableLabels));
-        dispatch(setAvailableZones(availableZones));
+        dispatch(
+          setAvailableForScope({
+            generation,
+            available: {
+              cameras: availableCameras,
+              labels: availableLabels,
+              zones: availableZones,
+            },
+          }),
+        );
       })
       .catch(async requestError => {
-        if (!mounted.current || currentRequest !== refreshRequestId.current) {
+        if (!isCurrentRequest(currentRequest)) {
           return;
         }
         await handleError(requestError, 'CamerasList.refresh');
-        if (mounted.current && currentRequest === refreshRequestId.current) {
+        if (isCurrentRequest(currentRequest)) {
           setError(true);
         }
       })
       .finally(() => {
-        if (mounted.current && currentRequest === refreshRequestId.current) {
+        if (isCurrentRequest(currentRequest)) {
           setLoading(false);
         }
       });
-  }, [dispatch, server]);
+  }, [dispatch, generation, isCurrentRequest, isCurrentScope, server]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       mounted.current = false;
       refreshRequestId.current += 1;
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(() => {
     const listener = Navigation.events().registerComponentListener(
       {
         componentDidAppear() {
-          setScreenVisible(true);
+          if (isCurrentScope()) {
+            setScreenVisible(true);
+          }
         },
         componentDidDisappear() {
-          setScreenVisible(false);
+          if (isCurrentScope()) {
+            setScreenVisible(false);
+          }
         },
       },
       componentId,
     );
     return () => listener.remove();
-  }, [componentId]);
+  }, [componentId, isCurrentScope]);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
@@ -215,9 +247,11 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
       events: intl.formatMessage(messages['tab.events']),
       settings: intl.formatMessage(messages['tab.settings']),
     }).catch(navigationError => {
-      handleError(navigationError, 'CamerasList.updateTabLabels');
+      if (isCurrentScope()) {
+        handleError(navigationError, 'CamerasList.updateTabLabels');
+      }
     });
-  }, [intl, localeRegion]);
+  }, [intl, isCurrentScope, localeRegion]);
 
   useEffect(() => {
     if (!server.host) {
@@ -229,10 +263,15 @@ export const CamerasList: NavigationFunctionComponent = ({componentId}) => {
   }, [refresh, server.host]);
 
   const openSettings = useCallback(() => {
+    if (!isCurrentScope()) {
+      return;
+    }
     void presentSettingsModal().catch(navigationError => {
-      handleError(navigationError, 'CamerasList.openSettings');
+      if (isCurrentScope()) {
+        handleError(navigationError, 'CamerasList.openSettings');
+      }
     });
-  }, []);
+  }, [isCurrentScope]);
   const refreshLabel = intl.formatMessage(messages.refresh);
   const onAccessibilityAction = useCallback(
     ({nativeEvent}: AccessibilityActionEvent) => {

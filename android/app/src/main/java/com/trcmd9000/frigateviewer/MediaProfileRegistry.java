@@ -312,6 +312,19 @@ final class MediaProfileRegistry {
       .toString();
   }
 
+  String createMseMediaUri(String profileId, String streamName) throws IOException {
+    MediaProfile profile = profileFor(profileId);
+    profile.requireRemoteHttpConsent();
+    String validatedStream = validateMseStreamName(streamName);
+    return new Uri.Builder()
+      .scheme(MEDIA_SCHEME)
+      .authority(profile.id)
+      .appendPath("mse")
+      .appendPath(validatedStream)
+      .build()
+      .toString();
+  }
+
   synchronized void releaseRtspMediaUri(String profileId, String handle) throws IOException {
     MediaProfile profile = profileFor(profileId);
     if (handle == null || !handle.matches("[A-Za-z0-9_-]{16,64}")) {
@@ -461,6 +474,44 @@ final class MediaProfileRegistry {
       authenticatedRequest(profile, profile.liveSocketUrl(streamName)).build(),
       currentSessionGeneration(profile)
     );
+  }
+
+  LiveSocketRequest mseSocketRequest(
+    String profileId,
+    String streamName
+  ) throws IOException {
+    String validatedStream = validateMseStreamName(streamName);
+    MediaProfile profile = profileFor(profileId);
+    profile.requireRemoteHttpConsent();
+    return new LiveSocketRequest(
+      profile,
+      authenticatedRequest(profile, profile.mseSocketUrl(validatedStream)).build(),
+      currentSessionGeneration(profile)
+    );
+  }
+
+  LiveSocketRequest mseSocketRequest(Uri requestUri) throws IOException {
+    if (requestUri == null ||
+      !MEDIA_SCHEME.equalsIgnoreCase(requestUri.getScheme()) ||
+      requestUri.getUserInfo() != null ||
+      requestUri.getPort() != -1 ||
+      requestUri.getQuery() != null ||
+      requestUri.getFragment() != null ||
+      requestUri.getPathSegments().size() != 2 ||
+      !"mse".equals(requestUri.getPathSegments().get(0))) {
+      throw new IOException("The protected MSE media handle is invalid");
+    }
+    return mseSocketRequest(
+      requestUri.getHost(),
+      requestUri.getPathSegments().get(1)
+    );
+  }
+
+  private static String validateMseStreamName(String streamName) throws IOException {
+    if (streamName == null || !streamName.matches("[A-Za-z0-9_.:-]{1,128}")) {
+      throw new IOException("The protected MSE stream name is invalid");
+    }
+    return streamName;
   }
 
   boolean refreshLiveSession(
@@ -1263,6 +1314,22 @@ final class MediaProfileRegistry {
           "The protected live signaling URL is invalid",
           error
         );
+      }
+    }
+
+    HttpUrl mseSocketUrl(String streamName) throws IOException {
+      try {
+        return new HttpUrl.Builder()
+          .scheme(protocol)
+          .host(host)
+          .port(port)
+          .encodedPath(
+            normalizePath(joinPath(basePath, "/live/mse/api/ws"), true)
+          )
+          .addQueryParameter("src", streamName)
+          .build();
+      } catch (IllegalArgumentException error) {
+        throw new IOException("The protected MSE URL is invalid", error);
       }
     }
 

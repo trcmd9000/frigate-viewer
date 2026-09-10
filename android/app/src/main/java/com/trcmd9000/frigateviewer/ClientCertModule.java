@@ -37,7 +37,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
@@ -58,6 +61,10 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
+import okio.ByteString;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * Provides access to user-approved client identities from Android KeyChain.
@@ -69,12 +76,18 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   private static final String MEDIA_CACHE_DIRECTORY = "frigate-media";
   private static final long MAX_MEDIA_BYTES = 256L * 1024L * 1024L;
   private static final int MAX_LIVE_MESSAGE_CHARS = 1024 * 1024;
+  private static final int MAX_MSE_CONTROL_MESSAGE_CHARS = 4096;
+  private static final long MSE_PROBE_TIMEOUT_SECONDS = 10L;
   private static final long MEDIA_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
   private static final Object MEDIA_CACHE_LOCK = new Object();
 
   private final ReactApplicationContext reactContext;
   private final ExecutorService executor = Executors.newFixedThreadPool(4);
+  private final ScheduledExecutorService probeScheduler =
+    Executors.newSingleThreadScheduledExecutor();
   private final Map<String, ProtectedLiveSocket> protectedLiveSockets =
+    new ConcurrentHashMap<>();
+  private final Map<String, ProtectedMseProbeSocket> protectedMseProbes =
     new ConcurrentHashMap<>();
   private final LocalRouteResolver localRouteResolver;
   private final ConnectivityManager connectivityManager;
@@ -134,6 +147,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   public void invalidate() {
     protectedLiveSockets.forEach((socketId, liveSocket) -> liveSocket.close());
     protectedLiveSockets.clear();
+    closeProtectedMseProbes(null);
     MediaProfileRegistry.get(reactContext).invalidateAll();
     retireAllClientSessions();
     reactContext.removeLifecycleEventListener(this);
@@ -145,6 +159,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       }
     }
     executor.shutdownNow();
+    probeScheduler.shutdownNow();
     super.invalidate();
   }
 
@@ -155,7 +170,9 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   }
 
   @Override
-  public void onHostPause() {}
+  public void onHostPause() {
+    closeProtectedMseProbes(null);
+  }
 
   @Override
   public void onHostDestroy() {
@@ -216,7 +233,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     }
     MediaProfileRegistry.get(reactContext).unregister(
       profileKey,
-      this::closeProtectedLiveSocketsForProfile
+      this::closeProtectedSocketsForProfile
     );
   }
 
@@ -563,7 +580,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
           );
         String profileId = registry.register(
           profileConfig,
-          this::closeProtectedLiveSocketsForProfile,
+          this::closeProtectedSocketsForProfile,
           registrationToken
         );
         protectedLiveSockets.forEach((socketId, liveSocket) -> {
@@ -598,6 +615,22 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         protectedLiveSockets.remove(socketId, liveSocket)
       ) {
         liveSocket.close();
+      }
+    });
+  }
+
+  private void closeProtectedSocketsForProfile(String profileId) {
+    closeProtectedLiveSocketsForProfile(profileId);
+    closeProtectedMseProbes(profileId);
+  }
+
+  private void closeProtectedMseProbes(String profileId) {
+    protectedMseProbes.forEach((probeId, probe) -> {
+      if (
+        (profileId == null || profileId.equals(probe.profileId)) &&
+        protectedMseProbes.remove(probeId, probe)
+      ) {
+        probe.cancel();
       }
     });
   }
@@ -649,6 +682,25 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         );
       } catch (Exception error) {
         promise.reject("MEDIA_URI_INVALID", "The protected media URI is invalid", error);
+      }
+    });
+  }
+
+  @ReactMethod
+  public void createMseMediaUri(
+    String profileId,
+    String streamName,
+    Promise promise
+  ) {
+    executor.execute(() -> {
+      try {
+        promise.resolve(
+          MediaProfileRegistry
+            .get(reactContext)
+            .createMseMediaUri(profileId, streamName)
+        );
+      } catch (Exception error) {
+        promise.reject("MSE_MEDIA_URI_INVALID", "The protected MSE media URI is invalid", error);
       }
     });
   }
@@ -719,6 +771,36 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         promise.reject("CODEC_CAPABILITY_PROBE_FAILED", "Codec capability discovery is unavailable");
       }
     });
+  }
+
+  @ReactMethod(isBlockingSynchronousMethod = true)
+  public boolean isProtectedMseProbeEnabled() {
+    return BuildConfig.ENABLE_PROTECTED_MSE_PROBE;
+  }
+
+  @ReactMethod
+  public void probeProtectedMse(
+    String profileId,
+    String streamName,
+    Promise promise
+  ) {
+    if (!BuildConfig.ENABLE_PROTECTED_MSE_PROBE) {
+      promise.reject("MSE_PROBE_DISABLED", "The protected MSE probe is disabled");
+      return;
+    }
+    String probeId = java.util.UUID.randomUUID().toString().replace("-", "");
+    ProtectedMseProbeSocket probe = new ProtectedMseProbeSocket(
+      probeId,
+      profileId,
+      streamName,
+      promise
+    );
+    protectedMseProbes.put(probeId, probe);
+    try {
+      probe.connect();
+    } catch (IOException error) {
+      probe.fail("MSE_PROBE_OPEN_FAILED", 0);
+    }
   }
 
   private void emitLiveSocketState(
@@ -1333,7 +1415,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     private volatile WebSocket webSocket;
     private volatile int connectionGeneration;
     private volatile boolean closed;
-    private volatile boolean retriedAuthentication;
+    private final AtomicBoolean retriedAuthentication = new AtomicBoolean();
 
     ProtectedLiveSocket(
       String socketId,
@@ -1413,9 +1495,8 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             if (
               statusCode == 401 &&
               "frigate".equals(liveRequest.profile.auth) &&
-              !retriedAuthentication
+              retriedAuthentication.compareAndSet(false, true)
             ) {
-              retriedAuthentication = true;
               connectionGeneration += 1;
               executor.execute(() -> {
                 try {
@@ -1482,6 +1563,212 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       if (protectedLiveSockets.remove(socketId, this)) {
         closed = true;
         emitLiveSocketState(socketId, "error", statusCode);
+      }
+    }
+  }
+
+  private final class ProtectedMseProbeSocket {
+    private final String probeId;
+    private final String profileId;
+    private final String streamName;
+    private final Promise promise;
+    private final ProtectedMseMp4Probe mp4 = new ProtectedMseMp4Probe();
+    private final AtomicBoolean finished = new AtomicBoolean();
+    private volatile WebSocket webSocket;
+    private volatile ScheduledFuture<?> timeout;
+    private volatile int connectionGeneration;
+    private final AtomicBoolean retriedAuthentication = new AtomicBoolean();
+    private volatile boolean mimeH265;
+
+    ProtectedMseProbeSocket(
+      String probeId,
+      String profileId,
+      String streamName,
+      Promise promise
+    ) {
+      this.probeId = probeId;
+      this.profileId = profileId;
+      this.streamName = streamName;
+      this.promise = promise;
+      timeout = probeScheduler.schedule(
+        () -> fail("MSE_PROBE_TIMEOUT", 0),
+        MSE_PROBE_TIMEOUT_SECONDS,
+        TimeUnit.SECONDS
+      );
+    }
+
+    void connect() throws IOException {
+      MediaProfileRegistry registry = MediaProfileRegistry.get(reactContext);
+      MediaProfileRegistry.LiveSocketRequest mseRequest =
+        registry.mseSocketRequest(profileId, streamName);
+      int generation = ++connectionGeneration;
+      WebSocket socket = mseRequest.profile.session.client.newWebSocket(
+        mseRequest.request,
+        new WebSocketListener() {
+          @Override
+          public void onOpen(WebSocket openedSocket, Response response) {
+            if (!isCurrent(generation)) {
+              openedSocket.cancel();
+              return;
+            }
+            if (!openedSocket.send(
+              "{\"type\":\"mse\",\"value\":\"hvc1.1.6.L153.B0\"}"
+            )) {
+              fail("MSE_PROBE_SEND_FAILED", response.code());
+            }
+          }
+
+          @Override
+          public void onMessage(WebSocket activeSocket, String text) {
+            if (!isCurrent(generation)) {
+              return;
+            }
+            if (text == null || text.length() > MAX_MSE_CONTROL_MESSAGE_CHARS) {
+              fail("MSE_PROBE_CONTROL_INVALID", 0);
+              return;
+            }
+            try {
+              JSONObject message = new JSONObject(text);
+              String type = message.optString("type", "");
+              String value = message.optString("value", "");
+              if ("error".equals(type)) {
+                fail("MSE_PROBE_SERVER_ERROR", 0);
+              } else if ("mse".equals(type)) {
+                String mime = value.toLowerCase(Locale.US);
+                mimeH265 = value.length() <= 256 &&
+                  mime.startsWith("video/mp4") && mime.contains("hvc1");
+                if (!mimeH265) {
+                  fail("MSE_PROBE_CODEC_UNAVAILABLE", 0);
+                }
+              }
+            } catch (JSONException error) {
+              fail("MSE_PROBE_CONTROL_INVALID", 0);
+            }
+          }
+
+          @Override
+          public void onMessage(WebSocket activeSocket, ByteString bytes) {
+            if (!isCurrent(generation)) {
+              return;
+            }
+            if (!mimeH265 || bytes == null) {
+              fail("MSE_PROBE_MEDIA_BEFORE_MIME", 0);
+              return;
+            }
+            if (bytes.size() > ProtectedMseMp4Probe.MAX_MESSAGE_BYTES) {
+              fail("MSE_PROBE_MESSAGE_TOO_LARGE", 0);
+              return;
+            }
+            try {
+              mp4.accept(bytes.toByteArray());
+              if (mp4.isComplete()) {
+                succeed();
+              }
+            } catch (IOException error) {
+              fail("MSE_PROBE_BYTE_BUDGET", 0);
+            }
+          }
+
+          @Override
+          public void onClosed(WebSocket activeSocket, int code, String reason) {
+            if (isCurrent(generation)) {
+              fail("MSE_PROBE_CLOSED", code);
+            }
+          }
+
+          @Override
+          public void onFailure(
+            WebSocket failedSocket,
+            Throwable error,
+            Response response
+          ) {
+            int statusCode = response == null ? 0 : response.code();
+            if (response != null) {
+              response.close();
+            }
+            if (!isCurrent(generation)) {
+              return;
+            }
+            if (
+              statusCode == 401 &&
+              "frigate".equals(mseRequest.profile.auth) &&
+              retriedAuthentication.compareAndSet(false, true)
+            ) {
+              connectionGeneration += 1;
+              executor.execute(() -> {
+                try {
+                  if (
+                    !finished.get() &&
+                    registry.refreshLiveSession(
+                      profileId,
+                      mseRequest.sessionGeneration
+                    )
+                  ) {
+                    connect();
+                    return;
+                  }
+                } catch (IOException ignored) {
+                  // The public result carries only a bounded failure code.
+                }
+                fail("MSE_PROBE_AUTH_FAILED", 401);
+              });
+              return;
+            }
+            fail("MSE_PROBE_CONNECTION_FAILED", statusCode);
+          }
+        }
+      );
+      webSocket = socket;
+      if (finished.get()) {
+        socket.cancel();
+      }
+    }
+
+    void cancel() {
+      fail("MSE_PROBE_CANCELLED", 0);
+    }
+
+    private boolean isCurrent(int generation) {
+      return !finished.get() &&
+        protectedMseProbes.get(probeId) == this &&
+        connectionGeneration == generation;
+    }
+
+    private void succeed() {
+      if (!finished.compareAndSet(false, true)) {
+        return;
+      }
+      protectedMseProbes.remove(probeId, this);
+      closeResources();
+      WritableMap result = Arguments.createMap();
+      result.putBoolean("mimeH265", mimeH265);
+      result.putBoolean("ftyp", mp4.hasFtyp());
+      result.putBoolean("moov", mp4.hasMoov());
+      result.putBoolean("moof", mp4.hasMoof());
+      result.putBoolean("mdat", mp4.hasMdat());
+      result.putDouble("bytesObserved", mp4.totalBytes());
+      promise.resolve(result);
+    }
+
+    private void fail(String code, int statusCode) {
+      if (!finished.compareAndSet(false, true)) {
+        return;
+      }
+      protectedMseProbes.remove(probeId, this);
+      closeResources();
+      String suffix = statusCode > 0 ? " (HTTP " + statusCode + ")" : "";
+      promise.reject(code, "The protected MSE probe failed" + suffix);
+    }
+
+    private void closeResources() {
+      ScheduledFuture<?> activeTimeout = timeout;
+      if (activeTimeout != null) {
+        activeTimeout.cancel(false);
+      }
+      WebSocket socket = webSocket;
+      if (socket != null) {
+        socket.close(1000, null);
+        socket.cancel();
       }
     }
   }

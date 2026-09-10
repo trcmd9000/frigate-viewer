@@ -46,11 +46,36 @@ describe('protectedLiveDiagnostics', () => {
         diagnostics({
           inboundVideoPackets: 10,
           inboundVideoFrames: 2,
-          codec: 'H264',
-          candidateType: 'host',
-          candidateProtocol: 'udp',
+          acceptedAudio: true,
+          receiverAudioTrackCount: 1,
+          streamAudioTrackCount: 1,
+          audioTrackCount: 1,
+          readyAudioTrackCount: 1,
+          mutedAudioTrackCount: 0,
+          enabledAudioTrackCount: 1,
+          endedAudioTrackCount: 0,
+          inboundAudioPackets: 12,
+          inboundAudioBytes: 480,
+        }),
+        'answer',
+      ),
+    ).toContain('acceptedAudio=true');
+    expect(
+      formatProtectedLiveDiagnostics(
+        diagnostics({
+          acceptedAudio: true,
+          audioTrackCount: 1,
+          inboundAudioPackets: 12,
+          inboundAudioBytes: 480,
         }),
       ),
-    ).toContain('codec=H264');
+    ).toContain('audioPackets=12');
+    expect(
+      formatProtectedLiveDiagnostics(
+        diagnostics({
+          acceptedAudio: true,
+        }),
+      ),
+    ).not.toMatch(/codec|candidate|sdp|track-id|url|host|token/i);
   });
 });

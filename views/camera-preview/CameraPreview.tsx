@@ -2,13 +2,17 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {NavigationFunctionComponent} from 'react-native-navigation';
 import {useStyles} from '../../helpers/colors';
+import {
+  ServerScopeScreenProps,
+  withServerScopeScreen,
+} from '../../helpers/serverScopeScreen';
 import {LivePreview} from './LivePreview';
 
-interface CameraPreviewProps {
+interface CameraPreviewProps extends ServerScopeScreenProps {
   cameraName: string;
 }
 
-export const CameraPreview: NavigationFunctionComponent<CameraPreviewProps> = ({
+const CameraPreviewContent: NavigationFunctionComponent<CameraPreviewProps> = ({
   cameraName,
 }) => {
   const styles = useStyles(({theme}) => ({
@@ -45,3 +49,5 @@ export const CameraPreview: NavigationFunctionComponent<CameraPreviewProps> = ({
     </View>
   );
 };
+
+export const CameraPreview = withServerScopeScreen(CameraPreviewContent);

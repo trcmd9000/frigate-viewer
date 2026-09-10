@@ -17,6 +17,12 @@ import {ScrollView} from 'react-native-gesture-handler';
 import {ICameraEventsProps} from '../camera-events/CameraEvents';
 import {useDesignTokens} from '../../helpers/designTokens';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {
+  currentServerScopeGeneration,
+  dismissModalWhenServerScopeChanges,
+  isCurrentServerScope,
+  useServerScopeOwner,
+} from '../../helpers/serverScopeScreen';
 import {MenuId} from './menuHelpers';
 import {MessageKey, messages} from './messages';
 
@@ -125,9 +131,13 @@ export const secondaryMenuSections: readonly MenuSection[] = [
 const pendingNavigations = new Set<string>();
 
 export const navigateToMenuItem =
-  ({view, modal, passProps}: IMenuItem) =>
+  (
+    {view, modal, passProps}: IMenuItem,
+    ownerScopeGeneration = currentServerScopeGeneration(),
+  ) =>
   (): Promise<void> => {
-    if (!view) {
+    const scoped = view === 'CameraEvents' || view === 'CameraPreview' || view === 'CameraEventClip';
+    if (!view || (scoped && !isCurrentServerScope(ownerScopeGeneration))) {
       return Promise.resolve();
     }
 
@@ -146,11 +156,17 @@ export const navigateToMenuItem =
         Navigation.showModal({
           component: {
             name: view,
-            passProps,
+            passProps: scoped
+              ? {...(passProps as object), ownerScopeGeneration}
+              : passProps,
           },
         }),
       )
-        .then(() => undefined)
+        .then(componentId => {
+          if (view === 'CameraEvents') {
+            dismissModalWhenServerScopeChanges(componentId, ownerScopeGeneration);
+          }
+        })
         .finally(clearPendingNavigation)
         .catch(error => {
           SecureLogger.logError(error as Error, 'navigation.show-secondary');
@@ -169,6 +185,7 @@ export const Menu: NavigationFunctionComponent<IMenuProps> = ({
   const intl = useIntl();
   const tokens = useDesignTokens();
   const dismissalInFlight = useRef(false);
+  const {generation} = useServerScopeOwner();
 
   const dismissMenu = useCallback((): Promise<void> => {
     if (dismissalInFlight.current) {
@@ -224,9 +241,15 @@ export const Menu: NavigationFunctionComponent<IMenuProps> = ({
         return;
       }
 
-      void dismissMenu().then(() => navigateToMenuItem(item)());
+      const navigateToItem = navigateToMenuItem(item, generation);
+      void dismissMenu().then(() => {
+        if (isCurrentServerScope(generation)) {
+          return navigateToItem();
+        }
+        return undefined;
+      });
     },
-    [dismissMenu],
+    [dismissMenu, generation],
   );
 
   const styles = useMemo(

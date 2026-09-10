@@ -106,30 +106,35 @@ export const prepareLocalRtspMedia = async (
   };
 };
 
-export const hasAcceptedVideoMedia = (sdp: string): boolean => {
+const hasAcceptedMedia = (sdp: string, mediaKind: 'audio' | 'video'): boolean => {
   if (typeof sdp !== 'string') {
     return false;
   }
-  let videoPortAccepted = false;
-  let videoDirection: string | undefined;
+  let mediaPortAccepted = false;
+  let mediaDirection: string | undefined;
+  let sessionDirection: string | undefined;
+  let mediaSectionStarted = false;
   const isAccepted = () =>
-    videoPortAccepted &&
-    videoDirection !== 'inactive' &&
-    videoDirection !== 'recvonly';
+    mediaPortAccepted &&
+    (mediaDirection || sessionDirection || 'sendrecv') !== 'inactive' &&
+    (mediaDirection || sessionDirection || 'sendrecv') !== 'recvonly';
   for (const line of sdp.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (trimmed.startsWith('m=')) {
+      mediaSectionStarted = true;
       if (isAccepted()) {
         return true;
       }
       const media = trimmed.split(/\s+/);
       const port = media[1] || '';
-      videoPortAccepted =
-        media[0] === 'm=video' && /^\d+$/.test(port) && Number(port) > 0;
-      videoDirection = undefined;
+      mediaPortAccepted =
+        media[0] === `m=${mediaKind}` &&
+        /^\d+(?:\/\d+)?$/.test(port) &&
+        Number(port.split('/')[0]) > 0;
+      mediaDirection = undefined;
       continue;
     }
-    if (videoPortAccepted && trimmed.startsWith('a=')) {
+    if (trimmed.startsWith('a=')) {
       const attribute = trimmed.slice(2);
       if (
         attribute === 'inactive' ||
@@ -137,11 +142,147 @@ export const hasAcceptedVideoMedia = (sdp: string): boolean => {
         attribute === 'sendonly' ||
         attribute === 'sendrecv'
       ) {
-        videoDirection = attribute;
+        if (mediaPortAccepted) {
+          mediaDirection = attribute;
+        } else if (!mediaSectionStarted) {
+          sessionDirection = attribute;
+        }
       }
     }
   }
   return isAccepted();
+};
+
+export const hasAcceptedVideoMedia = (sdp: string): boolean =>
+  hasAcceptedMedia(sdp, 'video');
+
+export const hasAcceptedAudioMedia = (sdp: string): boolean =>
+  hasAcceptedMedia(sdp, 'audio');
+
+export interface AudioMediaSummary {
+  readonly present: boolean;
+  readonly portAccepted: boolean;
+  readonly direction: 'sendrecv' | 'sendonly' | 'recvonly' | 'inactive';
+  readonly opus: boolean;
+  readonly pcma: boolean;
+  readonly pcmu: boolean;
+}
+
+export interface VideoMediaSummary {
+  readonly present: boolean;
+  readonly portAccepted: boolean;
+  readonly direction: 'sendrecv' | 'sendonly' | 'recvonly' | 'inactive';
+  readonly h264: boolean;
+  readonly h265: boolean;
+  readonly vp8: boolean;
+  readonly vp9: boolean;
+  readonly av1: boolean;
+}
+
+export const summarizeVideoMedia = (sdp: string): VideoMediaSummary => {
+  let inVideoSection = false;
+  let present = false;
+  let portAccepted = false;
+  let sessionDirection: VideoMediaSummary['direction'] = 'sendrecv';
+  let mediaDirection: VideoMediaSummary['direction'] | undefined;
+  const codecs = new Set<string>();
+  for (const rawLine of typeof sdp === 'string' ? sdp.split(/\r?\n/) : []) {
+    const line = rawLine.trim();
+    if (line.startsWith('m=')) {
+      const media = line.split(/\s+/);
+      inVideoSection = media[0] === 'm=video';
+      if (inVideoSection && !present) {
+        present = true;
+        const port = media[1] || '';
+        portAccepted =
+          /^\d+(?:\/\d+)?$/.test(port) && Number(port.split('/')[0]) > 0;
+      }
+      continue;
+    }
+    if (!line.startsWith('a=')) {
+      continue;
+    }
+    const attribute = line.slice(2).toLowerCase();
+    if (
+      attribute === 'sendrecv' ||
+      attribute === 'sendonly' ||
+      attribute === 'recvonly' ||
+      attribute === 'inactive'
+    ) {
+      if (inVideoSection) {
+        mediaDirection = attribute;
+      } else if (!present) {
+        sessionDirection = attribute;
+      }
+    } else if (inVideoSection && attribute.startsWith('rtpmap:')) {
+      const codec = attribute.split(/\s+/, 2)[1]?.split('/', 1)[0];
+      if (codec) {
+        codecs.add(codec);
+      }
+    }
+  }
+  return {
+    present,
+    portAccepted,
+    direction: mediaDirection || sessionDirection,
+    h264: codecs.has('h264'),
+    h265: codecs.has('h265') || codecs.has('hevc'),
+    vp8: codecs.has('vp8'),
+    vp9: codecs.has('vp9'),
+    av1: codecs.has('av1') || codecs.has('av01'),
+  };
+};
+
+export const summarizeAudioMedia = (sdp: string): AudioMediaSummary => {
+  let inAudioSection = false;
+  let present = false;
+  let portAccepted = false;
+  let sessionDirection: AudioMediaSummary['direction'] = 'sendrecv';
+  let mediaDirection: AudioMediaSummary['direction'] | undefined;
+  const codecs = new Set<string>();
+  for (const rawLine of typeof sdp === 'string' ? sdp.split(/\r?\n/) : []) {
+    const line = rawLine.trim();
+    if (line.startsWith('m=')) {
+      const media = line.split(/\s+/);
+      inAudioSection = media[0] === 'm=audio';
+      if (inAudioSection && !present) {
+        present = true;
+        const port = media[1] || '';
+        portAccepted =
+          /^\d+(?:\/\d+)?$/.test(port) && Number(port.split('/')[0]) > 0;
+      }
+      continue;
+    }
+    if (!line.startsWith('a=')) {
+      continue;
+    }
+    const attribute = line.slice(2).toLowerCase();
+    if (
+      attribute === 'sendrecv' ||
+      attribute === 'sendonly' ||
+      attribute === 'recvonly' ||
+      attribute === 'inactive'
+    ) {
+      if (inAudioSection) {
+        mediaDirection = attribute;
+      } else if (!present) {
+        sessionDirection = attribute;
+      }
+    } else if (inAudioSection && attribute.startsWith('rtpmap:')) {
+      const codec = attribute.split(/\s+/, 2)[1]?.split('/', 1)[0];
+      if (codec) {
+        codecs.add(codec);
+      }
+    }
+  }
+  return {
+    present,
+    portAccepted,
+    direction: mediaDirection || sessionDirection,
+    opus: codecs.has('opus'),
+    pcma: codecs.has('pcma'),
+    pcmu: codecs.has('pcmu'),
+  };
 };
 
 export const openProtectedLiveSocket = async (

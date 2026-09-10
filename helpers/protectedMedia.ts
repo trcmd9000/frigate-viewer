@@ -12,6 +12,7 @@ export const MEDIA_URI_SCHEME = 'frigate-media';
 interface NativeProtectedMediaModule {
   registerMediaProfile?: (config: NativeMediaProfileConfig) => Promise<string>;
   createMediaUri?: (profileId: string, resourcePath: string) => Promise<string>;
+  createMseMediaUri?: (profileId: string, streamName: string) => Promise<string>;
   createRtspMediaUri?: (
     profileId: string,
     streamName: string,
@@ -210,6 +211,26 @@ export const protectedMediaUri = async (
   const uri = await native.createMediaUri(profileId, path);
   if (typeof uri !== 'string' || !isProtectedMediaUri(uri)) {
     throw new Error('Native protected media URI is invalid');
+  }
+  return uri;
+};
+
+export const protectedMseMediaUri = async (
+  server: Server,
+  streamName: string,
+): Promise<string> => {
+  const native = nativeModule();
+  if (Platform.OS !== 'android' || !native?.createMseMediaUri) {
+    throw new Error('Protected MSE playback is unavailable on this platform');
+  }
+  if (!validRtspStreamName(streamName)) {
+    throw new Error('The protected MSE stream name is invalid');
+  }
+  assertRemoteHttpConsent(server);
+  const profileId = await protectedMediaProfileId(server);
+  const uri = await native.createMseMediaUri(profileId, streamName);
+  if (typeof uri !== 'string' || !isProtectedMediaUri(uri)) {
+    throw new Error('Native protected MSE media URI is invalid');
   }
   return uri;
 };

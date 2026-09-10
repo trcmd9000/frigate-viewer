@@ -16,7 +16,7 @@ export default {
     'Ursprünglich basierend auf sp-engineering/frigate-viewer. Diese Zuordnung bedeutet keine Billigung.',
   'author.error.cantOpenLink':
     'Ich kann keine App finden, um diesen Link zu öffnen.',
-  'camerasList.topBar.title': 'Liste der Kameras',
+  'camerasList.topBar.title': 'Kameraübersicht',
   'camerasList.noCameras': 'Keine Kameras',
   'camerasList.emptyDescription':
     'Fügen Sie einen Server hinzu oder konfigurieren Sie ihn, um Kameras zu finden.',
@@ -87,6 +87,14 @@ export default {
   'cameraEventClip.progressHint': 'Passt die Position im Video an',
   'cameraPreview.audio.enable': 'Audio einschalten',
   'cameraPreview.audio.mute': 'Audio ausschalten',
+  'cameraPreview.audio.unavailable': 'Audio nicht verfügbar',
+  'cameraPreview.audio.cancel': 'Audioaktivierung abbrechen',
+  'cameraPreview.audio.retry': 'Audio erneut versuchen',
+  'cameraPreview.audio.pending': 'Audio wird aktiviert… Zum Abbrechen tippen.',
+  'cameraPreview.audio.unavailableHint': 'In diesem Livestream ist kein Audio verfügbar.',
+  'cameraPreview.audio.failure.focus-denied': 'Audiofokus wurde nicht gewährt. Zum Wiederholen tippen.',
+  'cameraPreview.audio.failure.native': 'Audio konnte nicht aktiviert werden. Zum Wiederholen tippen.',
+  'cameraPreview.audio.failure.timeout': 'Audioaktivierung hat zu lange gedauert. Zum Wiederholen tippen.',
   'cameraPreview.fallback.message':
     'Live-Stream nicht verfügbar. Stattdessen werden geschützte Standbilder angezeigt.',
   'cameraPreview.fallback.landscape':
@@ -115,6 +123,7 @@ export default {
     'Verbindung zum Live-Stream wird hergestellt',
   'cameraPreview.status.rtsp': 'RTSP-Live-Stream',
   'cameraPreview.status.webrtc': 'WebRTC-Live-Stream',
+  'cameraPreview.status.mse': 'HEVC-Live-Stream',
   'cameraPreview.status.live': 'Live-Stream',
   'cameraPreview.status.reconnecting':
     'Verbindung zum Live-Stream wird erneut hergestellt',

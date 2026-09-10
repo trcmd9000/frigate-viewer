@@ -27,6 +27,7 @@ const defaultStatusMessages: Record<string, string> = {
   'cameraPreview.status.connecting': 'Connecting to live stream',
   'cameraPreview.status.rtsp': 'RTSP live stream',
   'cameraPreview.status.webrtc': 'WebRTC live stream',
+  'cameraPreview.status.mse': 'HEVC live stream',
   'cameraPreview.status.live': 'Live stream',
   'cameraPreview.status.reconnecting': 'Reconnecting to live stream',
   'cameraPreview.status.degraded': 'Live degraded; showing snapshots',
@@ -76,6 +77,8 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     state === 'live' && transport
       ? transport === 'webrtc'
         ? 'WebRTC'
+        : transport === 'mse'
+        ? 'HEVC'
         : 'RTSP'
       : label;
   const isLongLabel = compactLabel.length > 18;

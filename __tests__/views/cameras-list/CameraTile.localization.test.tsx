@@ -31,6 +31,7 @@ jest.mock('../../../store/settings', () => ({
 }));
 
 jest.mock('../../../store/store', () => ({
+  store: {getState: () => ({events: {scopeGeneration: 0}})},
   useAppSelector: (selector: keyof typeof state) => state[selector],
 }));
 

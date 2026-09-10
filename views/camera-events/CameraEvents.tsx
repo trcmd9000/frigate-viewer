@@ -1,5 +1,6 @@
-import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
+import {useStore} from 'react-redux';
 import {Dimensions, FlatList, ToastAndroid, Text, View} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {useRest} from '../../helpers/rest';
@@ -8,6 +9,7 @@ import {
   selectFiltersLabels,
   selectFiltersRetained,
   selectFiltersZones,
+  selectServerScopeGeneration,
 } from '../../store/events';
 import {
   selectEventsLockLandscapePlaybackOrientation,
@@ -17,6 +19,7 @@ import {
   setEventSnapshotHeight,
 } from '../../store/settings';
 import {useAppDispatch, useAppSelector} from '../../store/store';
+import type {RootState} from '../../store/store';
 import {
   filterButton,
   useEventsFilters,
@@ -85,13 +88,26 @@ const EventListSkeleton: FC<{label: string}> = ({label}) => {
 export interface ICameraEventsProps {
   cameraNames?: string[];
   retained?: boolean;
+  ownerScopeGeneration?: number;
 }
 
-export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
-  cameraNames,
-  retained,
-  componentId,
-}) => {
+export const CameraEvents: NavigationFunctionComponent<
+  ICameraEventsProps
+> = props => {
+  const generation = useAppSelector(selectServerScopeGeneration);
+  if (
+    props.ownerScopeGeneration !== undefined &&
+    props.ownerScopeGeneration !== generation
+  ) {
+    return null;
+  }
+  return <CameraEventsContent key={generation} {...props} generation={generation} />;
+};
+
+const CameraEventsContent: NavigationFunctionComponent<
+  ICameraEventsProps & {generation: number}
+> = ({cameraNames, retained, componentId, generation}) => {
+  const store = useStore<RootState>();
   const isSpecificCamera = useMemo(
     () => cameraNames && cameraNames.length === 1,
     [cameraNames],
@@ -118,7 +134,8 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
   const [sharedEvent, setSharedEvent] = useState<ICameraEvent>();
   const [mediaEnabled, setMediaEnabled] = useState(true);
   const clipNavigationInFlight = useRef(false);
-  const loadMoreInFlight = useRef(false);
+  const clipRequestId = useRef(0);
+  const loadMoreInFlight = useRef<number | null>(null);
   const requestId = useRef(0);
   const mounted = useRef(true);
   const dispatch = useAppDispatch();
@@ -137,26 +154,42 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
   const {get} = useRest();
   const getRef = useRef(get);
 
+  const isCurrentScope = useCallback(
+    () =>
+      mounted.current &&
+      selectServerScopeGeneration(store.getState()) === generation,
+    [generation, store],
+  );
+  const isCurrentRequest = useCallback(
+    (id: number) => isCurrentScope() && id === requestId.current,
+    [isCurrentScope],
+  );
+
   useEffect(() => {
     getRef.current = get;
   }, [get]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       mounted.current = false;
       requestId.current += 1;
-    },
-    [],
-  );
+      clipRequestId.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     const listener = Navigation.events().registerComponentListener(
       {
         componentDidAppear() {
-          setMediaEnabled(true);
+          if (isCurrentScope()) {
+            setMediaEnabled(true);
+          }
         },
         componentDidDisappear() {
-          setMediaEnabled(false);
+          if (isCurrentScope()) {
+            setMediaEnabled(false);
+          }
         },
       },
       componentId,
@@ -164,7 +197,7 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
     return () => {
       listener.remove();
     };
-  }, [componentId]);
+  }, [componentId, isCurrentScope]);
 
   const filterCount = useMemo(
     () =>
@@ -272,22 +305,29 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
   };
 
   const refresh = () => {
+    if (!isCurrentScope()) {
+      return;
+    }
+    // Invalidate pagination immediately, before the refresh effect runs.
+    requestId.current += 1;
+    loadMoreInFlight.current = null;
     setEndReached(false);
     setError(false);
-    setRefreshing(true);
+    setRefreshing(Boolean(server.host));
     setRefreshVersion(version => version + 1);
   };
 
   useEffect(() => {
-    if (!server.host || !refreshing || refreshVersion === 0) {
+    if (!isCurrentScope() || !server.host || !refreshing || refreshVersion === 0) {
       return;
     }
     const currentRequest = ++requestId.current;
+    loadMoreInFlight.current = null;
     getRef.current<ICameraEvent[]>(server, 'events', {
       queryParams: refreshQueryParams,
     })
       .then(data => {
-        if (!mounted.current || currentRequest !== requestId.current) {
+        if (!isCurrentRequest(currentRequest)) {
           return;
         }
         watchEndReached(data);
@@ -298,27 +338,41 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
         }
       })
       .catch(error => {
-        SecureLogger.logError(error as Error, 'loading-camera-events');
-        if (mounted.current && currentRequest === requestId.current) {
-          setError(true);
+        if (!isCurrentRequest(currentRequest)) {
+          return;
         }
+        SecureLogger.logError(error as Error, 'loading-camera-events');
+        setError(true);
       })
       .finally(() => {
-        if (mounted.current && currentRequest === requestId.current) {
+        if (isCurrentRequest(currentRequest)) {
           setRefreshing(false);
         }
       });
-  }, [refreshQueryParams, refreshVersion, refreshing, server]);
+  }, [
+    isCurrentRequest,
+    isCurrentScope,
+    refreshQueryParams,
+    refreshVersion,
+    refreshing,
+    server,
+  ]);
 
   const loadMore = () => {
-    if (!endReached && !loadMoreInFlight.current) {
-      loadMoreInFlight.current = true;
+    if (
+      isCurrentScope() &&
+      server.host &&
+      !refreshing &&
+      !endReached &&
+      loadMoreInFlight.current === null
+    ) {
       const currentRequest = ++requestId.current;
-      get<ICameraEvent[]>(server, 'events', {
+      loadMoreInFlight.current = currentRequest;
+      getRef.current<ICameraEvent[]>(server, 'events', {
         queryParams: eventsQueryParams,
       })
         .then(data => {
-          if (!mounted.current || currentRequest !== requestId.current) {
+          if (!isCurrentRequest(currentRequest)) {
             return;
           }
           watchEndReached(data);
@@ -332,13 +386,19 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
           setError(false);
         })
         .catch(error => {
-          SecureLogger.logError(error as Error, 'loading-more-events');
-          if (mounted.current && currentRequest === requestId.current) {
-            setError(true);
+          if (!isCurrentRequest(currentRequest)) {
+            return;
           }
+          SecureLogger.logError(error as Error, 'loading-more-events');
+          setError(true);
         })
         .finally(() => {
-          loadMoreInFlight.current = false;
+          if (
+            isCurrentRequest(currentRequest) &&
+            loadMoreInFlight.current === currentRequest
+          ) {
+            loadMoreInFlight.current = null;
+          }
         });
     }
   };
@@ -348,19 +408,22 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
   }, [filtersCameras, filtersLabels, filtersZones, filtersRetained]);
 
   const onDelete = (deletedIds: string[]) => {
+    if (!isCurrentScope()) {
+      return;
+    }
     setEvents(currentEvents =>
       currentEvents.filter(event => !deletedIds.includes(event.id)),
     );
   };
 
   const onSnapshotDimensions = (width: number, height: number) => {
-    if (!snapshotDimensions) {
+    if (isCurrentScope() && !snapshotDimensions) {
       setSnapshotDimensions([width, height]);
     }
   };
 
   useEffect(() => {
-    if (snapshotDimensions) {
+    if (isCurrentScope() && snapshotDimensions) {
       const [width, height] = snapshotDimensions;
       const proportion = height / width;
       const windowWidth = Dimensions.get('window').width;
@@ -372,18 +435,28 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
   }, [snapshotDimensions, numColumns, orientation]);
 
   const showEventClip = (event: ICameraEvent) => {
+    if (!isCurrentScope()) {
+      return;
+    }
     if (event.has_clip) {
       if (clipNavigationInFlight.current) {
         return;
       }
       clipNavigationInFlight.current = true;
+      const currentRequest = ++clipRequestId.current;
+      const isCurrentClipRequest = () =>
+        isCurrentScope() && currentRequest === clipRequestId.current;
       setMediaEnabled(false);
       requestAnimationFrame(() => {
+        if (!isCurrentClipRequest()) {
+          return;
+        }
         void Navigation.showModal({
           component: {
             name: 'CameraEventClip',
             passProps: {
               event,
+              ownerScopeGeneration: generation,
             },
             options: {
               layout: {
@@ -397,16 +470,21 @@ export const CameraEvents: NavigationFunctionComponent<ICameraEventsProps> = ({
           },
         })
           .then(componentId => {
-            if (mounted.current) {
+            if (isCurrentClipRequest()) {
               setComponentId(componentId);
             }
           })
           .catch(error => {
+            if (!isCurrentClipRequest()) {
+              return;
+            }
             setMediaEnabled(true);
             SecureLogger.logError(error as Error, 'navigation.camera-event-clip');
           })
           .finally(() => {
-            clipNavigationInFlight.current = false;
+            if (isCurrentClipRequest()) {
+              clipNavigationInFlight.current = false;
+            }
           });
       });
     } else {

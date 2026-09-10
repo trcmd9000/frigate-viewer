@@ -1,6 +1,7 @@
 import {Buffer} from 'buffer';
 import {NativeModules, Platform} from 'react-native';
 import type {Server} from '../store/settings';
+import {protectedMediaProfileId} from './protectedMedia';
 import {
   authorizationHeader,
   buildServerApiUrl,
@@ -87,6 +88,60 @@ export interface TransportEligibility {
   readonly experimentEligible: boolean;
   readonly transport: 'existing-webrtc' | 'existing-fallback';
 }
+
+export interface ProtectedMseProbeResult {
+  readonly mimeH265: boolean;
+  readonly ftyp: boolean;
+  readonly moov: boolean;
+  readonly moof: boolean;
+  readonly mdat: boolean;
+  readonly bytesObserved: number;
+}
+
+export type ProtectedMseProbeFailure =
+  | 'disabled'
+  | 'open'
+  | 'send'
+  | 'protocol'
+  | 'control-invalid'
+  | 'media-before-mime'
+  | 'message-too-large'
+  | 'server'
+  | 'codec-unavailable'
+  | 'budget'
+  | 'closed'
+  | 'auth'
+  | 'connection'
+  | 'timeout'
+  | 'cancelled'
+  | 'unknown';
+
+const MSE_PROBE_FAILURES: Readonly<Record<string, ProtectedMseProbeFailure>> = {
+  MSE_PROBE_DISABLED: 'disabled',
+  MSE_PROBE_OPEN_FAILED: 'open',
+  MSE_PROBE_SEND_FAILED: 'send',
+  MSE_PROBE_PROTOCOL_ERROR: 'protocol',
+  MSE_PROBE_CONTROL_INVALID: 'control-invalid',
+  MSE_PROBE_MEDIA_BEFORE_MIME: 'media-before-mime',
+  MSE_PROBE_MESSAGE_TOO_LARGE: 'message-too-large',
+  MSE_PROBE_SERVER_ERROR: 'server',
+  MSE_PROBE_CODEC_UNAVAILABLE: 'codec-unavailable',
+  MSE_PROBE_BYTE_BUDGET: 'budget',
+  MSE_PROBE_CLOSED: 'closed',
+  MSE_PROBE_AUTH_FAILED: 'auth',
+  MSE_PROBE_CONNECTION_FAILED: 'connection',
+  MSE_PROBE_TIMEOUT: 'timeout',
+  MSE_PROBE_CANCELLED: 'cancelled',
+};
+
+export const protectedMseProbeFailure = (
+  error: unknown,
+): ProtectedMseProbeFailure => {
+  const code = asRecord(error)?.code;
+  return typeof code === 'string'
+    ? MSE_PROBE_FAILURES[code] || 'unknown'
+    : 'unknown';
+};
 
 const UNKNOWN_DESCRIPTOR: MediaDescriptor = Object.freeze({
   kind: 'unknown',
@@ -558,6 +613,11 @@ export const deviceCodecCapabilityFromNative = (
 const nativeCodecModule = ():
   | {
       probeMediaCodecCapabilities?: () => Promise<unknown>;
+      isProtectedMseProbeEnabled?: () => boolean;
+      probeProtectedMse?: (
+        profileId: string,
+        streamName: string,
+      ) => Promise<unknown>;
     }
   | undefined =>
   NativeModules.ClientCertModule as
@@ -573,6 +633,50 @@ export const probeDeviceCodecCapability =
     const result = await native.probeMediaCodecCapabilities();
     return deviceCodecCapabilityFromNative(result);
   };
+
+export const protectedMseProbeEnabled = (): boolean => {
+  const native = nativeCodecModule();
+  return Platform.OS === 'android' &&
+    native?.isProtectedMseProbeEnabled?.() === true;
+};
+
+export const probeProtectedMseContract = async (
+  server: Server,
+  streamName: string,
+): Promise<ProtectedMseProbeResult> => {
+  const native = nativeCodecModule();
+  if (
+    Platform.OS !== 'android' ||
+    native?.isProtectedMseProbeEnabled?.() !== true ||
+    !native.probeProtectedMse
+  ) {
+    throw new Error('The protected MSE probe is disabled');
+  }
+  if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(streamName)) {
+    throw new Error('The protected MSE stream name is invalid');
+  }
+  const profileId = await protectedMediaProfileId(server);
+  const value = asRecord(await native.probeProtectedMse(profileId, streamName));
+  const bool = (key: string): boolean => value?.[key] === true;
+  const bytesObserved = value?.bytesObserved;
+  if (
+    !value ||
+    typeof bytesObserved !== 'number' ||
+    !Number.isFinite(bytesObserved) ||
+    bytesObserved < 0 ||
+    bytesObserved > 2 * 1024 * 1024
+  ) {
+    throw new Error('The protected MSE probe returned an invalid result');
+  }
+  return {
+    mimeH265: bool('mimeH265'),
+    ftyp: bool('ftyp'),
+    moov: bool('moov'),
+    moof: bool('moof'),
+    mdat: bool('mdat'),
+    bytesObserved,
+  };
+};
 
 const hasCodec = (
   metadata: StreamMetadata,

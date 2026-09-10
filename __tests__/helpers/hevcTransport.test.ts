@@ -4,14 +4,24 @@ jest.mock('../../helpers/rest', () => ({
   executeServerRequest: jest.fn(),
 }));
 
+const mockProtectedMediaProfileId = jest.fn();
+jest.mock('../../helpers/protectedMedia', () => ({
+  protectedMediaProfileId: (...args: unknown[]) =>
+    mockProtectedMediaProfileId(...args),
+}));
+
 import {
   decideTransportEligibility,
   deviceCodecCapabilityFromNative,
   fetchStreamMetadata,
   parseStreamMetadata,
   parseStreamMetadataJson,
+  probeProtectedMseContract,
+  protectedMseProbeEnabled,
+  protectedMseProbeFailure,
 } from '../../helpers/hevcTransport';
 import {executeServerRequest} from '../../helpers/rest';
+import {NativeModules, Platform} from 'react-native';
 
 const request = executeServerRequest as jest.Mock;
 
@@ -31,6 +41,10 @@ const device = (
 describe('HEVC transport observation model', () => {
   beforeEach(() => {
     request.mockReset();
+    mockProtectedMediaProfileId.mockReset();
+    NativeModules.ClientCertModule = NativeModules.ClientCertModule || {};
+    delete NativeModules.ClientCertModule.isProtectedMseProbeEnabled;
+    delete NativeModules.ClientCertModule.probeProtectedMse;
   });
 
   it('parses H264 and audio descriptors without copying producer URLs', () => {
@@ -314,5 +328,87 @@ describe('HEVC transport observation model', () => {
       unknown: [{codec: 'unknown'}],
     });
     expect(JSON.stringify(metadata)).not.toContain('secret');
+  });
+
+  it('keeps the protected MSE probe disabled without invoking native code', async () => {
+    const nativeProbe = jest.fn();
+    NativeModules.ClientCertModule.isProtectedMseProbeEnabled = () => false;
+    NativeModules.ClientCertModule.probeProtectedMse = nativeProbe;
+
+    expect(protectedMseProbeEnabled()).toBe(false);
+    await expect(
+      probeProtectedMseContract({} as never, 'camera'),
+    ).rejects.toThrow('disabled');
+    expect(nativeProbe).not.toHaveBeenCalled();
+    expect(mockProtectedMediaProfileId).not.toHaveBeenCalled();
+  });
+
+  it('uses an opaque profile and validates the bounded MSE result', async () => {
+    const previousPlatform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {configurable: true, value: 'android'});
+    NativeModules.ClientCertModule.isProtectedMseProbeEnabled = () => true;
+    NativeModules.ClientCertModule.probeProtectedMse = jest.fn().mockResolvedValue({
+      mimeH265: true,
+      ftyp: true,
+      moov: true,
+      moof: true,
+      mdat: true,
+      bytesObserved: 4096,
+      ignored: 'secret',
+    });
+    mockProtectedMediaProfileId.mockResolvedValue(
+      '0123456789abcdef0123456789abcdef',
+    );
+
+    await expect(
+      probeProtectedMseContract({} as never, 'front:main'),
+    ).resolves.toEqual({
+      mimeH265: true,
+      ftyp: true,
+      moov: true,
+      moof: true,
+      mdat: true,
+      bytesObserved: 4096,
+    });
+    expect(NativeModules.ClientCertModule.probeProtectedMse).toHaveBeenCalledWith(
+      '0123456789abcdef0123456789abcdef',
+      'front:main',
+    );
+
+    NativeModules.ClientCertModule.probeProtectedMse = jest.fn().mockResolvedValue({
+      bytesObserved: 2 * 1024 * 1024 + 1,
+    });
+    await expect(
+      probeProtectedMseContract({} as never, 'front:main'),
+    ).rejects.toThrow('invalid result');
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: previousPlatform,
+    });
+  });
+
+  it('reduces MSE probe errors to an allow-listed reason', () => {
+    expect(
+      protectedMseProbeFailure({
+        code: 'MSE_PROBE_CODEC_UNAVAILABLE',
+        message: 'private endpoint and token',
+      }),
+    ).toBe('codec-unavailable');
+    expect(
+      protectedMseProbeFailure({code: 'MSE_PROBE_CONTROL_INVALID'}),
+    ).toBe('control-invalid');
+    expect(
+      protectedMseProbeFailure({code: 'MSE_PROBE_MEDIA_BEFORE_MIME'}),
+    ).toBe('media-before-mime');
+    expect(
+      protectedMseProbeFailure({code: 'MSE_PROBE_MESSAGE_TOO_LARGE'}),
+    ).toBe('message-too-large');
+    expect(
+      protectedMseProbeFailure({
+        code: 'UNTRUSTED_PRIVATE_VALUE',
+        message: 'secret',
+      }),
+    ).toBe('unknown');
+    expect(protectedMseProbeFailure('secret')).toBe('unknown');
   });
 });

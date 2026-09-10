@@ -4,6 +4,41 @@ Status: Phase A implementation complete; the remaining work is a proposal and
 time-boxed spike. This document does not authorize a production transport
 change.
 
+## Separate WebView evaluation (8 September 2026)
+
+An independent comparison of the existing Frigate web player in Android WebView
+is now approved for investigation, including a possible later production
+proposal. It does not change the native Phase B/C acceptance boundaries below
+or authorize shipping a WebView, changing server configuration, adding routes,
+exposing go2rtc ports, or bypassing transport policy. No WebView implementation
+or compatibility result is included in the current source changes.
+
+First compare the same source and the actual selected transport: Frigate's web
+player normally prefers MSE, which can carry AAC, while WebRTC audio requires
+Opus or PCMA/PCMU. Browser audio success is not evidence that native WebRTC
+receives compatible audio. Verify against the installed Frigate and WebView
+versions; do not change server codecs as part of this comparison.
+
+Time-box the comparison to one day for a single-camera diagnostic player and
+two more for security/lifecycle feasibility. Inventory existing UI resources
+before approving any client allow-list expansion; assume no stable standalone
+embed route. Do not rely on DOM scraping to create a production interface.
+
+Android WebView supports KeyChain client-certificate and HTTP-auth callbacks,
+but its default cookie store and cached host/port certificate decisions do not
+provide the application's profile isolation. Require same-origin/different-user
+and different-certificate A-B-A tests, including WebSocket, storage and service
+worker state. Separate views, initial headers, or clearCache are not proof of
+isolation. TLS errors must be cancelled, never ignored. Unsupported profiles
+must retain the existing native path, not silently lose their trust policy.
+
+Require muted startup, cancellable playback, actual decoded frame progression,
+audible output, five-minute stability, lifecycle/renderer-crash recovery and
+measured resource use against the native baseline. Do not request microphone,
+camera, location or broad file permissions or expose an unrestricted native
+bridge. Only a separately reviewed implementation proposal with passing
+security and device evidence can authorize an optional production transport.
+
 ## Non-negotiable boundaries
 
 The experiment must work with the Frigate deployment as it exists today:
@@ -114,6 +149,22 @@ This is the first transport spike and is limited to three engineering days
 including device testing. It is the preferred experiment because it reuses the
 existing WebRTC signaling and candidate policy.
 
+### Result: aborted on Jitsi WebRTC 124.0.0
+
+The installed `react-native-webrtc` 124.0.8 dependency resolves to
+`org.jitsi:webrtc:124.0.0`. Its Android core and hardware decoder factory expose
+H.265, while the React Native wrapper normally filters hardware codecs to H.264.
+An isolated arm64 build allowed H.265 through that existing factory without
+changing signaling, authentication, or candidate handling.
+
+On the T Phone 3, the resulting offer advertised H.265 and the go2rtc answer
+accepted an active video section containing H.265. Before a decoded HEVC frame
+could be proven, `libjingle_peerconnection_so.so` dereferenced a null pointer on
+its worker thread and terminated the foreground process with `SIGSEGV`. The
+experiment therefore fails the decoded-frame and stability criteria. The
+decoder-factory change is not retained. Continue with Phase C rather than
+shipping or widening this WebRTC experiment.
+
 ### Work items
 
 1. In an isolated branch/build variant, substitute the candidate GetStream
@@ -160,6 +211,48 @@ Run this phase only if Phase B fails and the failure record shows that a
 server-provided fMP4 byte stream could still be useful. Time-box this spike to
 five engineering days. It is not a commitment to ship.
 
+### Contract probe implementation
+
+The first Phase C milestone is implemented behind the off-by-default Android
+property `enableProtectedMseProbe`. It reuses the native media profile's OkHttp
+client, cookies, Basic Auth, TLS and mTLS policy, and opens only the fixed
+`/live/mse/api/ws` path. JavaScript supplies an opaque profile ID and validated
+stream name; it never receives the resolved URL, credentials, cookies or media
+bytes.
+
+The probe requests only `hvc1.1.6.L153.B0`, requires a bounded `video/mp4`
+response containing `hvc1`, and scans binary messages for top-level `ftyp`,
+`moov`, `moof` and `mdat` boxes. It limits each binary message to 2 MiB
+(bounded by the same total probe budget),
+total observed data to 2 MiB and startup to ten seconds. It closes on success,
+failure, profile replacement, app pause or bridge invalidation. Its public
+result contains only codec/box booleans and a byte count.
+
+### Media3 bridge result: sustained frames on T Phone 3
+
+The experiment now creates a dedicated opaque `frigate-media://.../mse/...`
+handle after the contract probe succeeds. A native Media3 `DataSource` resolves
+that handle to the profile-scoped WebSocket, gates binary data on the validated
+HEVC MIME response, and exposes an ordered progressive stream to Media3. Media
+bytes, resolved endpoints, cookies and credentials remain native. The queue is
+bounded to 4 MiB, individual messages to 2 MiB, startup to ten seconds and an
+idle read to fifteen seconds. Profile retirement cancels the shared OkHttp
+dispatcher and closes the stream.
+
+On 10 September 2026, arm64 experiment build
+`20260910-133733-d18e6fe35f93` rendered the real Lumus HEVC stream on a T Phone
+3 for more than ten seconds without a playback exception or native crash.
+Camera-only frame hashes at 1, 6 and 12 seconds were distinct. Media3 selected
+`c2.qti.hevc.decoder` for `video/hevc` at 3840x2176. The stream identified as
+`hvc1.1.6.L186`, and Media3 warned that this exceeded the decoder's declared
+profile-level capability, but decoded frames remained stable during the test.
+
+This satisfies the single-device decoded-frame gate, not production release.
+The bridge remains behind the off-by-default property
+`enableProtectedMseProbe`. Additional devices, lifecycle transitions,
+authentication failures, H.264 regression behavior and longer soak tests are
+still required before enabling it by default.
+
 ### Proposed shape
 
 1. Open a native OkHttp WebSocket to the existing authenticated
@@ -180,13 +273,12 @@ five engineering days. It is not a commitment to ship.
    redacted diagnostics native. JavaScript receives only an opaque player handle
    and status.
 
-### Explicit feasibility uncertainty
+### Remaining feasibility uncertainty
 
-It is unknown whether `/live/mse/api/ws` provides a stable ordered fMP4
-contract, whether its framing can be mapped to Media3 without unbounded
-buffering, and whether HEVC sample descriptions are accepted by the available
-extractor/device. These are spike questions. A successful WebSocket connection
-or parsed initialization segment is not a production success.
+The tested `/live/mse/api/ws` session provided an ordered fMP4 contract and the
+Media3 extractor accepted it within bounded buffering. It remains unknown how
+portable that behavior is across Frigate/go2rtc versions, Android vendors and
+HEVC profiles. A single successful device is not production success.
 
 ### Phase C success and abort
 

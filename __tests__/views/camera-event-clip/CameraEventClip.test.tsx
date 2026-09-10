@@ -1,7 +1,10 @@
 import React from 'react';
-import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
+import {Navigation} from 'react-native-navigation';
+import Share from 'react-native-share';
+import {downloadMedia, releaseDownloadedMedia, retainDownloadedMedia} from '../../../helpers/mediaDownload';
 import {IntlProvider} from 'react-intl';
-import {Platform, StyleSheet} from 'react-native';
+import {Platform, Pressable, StyleSheet} from 'react-native';
 import en from '../../../i18n/en';
 import de from '../../../i18n/de';
 import {CameraEventClip} from '../../../views/camera-event-clip/CameraEventClip';
@@ -11,6 +14,8 @@ const mockUseAppSelector = jest.fn();
 const mockUseScreenPlaybackLifecycle = jest.fn();
 const mockMediaPlayerProps = jest.fn();
 const mockEmitProgress = {current: false};
+let mockGeneration = 0;
+const mockPlayerCleanup = jest.fn();
 let mockTheme = {
   background: '#ffffff',
   text: '#1f2933',
@@ -23,7 +28,15 @@ let mockTheme = {
 };
 
 jest.mock('../../../store/store', () => ({
-  useAppSelector: () => mockUseAppSelector(),
+  store: {getState: () => ({events: {scopeGeneration: mockGeneration}})},
+  useAppSelector: (selector: unknown) =>
+    selector === require('../../../store/events').selectServerScopeGeneration
+      ? mockGeneration
+      : mockUseAppSelector(),
+}));
+
+jest.mock('react-native-navigation', () => ({
+  Navigation: {dismissModal: jest.fn(() => Promise.resolve())},
 }));
 
 jest.mock('../../../store/settings', () => ({
@@ -44,6 +57,9 @@ jest.mock('../../../components/media/Media3MediaPlayer', () => ({
     const ReactModule = require('react');
     const {View: NativeView} = require('react-native');
     mockMediaPlayerProps(props);
+    ReactModule.useEffect(() => {
+      return () => mockPlayerCleanup();
+    }, []);
     ReactModule.useEffect(() => {
       if (mockEmitProgress.current) {
         (props.onProgress as CallableFunction)?.({
@@ -135,6 +151,8 @@ const renderClip = (
 describe('CameraEventClip protected playback state', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGeneration = 0;
+    (releaseDownloadedMedia as jest.Mock).mockResolvedValue(undefined);
     mockEmitProgress.current = false;
     (Platform as {OS: string}).OS = 'android';
     mockUseAppSelector.mockReturnValue(server);
@@ -142,6 +160,93 @@ describe('CameraEventClip protected playback state', () => {
       active: true,
       activationId: 0,
     });
+  });
+
+  const clipElement = (ownerScopeGeneration = 0) => (
+    <IntlProvider locale="en" messages={en}>
+      <CameraEventClip event={event as never} componentId="camera-event-clip"
+        componentName="CameraEventClip" ownerScopeGeneration={ownerScopeGeneration} />
+    </IntlProvider>
+  );
+
+  it('preserves playback in scope, then unmounts the player without preparing on the new server', async () => {
+    mockProtectedMediaUri.mockResolvedValue('frigate-media://test/vod/master.m3u8');
+    const view = render(clipElement());
+    await view.findByTestId('media-player');
+    view.rerender(clipElement());
+    expect(mockPlayerCleanup).not.toHaveBeenCalled();
+    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
+    mockGeneration = 1;
+    view.rerender(clipElement(1));
+    expect(view.toJSON()).toBeNull();
+    expect(mockPlayerCleanup).toHaveBeenCalledTimes(1);
+    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
+    expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');
+  });
+
+  it('rejects a delayed old navigation mount before any content hooks run', () => {
+    mockGeneration = 1;
+    const view = render(clipElement(0));
+    expect(view.toJSON()).toBeNull();
+    expect(mockUseAppSelector).not.toHaveBeenCalled();
+    expect(mockUseScreenPlaybackLifecycle).not.toHaveBeenCalled();
+    expect(mockProtectedMediaUri).not.toHaveBeenCalled();
+  });
+
+  it('does not start queued preparation after the live store has switched', async () => {
+    const view = render(clipElement());
+    mockGeneration = 1;
+    await act(async () => { await Promise.resolve(); });
+    expect(mockProtectedMediaUri).not.toHaveBeenCalled();
+    view.rerender(clipElement());
+    expect(view.toJSON()).toBeNull();
+  });
+
+  it.each([false, true])('releases the local display lease once on scope unmount (late result: %s)', async late => {
+    (Platform as {OS: string}).OS = 'ios';
+    let resolveDownload!: (path: string) => void;
+    (downloadMedia as jest.Mock).mockReturnValue(new Promise<string>(resolve => {
+      resolveDownload = resolve;
+    }));
+    const view = render(clipElement());
+    await act(async () => { await Promise.resolve(); });
+    if (!late) {
+      await act(async () => resolveDownload('/cache/scoped-clip.mp4'));
+      expect(view.getByTestId('media-player')).toBeTruthy();
+    }
+    mockGeneration = 1;
+    view.rerender(clipElement());
+    if (late) {
+      await act(async () => resolveDownload('/cache/scoped-clip.mp4'));
+    }
+    expect(view.toJSON()).toBeNull();
+    expect(retainDownloadedMedia).toHaveBeenCalledWith('/cache/scoped-clip.mp4', 'display');
+    expect(releaseDownloadedMedia).toHaveBeenCalledTimes(1);
+    expect(releaseDownloadedMedia).toHaveBeenCalledWith('/cache/scoped-clip.mp4', 'display');
+    expect(downloadMedia).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['share', 'download'])('blocks stale %s callbacks and releases a pending share lease', async action => {
+    mockEmitProgress.current = true;
+    mockProtectedMediaUri.mockResolvedValue('frigate-media://test/vod/master.m3u8');
+    let resolveDownload!: (path: string) => void;
+    (downloadMedia as jest.Mock).mockReturnValue(new Promise<string>(resolve => {
+      resolveDownload = resolve;
+    }));
+    const view = render(clipElement());
+    fireEvent.press(await view.findByTestId('event-player-overflow'));
+    const press = view.UNSAFE_getAllByType(Pressable).find(
+      button => button.props.testID === `event-player-${action}`,
+    )!.props.onPress;
+    act(() => { void press(); });
+    mockGeneration = 1;
+    view.rerender(clipElement());
+    await act(async () => resolveDownload('/cache/shared-clip.mp4'));
+    expect(Share.open).not.toHaveBeenCalled();
+    expect(retainDownloadedMedia).toHaveBeenCalledWith('/cache/shared-clip.mp4', 'share');
+    expect(releaseDownloadedMedia).toHaveBeenCalledWith('/cache/shared-clip.mp4', 'share');
+    await act(async () => press());
+    expect(downloadMedia).toHaveBeenCalledTimes(1);
   });
 
   it('shows localized loading and retryable error states', async () => {
