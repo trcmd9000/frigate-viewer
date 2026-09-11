@@ -137,7 +137,11 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       backgroundColor: theme.mediaBackground,
     },
     mediaTapSurface: {
-      ...StyleSheet.absoluteFillObject,
+      position: 'absolute',
+      top: 48,
+      right: 32,
+      bottom: 72,
+      left: 32,
       zIndex: 2,
     },
     topOverlay: {
@@ -1188,9 +1192,9 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 defaultMessage: 'Select live stream',
               })}
               value={
-                streamPreference?.mode === 'manual'
+                streamName || (streamPreference?.mode === 'manual'
                   ? streamPreference.streamName
-                  : 'auto'
+                  : 'auto')
               }
               options={[
                 {

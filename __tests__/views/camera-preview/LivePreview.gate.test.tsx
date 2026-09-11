@@ -24,6 +24,7 @@ let mockPlaybackActive = true;
 let mockActivationId = 1;
 let mockPlayerShouldReportPlaying = true;
 let mockMseProbeEnabled = false;
+let mockLiveStreamPreferences: Record<string, Record<string, unknown>> = {};
 let mockPlayerProps:
   | {
       muted?: boolean;
@@ -42,7 +43,7 @@ jest.mock('../../../store/store', () => ({
         v1: {
           servers: [mockServer],
           activeServerProfileId: 'profile-id',
-          liveStreamPreferences: {},
+          liveStreamPreferences: mockLiveStreamPreferences,
         },
       },
     }),
@@ -273,6 +274,7 @@ describe('LivePreview audio render gate', () => {
     mockActivationId = 1;
     mockPlayerShouldReportPlaying = true;
     mockMseProbeEnabled = false;
+    mockLiveStreamPreferences = {};
     mockPlayerProps = undefined;
     mockGet.mockReset();
     mockFetchStreamMetadata.mockReset();
@@ -476,6 +478,57 @@ describe('LivePreview audio render gate', () => {
         },
       }),
     );
+    view.unmount();
+  });
+
+  it('marks the active fallback stream instead of an unavailable manual preference', async () => {
+    mockLiveStreamPreferences = {
+      'profile-id': {
+        front: {mode: 'manual', streamName: 'original'},
+      },
+    };
+    mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
+    mockSelectProtectedLiveStreamOptions.mockReturnValue([
+      {name: 'compatible', label: 'Compatible'},
+      {name: 'original', label: 'Original'},
+    ]);
+    mockFetchStreamMetadata.mockImplementation((_: unknown, streamName: string) =>
+      Promise.resolve({
+        video: [{
+          kind: 'video',
+          codec: streamName === 'original' ? 'h265' : 'h264',
+        }],
+        audio: [],
+        malformed: false,
+      }),
+    );
+    mockPlanProtectedLiveStreams.mockReturnValue([
+      {name: 'compatible', codec: 'h264', transport: 'webrtc'},
+    ]);
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    const mediaTap = await view.findByTestId('camera-preview-media-tap');
+    expect(mediaTap.props.style).toMatchObject({
+      top: 48,
+      right: 32,
+      bottom: 72,
+      left: 32,
+    });
+    fireEvent.press(mediaTap);
+
+    expect(
+      view.getByRole('radio', {name: 'Compatible - H.264'}).props
+        .accessibilityState,
+    ).toEqual({selected: true});
+    expect(
+      view.getByRole('radio', {name: 'Original - H.265'}).props
+        .accessibilityState,
+    ).toEqual({selected: false});
     view.unmount();
   });
 
