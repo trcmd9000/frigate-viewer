@@ -8,11 +8,15 @@ import type {ProtectedAudioStatus} from '../../../helpers/protectedAudio';
 const appStateListeners: Array<(state: 'active' | 'background') => void> = [];
 const mockGet = jest.fn();
 const mockFetchStreamMetadata = jest.fn();
+const mockPrepareLocalRtspMedia = jest.fn();
+const mockProbeProtectedMseContract = jest.fn();
+const mockProtectedMseMediaUri = jest.fn();
 const mockLogInfo = jest.fn();
 const mockServer = {};
 let mockPlaybackActive = true;
 let mockActivationId = 1;
 let mockPlayerShouldReportPlaying = true;
+let mockMseProbeEnabled = false;
 let mockPlayerProps:
   | {
       muted?: boolean;
@@ -52,9 +56,7 @@ jest.mock('../../../helpers/rest', () => ({
 }));
 
 jest.mock('../../../helpers/protectedLive', () => ({
-  prepareLocalRtspMedia: jest.fn(() =>
-    Promise.reject(new Error('no local route')),
-  ),
+  prepareLocalRtspMedia: mockPrepareLocalRtspMedia,
   selectProtectedLiveStreams: jest.fn(() => ['front']),
 }));
 
@@ -71,9 +73,9 @@ jest.mock('../../../helpers/secureLogger', () => ({
 
 jest.mock('../../../helpers/hevcTransport', () => ({
   fetchStreamMetadata: mockFetchStreamMetadata,
-  protectedMseProbeEnabled: () => false,
+  protectedMseProbeEnabled: () => mockMseProbeEnabled,
   protectedMseProbeFailure: () => 'unknown',
-  probeProtectedMseContract: jest.fn(),
+  probeProtectedMseContract: mockProbeProtectedMseContract,
 }));
 
 jest.mock('../../../components/media/ProtectedWebRTCPlayer', () => {
@@ -106,8 +108,20 @@ jest.mock('../../../components/media/LocalRtspPlayer', () => ({
 }));
 
 jest.mock('../../../helpers/protectedMedia', () => ({
+  protectedMseMediaUri: mockProtectedMseMediaUri,
   releaseProtectedMediaUri: jest.fn(),
 }));
+
+jest.mock('../../../components/media/Media3MediaPlayer', () => {
+  const ReactModule = require('react');
+  const {View} = require('react-native');
+  return {
+    ['Media3MediaPlayer']: (props: {onFirstFrame: () => void}) => {
+      ReactModule.useEffect(() => props.onFirstFrame(), [props.onFirstFrame]);
+      return ReactModule.createElement(View, {testID: 'mse-player'});
+    },
+  };
+});
 
 jest.mock('../../../helpers/mediaDownload', () => ({
   downloadMedia: jest.fn(),
@@ -132,7 +146,14 @@ jest.mock('../../../components/ZoomableImage', () => ({
 }));
 
 jest.mock('../../../components/media/LiveStatusBadge', () => ({
-  ['LiveStatusBadge']: () => null,
+  ['LiveStatusBadge']: (props: Record<string, unknown>) => {
+    const ReactModule = require('react');
+    const {View} = require('react-native');
+    return ReactModule.createElement(View, {
+      testID: 'mock-live-status',
+      ...props,
+    });
+  },
 }));
 
 const {LivePreview} =
@@ -230,9 +251,15 @@ describe('LivePreview audio render gate', () => {
     mockPlaybackActive = true;
     mockActivationId = 1;
     mockPlayerShouldReportPlaying = true;
+    mockMseProbeEnabled = false;
     mockPlayerProps = undefined;
     mockGet.mockReset();
     mockFetchStreamMetadata.mockReset();
+    mockPrepareLocalRtspMedia.mockReset();
+    mockPrepareLocalRtspMedia.mockRejectedValue(new Error('no local route'));
+    mockProbeProtectedMseContract.mockReset();
+    mockProtectedMseMediaUri.mockReset();
+    mockProtectedMseMediaUri.mockResolvedValue('frigate-media://profile/mse/front');
     mockLogInfo.mockReset();
     mockFetchStreamMetadata.mockResolvedValue({
       audio: [{kind: 'audio', codec: 'opus'}],
@@ -259,6 +286,61 @@ describe('LivePreview audio render gate', () => {
     );
     expect(mockFetchStreamMetadata).toHaveBeenCalledWith(mockServer, 'front');
     expect(mockLogInfo.mock.calls.flat().join(' ')).not.toContain('front');
+    view.unmount();
+  });
+
+  it('keeps fallback transports idle until an HEVC probe reaches stable MSE playback', async () => {
+    let resolveProbe: (result: {
+      mimeH265: boolean;
+      ftyp: boolean;
+      moov: boolean;
+      moof: boolean;
+      mdat: boolean;
+      bytesObserved: number;
+    }) => void = () => undefined;
+    mockMseProbeEnabled = true;
+    mockPlayerShouldReportPlaying = false;
+    mockFetchStreamMetadata.mockResolvedValue({
+      video: [{kind: 'video', codec: 'h265'}],
+      audio: [],
+      malformed: false,
+    });
+    mockProbeProtectedMseContract.mockReturnValue(
+      new Promise(resolve => {
+        resolveProbe = resolve;
+      }),
+    );
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() => expect(mockProbeProtectedMseContract).toHaveBeenCalled());
+    expect(mockPrepareLocalRtspMedia).not.toHaveBeenCalled();
+    expect(view.queryByTestId('protected-player')).toBeNull();
+    expect(view.getByTestId('mock-live-status').props.state).toBe('preparing');
+
+    await act(async () => {
+      resolveProbe({
+        mimeH265: true,
+        ftyp: true,
+        moov: true,
+        moof: true,
+        mdat: true,
+        bytesObserved: 1024,
+      });
+    });
+
+    await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
+    await waitFor(() => {
+      const status = view.getByTestId('mock-live-status');
+      expect(status.props.state).toBe('live');
+      expect(status.props.transport).toBe('mse');
+    });
+    expect(mockPrepareLocalRtspMedia).not.toHaveBeenCalled();
+    expect(view.queryByText(en['cameraPreview.fallback.codec'])).toBeNull();
     view.unmount();
   });
 

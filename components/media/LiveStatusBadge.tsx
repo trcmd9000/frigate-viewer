@@ -42,13 +42,9 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
   const {width: windowWidth} = useWindowDimensions();
   const styles = useStyles(({theme: palette}) => ({
     badge: {
-      position: 'absolute',
-      top: 12,
-      right: 12,
-      zIndex: 3,
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'flex-end',
+      flexShrink: 0,
       minWidth: 0,
       overflow: 'hidden',
       paddingHorizontal: 8,
@@ -88,7 +84,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     viewportWidth > 0
       ? viewportWidth
       : windowWidth;
-  const badgeMaxWidth = Math.max(1, width - 24);
+  const badgeMaxWidth = Math.max(1, width - 48);
   const textMaxWidth = Math.max(1, width - 59);
   const connecting =
     state === 'preparing' ||

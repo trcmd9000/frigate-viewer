@@ -91,6 +91,28 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       position: 'relative',
       backgroundColor: theme.mediaBackground,
     },
+    topOverlay: {
+      position: 'absolute',
+      top: 12,
+      left: 16,
+      right: 12,
+      zIndex: 4,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    cameraTitle: {
+      flex: 1,
+      minWidth: 0,
+      marginRight: 8,
+      color: theme.mediaText,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    statusOverlay: {
+      maxWidth: '52%',
+      flexShrink: 0,
+      alignItems: 'flex-end',
+    },
     image: {
       width: '100%',
       height: '100%',
@@ -180,6 +202,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [muted, setMuted] = useState(true);
   const mutedIntentRef = useRef(muted);
   const [webrtcAudioAvailable, setWebrtcAudioAvailable] = useState(false);
+  const [mseAudioAvailable, setMseAudioAvailable] = useState(false);
   const [webrtcAudioStatus, setWebrtcAudioStatus] =
     useState<ProtectedAudioStatus>({state: 'inactive'});
   const [appActive, setAppActive] = useState(
@@ -391,6 +414,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       setMuted(true);
       setWebrtcAudioAvailable(false);
       setWebrtcAudioStatus({state: 'inactive'});
+      setMseAudioAvailable(false);
       setDecoded(false);
       setFallbackReason(reason);
       if (transportRef.current === 'mse') {
@@ -552,6 +576,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setMuted(true);
     setWebrtcAudioAvailable(false);
     setWebrtcAudioStatus({state: 'inactive'});
+    setMseAudioAvailable(false);
     setDecoded(false);
     setRtspMedia(undefined);
     setMseMedia(undefined);
@@ -560,6 +585,20 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setStreamNames([]);
     setFallbackReason(undefined);
     setLivePhase('snapshot');
+    const armFirstFrameTimeout = () => {
+      if (firstFrameTimer.current) {
+        clearTimeout(firstFrameTimer.current);
+      }
+      firstFrameTimer.current = setTimeout(() => {
+        firstFrameExpired.current = true;
+        setMuted(true);
+        setDecoded(false);
+        setFallbackReason('timeout');
+        setRtspMedia(undefined);
+        setLivePhase('fallback');
+        firstFrameTimer.current = undefined;
+      }, LIVE_FIRST_FRAME_TIMEOUT_MS);
+    };
     if (!playbackActive || Platform.OS !== 'android') {
       return () => {
         active = false;
@@ -580,11 +619,15 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           setLivePhase('fallback');
           return;
         }
-        selectedStreams.forEach((selectedStream, index) => {
+        setStreamNames(selectedStreams);
+        setLivePhase('preparing');
+        armFirstFrameTimeout();
+
+        const metadataRequests = selectedStreams.map((selectedStream, index) =>
           fetchStreamMetadata(server, selectedStream)
             .then(metadata => {
               if (!active) {
-                return;
+                return undefined;
               }
               const audioCodecs = new Set(
                 metadata.audio.map(descriptor => descriptor.codec),
@@ -593,44 +636,10 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 `streamIndex=${index}, metadataAvailable=true, malformed=${metadata.malformed}, aac=${audioCodecs.has('aac')}, opus=${audioCodecs.has('opus')}, pcma=${audioCodecs.has('pcma')}, pcmu=${audioCodecs.has('pcmu')}`,
                 'protected-live-codecs',
               );
-              if (
-                protectedMseProbeEnabled() &&
-                metadata.video.some(descriptor => descriptor.codec === 'h265')
-              ) {
-                probeProtectedMseContract(server, selectedStream)
-                  .then(async result => {
-                    if (active) {
-                      SecureLogger.logInfo(
-                        `streamIndex=${index}, success=true, mimeH265=${result.mimeH265}, ftyp=${result.ftyp}, moov=${result.moov}, moof=${result.moof}, mdat=${result.mdat}, bytesObserved=${result.bytesObserved}`,
-                        'protected-mse-probe',
-                      );
-                    }
-                    if (!active || index !== 0 || !result.mimeH265 ||
-                      !result.ftyp || !result.moov || !result.moof || !result.mdat) {
-                      return;
-                    }
-                    const uri = await protectedMseMediaUri(server, selectedStream);
-                    if (!active || firstFrameExpired.current) {
-                      return;
-                    }
-                    setMseMedia({
-                      uri,
-                      mimeType: 'video/mp4',
-                      mode: 'direct',
-                    });
-                    setRtspMedia(undefined);
-                    setActiveTransport('mse');
-                    setLivePhase('connecting');
-                  })
-                  .catch(error => {
-                    if (active) {
-                      SecureLogger.logInfo(
-                        `streamIndex=${index}, success=false, reason=${protectedMseProbeFailure(error)}`,
-                        'protected-mse-probe',
-                      );
-                    }
-                  });
+              if (active && index === 0) {
+                setMseAudioAvailable(audioCodecs.size > 0);
               }
+                return metadata;
             })
             .catch(() => {
               if (active) {
@@ -639,40 +648,89 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                   'protected-live-codecs',
                 );
               }
-            });
-        });
-        setStreamNames(selectedStreams);
-        setLivePhase('preparing');
-        firstFrameTimer.current = setTimeout(() => {
-          firstFrameExpired.current = true;
-          setMuted(true);
-          setDecoded(false);
-          setFallbackReason('timeout');
-          setRtspMedia(undefined);
-          setLivePhase('fallback');
-          firstFrameTimer.current = undefined;
-        }, LIVE_FIRST_FRAME_TIMEOUT_MS);
-        prepareLocalRtspMedia(server, config, cameraName)
-          .then(media => {
-            if (!active || firstFrameExpired.current ||
-              transportRef.current === 'mse') {
-              releaseProtectedMediaUri(media.uri);
+                return undefined;
+              }),
+          );
+
+          (async () => {
+            const primaryMetadata = await metadataRequests[0];
+            if (!active || firstFrameExpired.current) {
               return;
             }
-            setRtspMedia(media);
-            setActiveTransport('rtsp');
-            setLivePhase('connecting');
-          })
-          .catch(error => {
-            // A local route is optional. Its failure must not delay protected
-            // WebRTC, and the error is intentionally not exposed to the UI.
-            SecureLogger.logError(error as Error, 'preparing-local-live');
-            if (active && !firstFrameExpired.current &&
-              transportRef.current !== 'mse') {
-              setActiveTransport('webrtc');
-              setLivePhase('connecting');
+            if (
+              protectedMseProbeEnabled() &&
+              primaryMetadata?.video.some(
+                descriptor => descriptor.codec === 'h265',
+              )
+            ) {
+              try {
+                const result = await probeProtectedMseContract(
+                  server,
+                  selectedStreams[0],
+                );
+                if (active) {
+                  SecureLogger.logInfo(
+                    `streamIndex=0, success=true, mimeH265=${result.mimeH265}, ftyp=${result.ftyp}, moov=${result.moov}, moof=${result.moof}, mdat=${result.mdat}, bytesObserved=${result.bytesObserved}`,
+                    'protected-mse-probe',
+                  );
+                }
+                if (
+                  result.mimeH265 && result.ftyp && result.moov &&
+                  result.moof && result.mdat
+                ) {
+                  const uri = await protectedMseMediaUri(
+                    server,
+                    selectedStreams[0],
+                  );
+                  if (!active || firstFrameExpired.current) {
+                    releaseProtectedMediaUri(uri);
+                    return;
+                  }
+                  armFirstFrameTimeout();
+                  setMseMedia({
+                    uri,
+                    mimeType: 'video/mp4',
+                    mode: 'direct',
+                  });
+                  setRtspMedia(undefined);
+                  setActiveTransport('mse');
+                  setLivePhase('connecting');
+                  return;
+                }
+              } catch (error) {
+                if (active) {
+                  SecureLogger.logInfo(
+                    `streamIndex=0, success=false, reason=${protectedMseProbeFailure(error)}`,
+                    'protected-mse-probe',
+                  );
+                }
+              }
             }
-          });
+            if (!active || firstFrameExpired.current) {
+              return;
+            }
+            prepareLocalRtspMedia(server, config, cameraName)
+              .then(media => {
+                if (!active || firstFrameExpired.current) {
+                  releaseProtectedMediaUri(media.uri);
+                  return;
+                }
+                armFirstFrameTimeout();
+                setRtspMedia(media);
+                setActiveTransport('rtsp');
+                setLivePhase('connecting');
+              })
+              .catch(error => {
+                // A local route is optional. Its failure must not delay protected
+                // WebRTC, and the error is intentionally not exposed to the UI.
+                SecureLogger.logError(error as Error, 'preparing-local-live');
+                if (active && !firstFrameExpired.current) {
+                  armFirstFrameTimeout();
+                  setActiveTransport('webrtc');
+                  setLivePhase('connecting');
+                }
+              });
+          })();
       })
       .catch(error => {
         SecureLogger.logError(error as Error, 'loading-live-stream-config');
@@ -738,6 +796,12 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         defaultMessage: 'Live unavailable — showing snapshots',
       })
     : fallbackDetailedText;
+  const statusOverlayVisible =
+    livePhase === 'live' || transientOverlayVisible;
+  const statusOverlayOpacity = useMemo(
+    () => ({opacity: livePhase === 'live' ? 1 : overlayOpacity}),
+    [livePhase, overlayOpacity],
+  );
 
   return (
     <View style={styles.container}>
@@ -815,7 +879,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             key={`${activationId}:mse:${streamName}`}
             media={mseMedia}
             paused={false}
-            muted
+            muted={muted}
             style={[styles.livePlayer, !decoded && styles.snapshotPending]}
             onProgress={() => undefined}
             onEnd={() => liveFailed('timeout')}
@@ -894,29 +958,47 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             </Pressable>
           </Animated.View>
         )}
-        <Animated.View
-          accessibilityElementsHidden={!transientOverlayVisible}
-          importantForAccessibility={
-            transientOverlayVisible ? 'yes' : 'no-hide-descendants'
-          }
-          pointerEvents="none"
-          style={{opacity: overlayOpacity}}
-        >
-          <LiveStatusBadge
-            state={livePhase}
-            transport={transport}
-            viewportWidth={mediaWidth}
-          />
-        </Animated.View>
+        <View testID="camera-preview-top-overlay" style={styles.topOverlay}>
+          <Text
+            testID="camera-preview-title"
+            accessibilityRole="header"
+            accessibilityLabel={cameraName}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={styles.cameraTitle}
+          >
+            {cameraName}
+          </Text>
+          <Animated.View
+            accessibilityElementsHidden={!statusOverlayVisible}
+            importantForAccessibility={
+              statusOverlayVisible ? 'yes' : 'no-hide-descendants'
+            }
+            pointerEvents="none"
+            style={[
+              styles.statusOverlay,
+              statusOverlayOpacity,
+            ]}
+          >
+            <LiveStatusBadge
+              state={livePhase}
+              transport={transport}
+              viewportWidth={mediaWidth}
+            />
+          </Animated.View>
+        </View>
         {appActive &&
           playbackActive &&
           decoded &&
           livePhase === 'live' &&
-          (transport === 'rtsp' || transport === 'webrtc') && (
+          (transport === 'rtsp' || transport === 'webrtc' || transport === 'mse') && (
           <LiveAudioControl
             muted={transport === 'webrtc' ? webrtcAudioStatus.state !== 'active' : muted}
             status={transport === 'webrtc' ? webrtcAudioStatus : undefined}
-            disabled={transport === 'webrtc' && !webrtcAudioAvailable}
+            disabled={
+              (transport === 'webrtc' && !webrtcAudioAvailable) ||
+              (transport === 'mse' && !mseAudioAvailable)
+            }
             onToggle={() => {
               const nextMuted = !mutedIntentRef.current;
               mutedIntentRef.current = nextMuted;

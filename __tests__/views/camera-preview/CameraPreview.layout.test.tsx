@@ -9,9 +9,17 @@ jest.mock('../../../store/store', () => ({
   useAppSelector: () => 0,
 }));
 
-jest.mock('../../../views/camera-preview/LivePreview', () => ({
-  ['LivePreview']: () => null,
-}));
+jest.mock('../../../views/camera-preview/LivePreview', () => {
+  const ReactModule = require('react');
+  const {View} = require('react-native');
+  return {
+    ['LivePreview']: ({cameraName}: {cameraName: string}) =>
+      ReactModule.createElement(View, {
+        testID: 'delegated-live-preview',
+        cameraName,
+      }),
+  };
+});
 
 jest.mock('../../../helpers/colors', () => ({
   useStyles: (fn: (value: unknown) => unknown) =>
@@ -23,25 +31,20 @@ jest.mock('../../../helpers/colors', () => ({
     }),
 }));
 
-describe('CameraPreview top overlay layout', () => {
-  it('reserves a separate top region for long camera names', () => {
+describe('CameraPreview overlay ownership', () => {
+  it('delegates the camera name to the live preview overlay', () => {
     const cameraName =
       'a-camera-name-that-is-long-enough-to-wrap-without-covering-status';
-    const {getByTestId} = render(
+    const view = render(
       <CameraPreview
         cameraName={cameraName}
         componentId="camera-preview"
         componentName="CameraPreview"
       />,
     );
-    const title = getByTestId('camera-preview-title');
-    const style = title.props.style;
-
-    expect(style.left).toBe(16);
-    expect(style.right).toBe('52%');
-    expect(style.maxWidth).toBeUndefined();
-    expect(title.props.numberOfLines).toBe(2);
-    expect(title.props.ellipsizeMode).toBe('tail');
-    expect(title.props.accessibilityLabel).toBe(cameraName);
+    expect(view.getByTestId('delegated-live-preview').props.cameraName).toBe(
+      cameraName,
+    );
+    expect(view.queryByTestId('camera-preview-title')).toBeNull();
   });
 });

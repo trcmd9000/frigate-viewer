@@ -113,7 +113,7 @@ describe('LiveStatusBadge', () => {
     },
   );
 
-  it('uses intrinsic right-aligned width for long localized text', () => {
+  it('uses intrinsic bounded width inside the shared top overlay', () => {
     const {UNSAFE_getByType: unsafeGetByType} = render(
       <IntlProvider locale="de" messages={de}>
         <LiveStatusBadge state="connecting" viewportWidth={390} />
@@ -122,10 +122,11 @@ describe('LiveStatusBadge', () => {
 
     const badgeStyle = unsafeGetByType(View).props.style;
     const labelStyle = unsafeGetByType(Text).props.style;
+    expect(badgeStyle.position).toBeUndefined();
     expect(badgeStyle.left).toBeUndefined();
-    expect(badgeStyle.right).toBe(12);
-    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 - 24);
-    expect(badgeStyle.alignSelf).toBe('flex-end');
+    expect(badgeStyle.right).toBeUndefined();
+    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 - 48);
+    expect(badgeStyle.flexShrink).toBe(0);
     expect(badgeStyle.overflow).toBe('hidden');
     expect(labelStyle.flexShrink).toBe(1);
   });
