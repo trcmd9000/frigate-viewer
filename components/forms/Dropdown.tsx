@@ -30,6 +30,8 @@ interface IDropdownProps<T extends DropdownValue> {
   testID?: string;
   compact?: boolean;
   icon?: OutlineGlyphMapType;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const OPTION_HEIGHT = 56;
@@ -44,6 +46,8 @@ export const Dropdown = <T extends DropdownValue>({
   testID,
   compact = false,
   icon = 'switcher',
+  open,
+  onOpenChange,
 }: IDropdownProps<T>) => {
   const formsStyles = useFormsStyles();
   const styles = useStyles(({theme}) => ({
@@ -124,7 +128,17 @@ export const Dropdown = <T extends DropdownValue>({
     },
   }));
 
-  const [opened, setOpened] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const opened = open ?? uncontrolledOpen;
+  const setOpened = useCallback(
+    (nextOpen: boolean) => {
+      if (open === undefined) {
+        setUncontrolledOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [onOpenChange, open],
+  );
   const listRef = useRef<FlatList<IDropdownOption<T>>>(null);
   const selectedIndex = useMemo(
     () => options.findIndex(option => Object.is(value, option.value)),

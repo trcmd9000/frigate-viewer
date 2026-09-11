@@ -89,4 +89,21 @@ describe('Dropdown', () => {
     fireEvent.press(getByRole('button', {name: 'Select live stream'}));
     expect(getByText('Original - H.265, 3840 x 2160, 15 fps')).toBeTruthy();
   });
+
+  it('supports opening the selection list from an external media gesture', () => {
+    const onOpenChange = jest.fn();
+    const {getAllByText} = render(
+      <Dropdown
+        open
+        onOpenChange={onOpenChange}
+        value="one"
+        options={[{value: 'one', label: 'First'}]}
+      />,
+    );
+
+    const firstLabels = getAllByText('First');
+    expect(firstLabels).toHaveLength(2);
+    fireEvent.press(firstLabels[1]);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
 });

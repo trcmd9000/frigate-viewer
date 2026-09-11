@@ -256,6 +256,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     useState<ProtectedLiveFailureReason>();
   const [transientOverlayVisible, setTransientOverlayVisible] = useState(true);
   const [overlayOpacity] = useState(() => new Animated.Value(1));
+  const [streamSelectorOpen, setStreamSelectorOpen] = useState(false);
   const overlayTimer = useRef<ReturnType<typeof setTimeout>>();
   const overlayGeneration = useRef(0);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
@@ -346,6 +347,12 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setTransientOverlayVisible(true);
     scheduleOverlayHide();
   }, [clearOverlayTimer, overlayOpacity, scheduleOverlayHide]);
+  const handleDecodedMediaPress = useCallback(() => {
+    revealTransientOverlays();
+    if (streamOptions.length > 1 && server.profileId) {
+      setStreamSelectorOpen(true);
+    }
+  }, [revealTransientOverlays, server.profileId, streamOptions.length]);
   const cancelTransientOverlay = useCallback(() => {
     overlayGeneration.current += 1;
     clearOverlayTimer();
@@ -1073,7 +1080,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           testID="camera-preview-media-tap"
           accessible={false}
           style={styles.mediaTapSurface}
-          onPress={revealTransientOverlays}
+          onPress={handleDecodedMediaPress}
         />
       )}
       {playbackActive &&
@@ -1164,6 +1171,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               testID="camera-preview-stream-dropdown"
               compact
               icon="switcher"
+              open={streamSelectorOpen}
+              onOpenChange={setStreamSelectorOpen}
               accessibilityLabel={intl.formatMessage({
                 id: 'cameraPreview.stream.select',
                 defaultMessage: 'Select live stream',
