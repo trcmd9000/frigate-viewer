@@ -463,9 +463,6 @@ describe('LivePreview audio render gate', () => {
     fireEvent.press(view.getByTestId('camera-preview-media-tap'));
     expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy();
     fireEvent.press(
-      view.getByRole('button', {name: 'Select live stream'}),
-    );
-    fireEvent.press(
       view.getByRole('radio', {
         name: 'Original H.264 - 1920 x 1080, 15 fps',
       }),
