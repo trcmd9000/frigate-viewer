@@ -32,7 +32,6 @@ jest.mock(
       },
     );
   },
-  {virtual: true},
 );
 
 const makeMedia = (overrides: Partial<PlayableMedia> = {}): PlayableMedia => ({
