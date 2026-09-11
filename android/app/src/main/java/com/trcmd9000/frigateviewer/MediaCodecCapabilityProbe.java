@@ -24,10 +24,16 @@ final class MediaCodecCapabilityProbe {
   private MediaCodecCapabilityProbe() {}
 
   static WritableMap probe() {
+    MediaCodecInfo[] infos;
     try {
-      return probe(new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos());
+      infos = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
     } catch (RuntimeException ignored) {
       return unknownResult();
+    }
+    try {
+      return probe(infos);
+    } catch (RuntimeException ignored) {
+      return availabilityOnlyResult(infos);
     }
   }
 
@@ -48,9 +54,13 @@ final class MediaCodecCapabilityProbe {
         if (info == null || info.isEncoder()) {
           continue;
         }
+        String hevcType = findHevcType(info.getSupportedTypes());
+        if (hevcType == null) {
+          continue;
+        }
         MediaCodecInfo.CodecCapabilities capabilities;
         try {
-          capabilities = info.getCapabilitiesForType(HEVC_MIME);
+          capabilities = info.getCapabilitiesForType(hevcType);
         } catch (IllegalArgumentException ignored) {
           continue;
         }
@@ -155,6 +165,25 @@ final class MediaCodecCapabilityProbe {
     return result;
   }
 
+  private static WritableMap availabilityOnlyResult(MediaCodecInfo[] infos) {
+    WritableMap result = unknownResult();
+    if (infos == null) {
+      return result;
+    }
+    for (MediaCodecInfo info : infos) {
+      try {
+        if (info != null && !info.isEncoder() && findHevcType(info.getSupportedTypes()) != null) {
+          result.putBoolean("hevcDecoderAvailable", true);
+          return result;
+        }
+      } catch (RuntimeException ignored) {
+        // Continue past broken vendor entries; MIME advertisement is sufficient here.
+      }
+    }
+    result.putBoolean("hevcDecoderAvailable", false);
+    return result;
+  }
+
   private static WritableMap baseResult() {
     WritableMap result = Arguments.createMap();
     result.putInt("apiLevel", Build.VERSION.SDK_INT);
@@ -170,5 +199,17 @@ final class MediaCodecCapabilityProbe {
 
   static boolean supportsHardwareClassification(int apiLevel) {
     return apiLevel >= 29;
+  }
+
+  static String findHevcType(String[] supportedTypes) {
+    if (supportedTypes == null) {
+      return null;
+    }
+    for (String supportedType : supportedTypes) {
+      if (HEVC_MIME.equalsIgnoreCase(supportedType)) {
+        return supportedType;
+      }
+    }
+    return null;
   }
 }

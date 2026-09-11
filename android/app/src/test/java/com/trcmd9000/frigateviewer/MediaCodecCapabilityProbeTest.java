@@ -1,6 +1,8 @@
 package com.trcmd9000.frigateviewer;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.lang.reflect.Method;
@@ -15,5 +17,14 @@ public class MediaCodecCapabilityProbeTest {
     assertFalse(MediaCodecCapabilityProbe.supportsHardwareClassification(28));
     assertTrue(MediaCodecCapabilityProbe.supportsHardwareClassification(29));
     assertTrue(MediaCodecCapabilityProbe.supportsHardwareClassification(36));
+  }
+
+  @Test
+  public void findsTheAdvertisedHevcMimeTypeCaseInsensitively() {
+    assertEquals(
+        "Video/HEVC",
+        MediaCodecCapabilityProbe.findHevcType(new String[] {"video/avc", "Video/HEVC"}));
+    assertNull(MediaCodecCapabilityProbe.findHevcType(new String[] {"video/avc"}));
+    assertNull(MediaCodecCapabilityProbe.findHevcType(null));
   }
 }

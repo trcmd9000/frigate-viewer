@@ -6,7 +6,12 @@ import React, {
   useRef,
 } from 'react';
 import {StyleProp, ViewStyle} from 'react-native';
-import Video, {OnLoadData, OnProgressData, VideoRef} from 'react-native-video';
+import Video, {
+  OnLoadData,
+  OnProgressData,
+  VideoRef,
+  ViewType,
+} from 'react-native-video';
 import {MediaPlayerHandle, MediaProgress, PlayableMedia} from './PlayableMedia';
 import {
   DEFAULT_EVENT_PLAYBACK_SPEED,
@@ -142,6 +147,7 @@ const Media3MediaPlayerComponent = (
       resizeMode="contain"
       controls={controls}
       muted={muted}
+      viewType={media.mode === 'direct' ? ViewType.TEXTURE : undefined}
       playInBackground={false}
       playWhenInactive={false}
       // react-native-video's Media3 implementation uses pitch=1f with rate,

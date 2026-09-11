@@ -15,7 +15,7 @@ jest.mock(
     const ReactModule = require('react');
     const {View} = require('react-native');
 
-    return ReactModule.forwardRef(
+    const Video = ReactModule.forwardRef(
       (
         props: Record<string, unknown>,
         ref: React.Ref<{seek: typeof mockSeek; resume: typeof mockResume}>,
@@ -31,6 +31,11 @@ jest.mock(
         });
       },
     );
+    return {
+      __esModule: true,
+      default: Video,
+      ViewType: {TEXTURE: 0},
+    };
   },
 );
 
@@ -107,6 +112,7 @@ describe('Media3MediaPlayer', () => {
       type: 'm3u8',
     });
     expect(video.props.minLoadRetryCount).toBe(0);
+    expect(video.props.viewType).toBe(0);
   });
 
   it('selects the Media3 RTSP extension for opaque local handles', () => {

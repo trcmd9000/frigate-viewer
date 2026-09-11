@@ -70,12 +70,13 @@ describe('LiveStatusBadge', () => {
           state="live"
           transport="webrtc"
           streamType="H.264"
+          frameRate={15}
         />
       </IntlProvider>,
     );
 
-    expect(getByText('WebRTC · H.264')).toBeTruthy();
-    expect(getByLabelText('WebRTC live stream: H.264')).toBeTruthy();
+    expect(getByText('WebRTC · H.264 · 15 FPS')).toBeTruthy();
+    expect(getByLabelText('WebRTC live stream: H.264, 15 FPS')).toBeTruthy();
   });
 
   it.each([

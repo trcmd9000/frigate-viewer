@@ -356,7 +356,7 @@ describe('HEVC transport observation model', () => {
     ).toMatchObject({decision: 'unsupported', reason: 'constraint-mismatch'});
   });
 
-  it('keeps unknown stream constraints unknown instead of claiming support', () => {
+  it('lets an available decoder with unreported limits reach the MSE probe', () => {
     const metadata = parseStreamMetadataJson(
       JSON.stringify({
         producers: [{type: 'video', codec: 'HEVC', width: 3840}],
@@ -371,8 +371,9 @@ describe('HEVC transport observation model', () => {
         experimentEnabled: true,
       }),
     ).toMatchObject({
-      decision: 'unknown',
-      reason: 'constraint-unknown',
+      decision: 'supported',
+      reason: 'device-supported',
+      experimentEligible: true,
       transport: 'existing-fallback',
     });
   });

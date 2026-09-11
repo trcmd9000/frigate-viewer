@@ -19,6 +19,7 @@ interface LiveStatusBadgeProps {
   state: LivePreviewState;
   transport?: LivePreviewTransport;
   streamType?: string;
+  frameRate?: number;
   viewportWidth?: number;
 }
 
@@ -39,6 +40,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
   state,
   transport,
   streamType,
+  frameRate,
   viewportWidth,
 }) => {
   const {width: windowWidth} = useWindowDimensions();
@@ -81,11 +83,13 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
       : label;
   const displayLabel =
     state === 'live' && transport && streamType
-      ? `${compactLabel} · ${streamType}`
+      ? `${compactLabel} · ${streamType}${
+          frameRate ? ` · ${Number(frameRate.toFixed(1))} FPS` : ''
+        }`
       : compactLabel;
   const accessibilityLabel =
     state === 'live' && transport && streamType
-      ? `${label}: ${streamType}`
+      ? `${label}: ${streamType}${frameRate ? `, ${frameRate} FPS` : ''}`
       : label;
   const isLongLabel = displayLabel.length > 18;
   const width =

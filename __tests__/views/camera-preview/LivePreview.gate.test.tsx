@@ -436,6 +436,14 @@ describe('LivePreview audio render gate', () => {
   });
 
   it('shows configured streams in the live view and persists a manual choice', async () => {
+    mockGet.mockImplementation((_server: unknown, endpoint: string) =>
+      Promise.resolve(endpoint === 'stats'
+        ? {cameras: {front: {camera_fps: 12}}}
+        : {
+            go2rtc: {streams: {front: {}}},
+            cameras: {front: {live: {streams: {main: 'front'}}}},
+          }),
+    );
     mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
     mockSelectProtectedLiveStreamOptions.mockReturnValue([
       {name: 'compatible', label: 'Compatible'},
@@ -447,7 +455,6 @@ describe('LivePreview audio render gate', () => {
         codec: 'h264',
         width: 1920,
         height: 1080,
-        frameRate: 15,
       }],
       audio: [],
       malformed: false,
@@ -462,11 +469,12 @@ describe('LivePreview audio render gate', () => {
     await waitFor(() =>
       expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy(),
     );
+    expect(view.getByTestId('mock-live-status').props.frameRate).toBe(12);
     fireEvent.press(view.getByTestId('camera-preview-media-tap'));
     expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy();
     fireEvent.press(
       view.getByRole('radio', {
-        name: 'Original H.264 - 1920 x 1080, 15 fps',
+        name: 'Original H.264 - 1920 x 1080',
       }),
     );
     expect(mockDispatch).toHaveBeenCalledWith(

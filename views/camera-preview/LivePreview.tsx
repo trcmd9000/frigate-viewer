@@ -63,6 +63,7 @@ import type {ProtectedLiveFailureReason} from '../../helpers/protectedLiveDiagno
 import {LiveAudioControl} from './LiveAudioControl';
 import {Dropdown} from '../../components/forms/Dropdown';
 import type {ProtectedAudioStatus} from '../../helpers/protectedAudio';
+import type {Stats} from '../../helpers/interfaces';
 import {
   fetchStreamMetadata,
   planProtectedLiveStreams,
@@ -249,10 +250,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   >({});
   const [streamIndex, setStreamIndex] = useState(0);
   const [streamCodecs, setStreamCodecs] = useState<CodecFamily[]>([]);
+  const [streamFrameRates, setStreamFrameRates] = useState<
+    Array<number | undefined>
+  >([]);
   const [firstCompatibleStreamIndex, setFirstCompatibleStreamIndex] =
     useState(0);
   const streamName = streamNames[streamIndex];
   const activeStreamType = formatCodec(streamCodecs[streamIndex]);
+  const activeStreamFrameRate = streamFrameRates[streamIndex];
   const [livePhase, setLivePhase] =
     useState<LivePreviewPhase>('snapshot');
   const [rtspMedia, setRtspMedia] = useState<PlayableMedia>();
@@ -674,6 +679,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setTransport(undefined);
     setStreamNames([]);
     setStreamCodecs([]);
+    setStreamFrameRates([]);
     setStreamOptions([]);
     setStreamOptionLabels({});
     setFallbackReason(undefined);
@@ -739,6 +745,15 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         setLivePhase('preparing');
         armFirstFrameTimeout();
         const deviceCapabilityRequest = probeDeviceCodecCapability();
+        const cameraFrameRateRequest = getRef.current<Stats>(server, 'stats')
+          .then(stats => {
+            const frameRate = stats.cameras?.[cameraName]?.camera_fps;
+            return typeof frameRate === 'number' &&
+              Number.isFinite(frameRate) && frameRate > 0
+              ? frameRate
+              : undefined;
+          })
+          .catch(() => undefined);
 
         const metadataRequests = selectedStreams.map((selectedStream, index) =>
           fetchStreamMetadata(server, selectedStream)
@@ -767,13 +782,19 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           );
 
           (async () => {
-            const [metadata, device] = await Promise.all([
+            const [metadata, device, cameraFrameRate] = await Promise.all([
               Promise.all(metadataRequests),
               deviceCapabilityRequest,
+              cameraFrameRateRequest,
             ]);
             if (!active || firstFrameExpired.current) {
               return;
             }
+            const mseEnabled = protectedMseProbeEnabled();
+            SecureLogger.logInfo(
+              `availability=${device.availability}, hardware=${device.hardware}, software=${device.software}, maxWidth=${device.maxWidth ?? 'unknown'}, maxHeight=${device.maxHeight ?? 'unknown'}, maxFrameRate=${device.maxFrameRate ?? 'unknown'}, mseEnabled=${mseEnabled}`,
+              'protected-live-capability',
+            );
             const plan = planProtectedLiveStreams({
               streams: selectedStreams.map((name, index) => ({
                 name,
@@ -781,7 +802,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               })),
               device,
               selection: effectiveStreamPreference,
-              mseEnabled: protectedMseProbeEnabled(),
+              mseEnabled,
             });
             if (!active || firstFrameExpired.current || plan.length === 0) {
               setLivePhase('fallback');
@@ -810,6 +831,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             ));
             setStreamNames(plan.map(candidate => candidate.name));
             setStreamCodecs(plan.map(candidate => candidate.codec));
+            setStreamFrameRates(plan.map(candidate => {
+              const streamMetadata = metadata[
+                selectedStreams.indexOf(candidate.name)
+              ];
+              return streamMetadata?.video?.find(
+                descriptor => descriptor.codec === candidate.codec,
+              )?.frameRate ?? cameraFrameRate;
+            }));
             setStreamIndex(0);
             setFirstCompatibleStreamIndex(
               compatibleStreamIndex >= 0 ? compatibleStreamIndex : plan.length,
@@ -1162,6 +1191,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               state={livePhase}
               transport={transport}
               streamType={activeStreamType}
+              frameRate={activeStreamFrameRate}
               viewportWidth={mediaWidth}
             />
           </Animated.View>

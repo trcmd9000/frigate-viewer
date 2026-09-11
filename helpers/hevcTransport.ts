@@ -746,22 +746,24 @@ const constraintsMatch = (
 ): 'supported' | 'unsupported' | 'unknown' => {
   if (
     descriptor.width !== undefined &&
-    (device.maxWidth === undefined || descriptor.width > device.maxWidth)
+    device.maxWidth !== undefined &&
+    descriptor.width > device.maxWidth
   ) {
-    return device.maxWidth === undefined ? 'unknown' : 'unsupported';
+    return 'unsupported';
   }
   if (
     descriptor.height !== undefined &&
-    (device.maxHeight === undefined || descriptor.height > device.maxHeight)
+    device.maxHeight !== undefined &&
+    descriptor.height > device.maxHeight
   ) {
-    return device.maxHeight === undefined ? 'unknown' : 'unsupported';
+    return 'unsupported';
   }
   if (
     descriptor.frameRate !== undefined &&
-    (device.maxFrameRate === undefined ||
-      descriptor.frameRate > device.maxFrameRate)
+    device.maxFrameRate !== undefined &&
+    descriptor.frameRate > device.maxFrameRate
   ) {
-    return device.maxFrameRate === undefined ? 'unknown' : 'unsupported';
+    return 'unsupported';
   }
   if (descriptor.profile !== undefined && device.profiles.length > 0) {
     const numericProfile =
