@@ -113,6 +113,7 @@ describe('Media3MediaPlayer', () => {
     });
     expect(video.props.minLoadRetryCount).toBe(0);
     expect(video.props.viewType).toBe(0);
+    expect(video.props.pointerEvents).toBe('none');
   });
 
   it('selects the Media3 RTSP extension for opaque local handles', () => {

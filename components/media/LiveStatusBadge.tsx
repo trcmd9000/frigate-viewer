@@ -48,6 +48,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     badge: {
       flexDirection: 'row',
       alignItems: 'center',
+      alignSelf: 'flex-end',
       flexShrink: 0,
       minWidth: 0,
       overflow: 'hidden',
@@ -65,6 +66,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
       color: palette.mediaText,
       fontSize: 12,
       fontWeight: '600',
+      textAlign: 'right',
     },
   }));
   const intl = useIntl();
@@ -98,7 +100,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     viewportWidth > 0
       ? viewportWidth
       : windowWidth;
-  const badgeMaxWidth = Math.max(1, Math.min(width - 48, width * 0.46));
+  const badgeMaxWidth = Math.max(1, Math.min(width - 32, width * 0.68));
   const textMaxWidth = Math.max(1, badgeMaxWidth - 27);
   const connecting =
     state === 'preparing' ||
@@ -136,7 +138,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
             ? {...styles.text, maxWidth: textMaxWidth}
             : styles.text
         }
-        numberOfLines={1}
+        numberOfLines={state === 'live' ? 1 : 2}
         ellipsizeMode="tail"
       >
         {displayLabel}

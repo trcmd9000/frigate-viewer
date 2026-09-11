@@ -206,7 +206,8 @@ describe('LivePreview audio render gate', () => {
     fireEvent.press(view.getByRole('button', {name: 'Disable audio'}));
     expect(mockPlayerProps?.muted).toBe(true);
     expect(view.getByTestId('camera-preview-audio-container').props.pointerEvents).toBe('box-none');
-    fireEvent(view.getByTestId('camera-preview-media'), 'touchEnd');
+    expect(view.getByTestId('camera-preview-media').props.pointerEvents).toBe('box-none');
+    fireEvent.press(view.getByTestId('camera-preview-media-tap'));
     expect(view.getByRole('button', {name: 'Enable audio'})).toBeTruthy();
     view.unmount();
   });

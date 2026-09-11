@@ -144,6 +144,7 @@ const Media3MediaPlayerComponent = (
       }}
       paused={paused}
       style={style}
+      pointerEvents="none"
       resizeMode="contain"
       controls={controls}
       muted={muted}

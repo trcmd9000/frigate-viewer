@@ -163,8 +163,9 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       fontWeight: '700',
     },
     statusOverlay: {
-      maxWidth: '52%',
+      maxWidth: '68%',
       flexShrink: 0,
+      marginLeft: 'auto',
       alignItems: 'flex-end',
     },
     streamSelector: {
@@ -1008,7 +1009,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         testID="camera-preview-media"
         style={styles.mediaFrame}
         onLayout={handleMediaLayout}
-        onTouchEnd={revealTransientOverlays}
+        pointerEvents="box-none"
       >
       {!decoded && snapshotState.displayed && (
         <ZoomableImage
@@ -1122,6 +1123,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         <Pressable
           testID="camera-preview-media-tap"
           accessible={false}
+          pointerEvents="auto"
           style={styles.mediaTapSurface}
           onPress={handleDecodedMediaPress}
         />

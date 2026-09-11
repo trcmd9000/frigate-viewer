@@ -138,13 +138,33 @@ describe('LiveStatusBadge', () => {
 
     const badgeStyle = unsafeGetByType(View).props.style;
     const labelStyle = unsafeGetByType(Text).props.style;
+    const labelProps = unsafeGetByType(Text).props;
     expect(badgeStyle.position).toBeUndefined();
     expect(badgeStyle.left).toBeUndefined();
     expect(badgeStyle.right).toBeUndefined();
-    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 * 0.46);
+    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 * 0.68);
+    expect(badgeStyle.alignSelf).toBe('flex-end');
     expect(badgeStyle.flexShrink).toBe(0);
     expect(badgeStyle.overflow).toBe('hidden');
     expect(labelStyle.flexShrink).toBe(1);
+    expect(labelStyle.textAlign).toBe('right');
+    expect(labelProps.numberOfLines).toBe(2);
+  });
+
+  it('keeps compact live telemetry on one line', () => {
+    const {UNSAFE_getByType: unsafeGetByType} = render(
+      <IntlProvider locale="en" messages={en}>
+        <LiveStatusBadge
+          state="live"
+          transport="webrtc"
+          streamType="H.264"
+          frameRate={120}
+          viewportWidth={390}
+        />
+      </IntlProvider>,
+    );
+
+    expect(unsafeGetByType(Text).props.numberOfLines).toBe(1);
   });
 
   it('uses the English fallback when a locale has no badge translations', () => {
