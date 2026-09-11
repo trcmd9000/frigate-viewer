@@ -251,6 +251,20 @@ describe('HEVC transport observation model', () => {
     ]);
   });
 
+  it('prefers protected HEVC for a stream advertising H264 and H265', () => {
+    expect(
+      planProtectedLiveStreams({
+        streams: [{
+          name: 'hybrid',
+          metadata: parseStreamMetadata({video: 'H264, H265'}),
+        }],
+        device: device(),
+        selection: {mode: 'auto'},
+        mseEnabled: true,
+      }),
+    ).toEqual([{name: 'hybrid', codec: 'h265', transport: 'mse'}]);
+  });
+
   it('keeps a manual stream first and falls back only to compatible streams', () => {
     const streams = [
       {

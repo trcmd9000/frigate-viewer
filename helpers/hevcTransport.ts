@@ -754,6 +754,7 @@ export const decideTransportEligibility = (input: {
   device: DeviceCodecCapability;
   webRtc?: WebRtcCodecEligibility;
   experimentEnabled?: boolean;
+  preferExperimentalH265?: boolean;
 }): TransportEligibility => {
   const webRtc: WebRtcCodecEligibility = input.webRtc || {
     h264: true,
@@ -771,11 +772,15 @@ export const decideTransportEligibility = (input: {
       transport: 'existing-fallback',
     };
   }
-  const descriptor =
-    hasCodec(input.metadata, 'h264') ||
-    hasCodec(input.metadata, 'vp8') ||
-    hasCodec(input.metadata, 'vp9') ||
-    hasCodec(input.metadata, 'h265');
+  const descriptor = input.preferExperimentalH265
+    ? hasCodec(input.metadata, 'h265') ||
+      hasCodec(input.metadata, 'h264') ||
+      hasCodec(input.metadata, 'vp8') ||
+      hasCodec(input.metadata, 'vp9')
+    : hasCodec(input.metadata, 'h264') ||
+      hasCodec(input.metadata, 'vp8') ||
+      hasCodec(input.metadata, 'vp9') ||
+      hasCodec(input.metadata, 'h265');
   if (!descriptor) {
     return {
       decision: 'unknown',
@@ -871,6 +876,7 @@ export const planProtectedLiveStreams = (input: {
       device: input.device,
       webRtc: input.webRtc,
       experimentEnabled: input.mseEnabled,
+      preferExperimentalH265: input.mseEnabled,
     });
     if (eligibility.codec === 'h265' && eligibility.experimentEligible) {
       planned.push({name: stream.name, codec: 'h265', transport: 'mse'});
