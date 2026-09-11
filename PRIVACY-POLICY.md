@@ -28,7 +28,8 @@ the configured Frigate server, including:
   Android system certificate chooser.
 - Camera names, events, snapshots, clips, and live video returned by the
   configured server.
-- App preferences such as theme, language, and per-server settings.
+- App preferences such as theme, language, per-server settings, and a
+  non-secret per-camera live-stream selection scoped to the server profile.
 
 Server credentials are stored through the platform credential-storage layer.
 Non-secret configuration is stored in the app's local storage. Android client

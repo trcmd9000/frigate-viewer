@@ -8,6 +8,8 @@ and currently focuses on a secure Android release.
 ## Features
 
 - Browse camera events, snapshots, clips, and live feeds.
+- Choose a configured live stream per camera, or use Auto to prefer an
+  eligible H.265 stream with a compatible fallback.
 - Configure multiple Frigate servers.
 - Use Basic Auth, Frigate authentication, or Android client-certificate
   authentication (mTLS).
@@ -35,9 +37,11 @@ transport and camera preview fallback.
 
 ## Releases
 
-Version `14.3.1` is available as an Android pre-release for internal testing.
-See the [GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases)
-for signed artifacts. Validate mTLS on a physical device before production use.
+Version `14.4.0` is the next Android release candidate. It requires the
+documented worker build, physical-device, and Play Internal Testing checks
+before public production promotion. See the
+[GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases) for
+signed artifacts.
 
 ## Privacy and security
 

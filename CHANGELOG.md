@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Added per-camera, per-server-profile live stream selection with an `Auto`
+  default that prefers a verified H.265 MSE stream and otherwise selects a
+  compatible H.264, VP8, or VP9 WebRTC stream.
+- Added a guarded native H.265 MSE path for Android. Decoder capability,
+  stream metadata, the protected fMP4 contract, and the first decoded frame
+  must all succeed; a failure falls back to a compatible stream or snapshots.
+- Consolidated camera title, transport status, and audio controls into one
+  bounded live-preview overlay and removed the duplicate native `LIVE` badge.
 - Switched event clip playback to protected Frigate VOD HLS through the
   Media3/react-native-video transport extension.
 - Added Android Frigate/go2rtc WebRTC live preview with native protected

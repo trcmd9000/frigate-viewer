@@ -7,8 +7,9 @@ Google Play review.
 
 - App name: `Frigate Viewer`
 - Package ID: `com.trcmd9000.frigateviewer`
-- Current version name: `14.3.1`
-- Current version code: `21`
+- Current public version name: `14.3.1`
+- Next release candidate version name: `14.4.0`
+- Next release candidate version code: `22`
 - Minimum Android version: API 24
 - Target Android version: API 35
 - Current release ABI: `arm64-v8a`

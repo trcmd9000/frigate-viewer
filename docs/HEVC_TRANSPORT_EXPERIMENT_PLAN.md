@@ -1,8 +1,9 @@
 # HEVC transport experiment plan
 
-Status: Phase A implementation complete; the remaining work is a proposal and
-time-boxed spike. This document does not authorize a production transport
-change.
+Status: The native MSE/Media3 path and stream-selection policy are implemented
+for the Android 14.4.0 release candidate. The public production release remains
+blocked on the documented worker build, device matrix, and Play Internal
+Testing of the exact final AAB.
 
 ## Separate WebView evaluation (8 September 2026)
 
@@ -213,8 +214,9 @@ five engineering days. It is not a commitment to ship.
 
 ### Contract probe implementation
 
-The first Phase C milestone is implemented behind the off-by-default Android
-property `enableProtectedMseProbe`. It reuses the native media profile's OkHttp
+The first Phase C milestone is implemented behind the Android property
+`enableProtectedMseProbe`, whose release-candidate default is enabled and which
+remains an explicit build-time emergency disable switch. It reuses the native media profile's OkHttp
 client, cookies, Basic Auth, TLS and mTLS policy, and opens only the fixed
 `/live/mse/api/ws` path. JavaScript supplies an opaque profile ID and validated
 stream name; it never receives the resolved URL, credentials, cookies or media
@@ -248,10 +250,10 @@ Camera-only frame hashes at 1, 6 and 12 seconds were distinct. Media3 selected
 profile-level capability, but decoded frames remained stable during the test.
 
 This satisfies the single-device decoded-frame gate, not production release.
-The bridge remains behind the off-by-default property
-`enableProtectedMseProbe`. Additional devices, lifecycle transitions,
-authentication failures, H.264 regression behavior and longer soak tests are
-still required before enabling it by default.
+The bridge is default-enabled in the 14.4.0 release candidate but remains
+strictly gated at runtime. Lifecycle transitions, authentication failures,
+H.264 regression behavior, a longer soak test, and Play Internal Testing are
+still required before public promotion.
 
 ### Proposed shape
 

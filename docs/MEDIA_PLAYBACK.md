@@ -54,6 +54,26 @@ authenticated snapshot remains visible until the first decoded WebRTC frame.
 After the retry budget, a visible snapshot fallback offers a manual retry.
 iOS retains authenticated snapshots in this stage.
 
+### Stream selection and guarded HEVC
+
+When a camera has multiple configured live streams, the live view provides an
+`Auto` choice and the configured stream labels. The non-secret choice is stored
+per server profile and camera. `Auto` evaluates the sanitized metadata of each
+configured stream and prefers an eligible H.265 stream, even when a compatible
+stream appears first in the Frigate configuration.
+
+H.265 uses only the fixed native MSE WebSocket route and a project-owned Media3
+data source. The release candidate enables this path by default, but it is not
+optimistic: a supported decoder, matching stream constraints, the protected
+fMP4 contract, and a first decoded frame are all required. Failure switches to
+a compatible configured WebRTC stream when possible, otherwise to protected
+snapshots. WebRTC H.265 is intentionally not used.
+
+The Android Gradle property `enableProtectedMseProbe=false` is a build-time
+emergency disable switch. It is not a user-facing setting and cannot expose a
+server URL, cookie, credential, certificate alias, or media bytes to
+JavaScript.
+
 ### Profile changes and audio feedback
 
 Changing the active profile or its connection/security settings clears the
