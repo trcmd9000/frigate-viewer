@@ -71,7 +71,7 @@ import {
   protectedMseProbeEnabled,
   protectedMseProbeFailure,
 } from '../../helpers/hevcTransport';
-import type {MediaDescriptor} from '../../helpers/hevcTransport';
+import type {CodecFamily, MediaDescriptor} from '../../helpers/hevcTransport';
 
 type LivePreviewProps = PropsWithChildren<{
   cameraName: string;
@@ -80,6 +80,15 @@ type LivePreviewProps = PropsWithChildren<{
 const LIVE_PREVIEW_REFRESH_MS = 1000;
 const LIVE_FIRST_FRAME_TIMEOUT_MS = 15_000;
 
+const formatCodec = (codec?: CodecFamily): string | undefined =>
+  codec === 'h264'
+    ? 'H.264'
+    : codec === 'h265'
+      ? 'H.265'
+      : codec && codec !== 'unknown'
+        ? codec.toUpperCase()
+        : undefined;
+
 const formatStreamOptionLabel = (
   stream: ProtectedLiveStream,
   descriptor?: MediaDescriptor,
@@ -87,11 +96,7 @@ const formatStreamOptionLabel = (
   if (!descriptor || descriptor.codec === 'unknown') {
     return stream.label;
   }
-  const codec = descriptor.codec === 'h264'
-    ? 'H.264'
-    : descriptor.codec === 'h265'
-      ? 'H.265'
-      : descriptor.codec.toUpperCase();
+  const codec = formatCodec(descriptor.codec) as string;
   const normalizedLabel = stream.label.toLowerCase().replace(/[^a-z0-9]/g, '');
   const codecAlreadyNamed = normalizedLabel.includes(descriptor.codec) ||
     (descriptor.codec === 'h265' && normalizedLabel.includes('hevc'));
@@ -239,12 +244,11 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     Record<string, string>
   >({});
   const [streamIndex, setStreamIndex] = useState(0);
+  const [streamCodecs, setStreamCodecs] = useState<CodecFamily[]>([]);
   const [firstCompatibleStreamIndex, setFirstCompatibleStreamIndex] =
     useState(0);
   const streamName = streamNames[streamIndex];
-  const activeStreamLabel = streamOptions.find(
-    stream => stream.name === streamName,
-  )?.label;
+  const activeStreamType = formatCodec(streamCodecs[streamIndex]);
   const [livePhase, setLivePhase] =
     useState<LivePreviewPhase>('snapshot');
   const [rtspMedia, setRtspMedia] = useState<PlayableMedia>();
@@ -665,6 +669,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     transportRef.current = undefined;
     setTransport(undefined);
     setStreamNames([]);
+    setStreamCodecs([]);
     setStreamOptions([]);
     setStreamOptionLabels({});
     setFallbackReason(undefined);
@@ -729,6 +734,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         }
         setLivePhase('preparing');
         armFirstFrameTimeout();
+        const deviceCapabilityRequest = probeDeviceCodecCapability();
 
         const metadataRequests = selectedStreams.map((selectedStream, index) =>
           fetchStreamMetadata(server, selectedStream)
@@ -757,7 +763,10 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           );
 
           (async () => {
-            const metadata = await Promise.all(metadataRequests);
+            const [metadata, device] = await Promise.all([
+              Promise.all(metadataRequests),
+              deviceCapabilityRequest,
+            ]);
             if (!active || firstFrameExpired.current) {
               return;
             }
@@ -766,7 +775,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 name,
                 metadata: metadata[index],
               })),
-              device: await probeDeviceCodecCapability(),
+              device,
               selection: effectiveStreamPreference,
               mseEnabled: protectedMseProbeEnabled(),
             });
@@ -796,6 +805,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             }),
             ));
             setStreamNames(plan.map(candidate => candidate.name));
+            setStreamCodecs(plan.map(candidate => candidate.codec));
             setStreamIndex(0);
             setFirstCompatibleStreamIndex(
               compatibleStreamIndex >= 0 ? compatibleStreamIndex : plan.length,
@@ -1147,7 +1157,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             <LiveStatusBadge
               state={livePhase}
               transport={transport}
-              streamLabel={activeStreamLabel}
+              streamType={activeStreamType}
               viewportWidth={mediaWidth}
             />
           </Animated.View>

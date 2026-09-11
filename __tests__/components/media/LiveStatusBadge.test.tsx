@@ -63,19 +63,19 @@ describe('LiveStatusBadge', () => {
     expect(getByLabelText('Live stream')).toBeTruthy();
   });
 
-  it('shows the active configured stream next to a live transport label', () => {
+  it('shows the active codec next to a live transport label', () => {
     const {getByLabelText, getByText} = render(
       <IntlProvider locale="en" messages={en}>
         <LiveStatusBadge
           state="live"
           transport="webrtc"
-          streamLabel="Compatible live"
+          streamType="H.264"
         />
       </IntlProvider>,
     );
 
-    expect(getByText('WebRTC · Compatible live')).toBeTruthy();
-    expect(getByLabelText('WebRTC live stream: Compatible live')).toBeTruthy();
+    expect(getByText('WebRTC · H.264')).toBeTruthy();
+    expect(getByLabelText('WebRTC live stream: H.264')).toBeTruthy();
   });
 
   it.each([
@@ -140,7 +140,7 @@ describe('LiveStatusBadge', () => {
     expect(badgeStyle.position).toBeUndefined();
     expect(badgeStyle.left).toBeUndefined();
     expect(badgeStyle.right).toBeUndefined();
-    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 - 48);
+    expect(badgeStyle.maxWidth).toBeLessThanOrEqual(390 * 0.46);
     expect(badgeStyle.flexShrink).toBe(0);
     expect(badgeStyle.overflow).toBe('hidden');
     expect(labelStyle.flexShrink).toBe(1);

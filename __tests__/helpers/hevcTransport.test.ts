@@ -472,13 +472,50 @@ describe('HEVC transport observation model', () => {
       '0123456789abcdef0123456789abcdef',
       'front:main',
     );
+    await probeProtectedMseContract({} as never, 'front:main');
+    expect(NativeModules.ClientCertModule.probeProtectedMse).toHaveBeenCalledTimes(1);
 
     NativeModules.ClientCertModule.probeProtectedMse = jest.fn().mockResolvedValue({
       bytesObserved: 2 * 1024 * 1024 + 1,
     });
     await expect(
-      probeProtectedMseContract({} as never, 'front:main'),
+      probeProtectedMseContract({} as never, 'front:invalid'),
     ).rejects.toThrow('invalid result');
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: previousPlatform,
+    });
+  });
+
+  it('retries an MSE contract that did not fully pass', async () => {
+    const previousPlatform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {configurable: true, value: 'android'});
+    NativeModules.ClientCertModule.isProtectedMseProbeEnabled = () => true;
+    NativeModules.ClientCertModule.probeProtectedMse = jest.fn()
+      .mockResolvedValueOnce({
+        mimeH265: true,
+        ftyp: true,
+        moov: false,
+        moof: false,
+        mdat: false,
+        bytesObserved: 512,
+      })
+      .mockResolvedValueOnce({
+        mimeH265: true,
+        ftyp: true,
+        moov: true,
+        moof: true,
+        mdat: true,
+        bytesObserved: 4096,
+      });
+    mockProtectedMediaProfileId.mockResolvedValue(
+      'fedcba9876543210fedcba9876543210',
+    );
+
+    await probeProtectedMseContract({} as never, 'front:retry');
+    await probeProtectedMseContract({} as never, 'front:retry');
+
+    expect(NativeModules.ClientCertModule.probeProtectedMse).toHaveBeenCalledTimes(2);
     Object.defineProperty(Platform, 'OS', {
       configurable: true,
       value: previousPlatform,

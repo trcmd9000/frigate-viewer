@@ -18,7 +18,7 @@ import type {
 interface LiveStatusBadgeProps {
   state: LivePreviewState;
   transport?: LivePreviewTransport;
-  streamLabel?: string;
+  streamType?: string;
   viewportWidth?: number;
 }
 
@@ -38,7 +38,7 @@ const defaultStatusMessages: Record<string, string> = {
 export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
   state,
   transport,
-  streamLabel,
+  streamType,
   viewportWidth,
 }) => {
   const {width: windowWidth} = useWindowDimensions();
@@ -80,12 +80,12 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
         : 'RTSP'
       : label;
   const displayLabel =
-    state === 'live' && transport && streamLabel
-      ? `${compactLabel} · ${streamLabel}`
+    state === 'live' && transport && streamType
+      ? `${compactLabel} · ${streamType}`
       : compactLabel;
   const accessibilityLabel =
-    state === 'live' && transport && streamLabel
-      ? `${label}: ${streamLabel}`
+    state === 'live' && transport && streamType
+      ? `${label}: ${streamType}`
       : label;
   const isLongLabel = displayLabel.length > 18;
   const width =
@@ -94,8 +94,8 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     viewportWidth > 0
       ? viewportWidth
       : windowWidth;
-  const badgeMaxWidth = Math.max(1, width - 48);
-  const textMaxWidth = Math.max(1, width - 59);
+  const badgeMaxWidth = Math.max(1, Math.min(width - 48, width * 0.46));
+  const textMaxWidth = Math.max(1, badgeMaxWidth - 27);
   const connecting =
     state === 'preparing' ||
     state === 'connecting' ||

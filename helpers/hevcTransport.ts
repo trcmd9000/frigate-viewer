@@ -639,14 +639,24 @@ const nativeCodecModule = ():
     | {probeMediaCodecCapabilities?: () => Promise<unknown>}
     | undefined;
 
+let deviceCodecCapabilityRequest: Promise<DeviceCodecCapability> | undefined;
+
 export const probeDeviceCodecCapability =
-  async (): Promise<DeviceCodecCapability> => {
+  (): Promise<DeviceCodecCapability> => {
+    if (deviceCodecCapabilityRequest) {
+      return deviceCodecCapabilityRequest;
+    }
     const native = nativeCodecModule();
     if (Platform.OS !== 'android' || !native?.probeMediaCodecCapabilities) {
-      return deviceCodecCapabilityFromNative(undefined);
+      return Promise.resolve(deviceCodecCapabilityFromNative(undefined));
     }
-    const result = await native.probeMediaCodecCapabilities();
-    return deviceCodecCapabilityFromNative(result);
+    deviceCodecCapabilityRequest = native.probeMediaCodecCapabilities()
+      .then(deviceCodecCapabilityFromNative)
+      .catch(error => {
+        deviceCodecCapabilityRequest = undefined;
+        throw error;
+      });
+    return deviceCodecCapabilityRequest;
   };
 
 export const protectedMseProbeEnabled = (): boolean => {
@@ -654,6 +664,11 @@ export const protectedMseProbeEnabled = (): boolean => {
   return Platform.OS === 'android' &&
     native?.isProtectedMseProbeEnabled?.() === true;
 };
+
+const protectedMseProbeRequests = new Map<
+  string,
+  Promise<ProtectedMseProbeResult>
+>();
 
 export const probeProtectedMseContract = async (
   server: Server,
@@ -671,26 +686,50 @@ export const probeProtectedMseContract = async (
     throw new Error('The protected MSE stream name is invalid');
   }
   const profileId = await protectedMediaProfileId(server);
-  const value = asRecord(await native.probeProtectedMse(profileId, streamName));
-  const bool = (key: string): boolean => value?.[key] === true;
-  const bytesObserved = value?.bytesObserved;
-  if (
-    !value ||
-    typeof bytesObserved !== 'number' ||
-    !Number.isFinite(bytesObserved) ||
-    bytesObserved < 0 ||
-    bytesObserved > 2 * 1024 * 1024
-  ) {
-    throw new Error('The protected MSE probe returned an invalid result');
+  const cacheKey = `${profileId}:${streamName}`;
+  const cached = protectedMseProbeRequests.get(cacheKey);
+  if (cached) {
+    return cached;
   }
-  return {
-    mimeH265: bool('mimeH265'),
-    ftyp: bool('ftyp'),
-    moov: bool('moov'),
-    moof: bool('moof'),
-    mdat: bool('mdat'),
-    bytesObserved,
-  };
+  const request = native.probeProtectedMse(profileId, streamName)
+    .then(result => {
+      const value = asRecord(result);
+      const bool = (key: string): boolean => value?.[key] === true;
+      const bytesObserved = value?.bytesObserved;
+      if (
+        !value ||
+        typeof bytesObserved !== 'number' ||
+        !Number.isFinite(bytesObserved) ||
+        bytesObserved < 0 ||
+        bytesObserved > 2 * 1024 * 1024
+      ) {
+        throw new Error('The protected MSE probe returned an invalid result');
+      }
+      const parsed = {
+        mimeH265: bool('mimeH265'),
+        ftyp: bool('ftyp'),
+        moov: bool('moov'),
+        moof: bool('moof'),
+        mdat: bool('mdat'),
+        bytesObserved,
+      };
+      if (
+        !parsed.mimeH265 ||
+        !parsed.ftyp ||
+        !parsed.moov ||
+        !parsed.moof ||
+        !parsed.mdat
+      ) {
+        protectedMseProbeRequests.delete(cacheKey);
+      }
+      return parsed;
+    })
+    .catch(error => {
+      protectedMseProbeRequests.delete(cacheKey);
+      throw error;
+    });
+  protectedMseProbeRequests.set(cacheKey, request);
+  return request;
 };
 
 const hasCodec = (
