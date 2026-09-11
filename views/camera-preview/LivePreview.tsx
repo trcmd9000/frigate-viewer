@@ -92,7 +92,10 @@ const formatStreamOptionLabel = (
     : descriptor.codec === 'h265'
       ? 'H.265'
       : descriptor.codec.toUpperCase();
-  const details = [codec];
+  const normalizedLabel = stream.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const codecAlreadyNamed = normalizedLabel.includes(descriptor.codec) ||
+    (descriptor.codec === 'h265' && normalizedLabel.includes('hevc'));
+  const details = codecAlreadyNamed ? [] : [codec];
   if (descriptor.width && descriptor.height) {
     details.push(`${descriptor.width} x ${descriptor.height}`);
   }
@@ -102,7 +105,9 @@ const formatStreamOptionLabel = (
       : String(Number(descriptor.frameRate.toFixed(1)));
     details.push(`${frameRate} fps`);
   }
-  return `${stream.label} - ${details.join(', ')}`;
+  return details.length > 0
+    ? `${stream.label} - ${details.join(', ')}`
+    : stream.label;
 };
 
 const releaseDownloadedMediaSafely = (path?: string) => {

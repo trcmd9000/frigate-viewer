@@ -437,7 +437,7 @@ describe('LivePreview audio render gate', () => {
     mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
     mockSelectProtectedLiveStreamOptions.mockReturnValue([
       {name: 'compatible', label: 'Compatible'},
-      {name: 'original', label: 'Original'},
+      {name: 'original', label: 'Original H.264'},
     ]);
     mockFetchStreamMetadata.mockResolvedValue({
       video: [{
@@ -465,7 +465,7 @@ describe('LivePreview audio render gate', () => {
     );
     fireEvent.press(
       view.getByRole('radio', {
-        name: 'Original - H.264, 1920 x 1080, 15 fps',
+        name: 'Original H.264 - 1920 x 1080, 15 fps',
       }),
     );
     expect(mockDispatch).toHaveBeenCalledWith(
