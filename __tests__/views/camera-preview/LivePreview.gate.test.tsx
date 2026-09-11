@@ -440,7 +440,13 @@ describe('LivePreview audio render gate', () => {
       {name: 'original', label: 'Original'},
     ]);
     mockFetchStreamMetadata.mockResolvedValue({
-      video: [{kind: 'video', codec: 'h264'}],
+      video: [{
+        kind: 'video',
+        codec: 'h264',
+        width: 1920,
+        height: 1080,
+        frameRate: 15,
+      }],
       audio: [],
       malformed: false,
     });
@@ -457,7 +463,11 @@ describe('LivePreview audio render gate', () => {
     fireEvent.press(
       view.getByRole('button', {name: 'Select live stream'}),
     );
-    fireEvent.press(view.getByRole('radio', {name: 'Original (H264)'}));
+    fireEvent.press(
+      view.getByRole('radio', {
+        name: 'Original - H.264, 1920 x 1080, 15 fps',
+      }),
+    );
     expect(mockDispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: {

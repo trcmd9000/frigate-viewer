@@ -71,6 +71,7 @@ import {
   protectedMseProbeEnabled,
   protectedMseProbeFailure,
 } from '../../helpers/hevcTransport';
+import type {MediaDescriptor} from '../../helpers/hevcTransport';
 
 type LivePreviewProps = PropsWithChildren<{
   cameraName: string;
@@ -78,6 +79,31 @@ type LivePreviewProps = PropsWithChildren<{
 
 const LIVE_PREVIEW_REFRESH_MS = 1000;
 const LIVE_FIRST_FRAME_TIMEOUT_MS = 15_000;
+
+const formatStreamOptionLabel = (
+  stream: ProtectedLiveStream,
+  descriptor?: MediaDescriptor,
+): string => {
+  if (!descriptor || descriptor.codec === 'unknown') {
+    return stream.label;
+  }
+  const codec = descriptor.codec === 'h264'
+    ? 'H.264'
+    : descriptor.codec === 'h265'
+      ? 'H.265'
+      : descriptor.codec.toUpperCase();
+  const details = [codec];
+  if (descriptor.width && descriptor.height) {
+    details.push(`${descriptor.width} x ${descriptor.height}`);
+  }
+  if (descriptor.frameRate) {
+    const frameRate = Number.isInteger(descriptor.frameRate)
+      ? String(descriptor.frameRate)
+      : String(Number(descriptor.frameRate.toFixed(1)));
+    details.push(`${frameRate} fps`);
+  }
+  return `${stream.label} - ${details.join(', ')}`;
+};
 
 const releaseDownloadedMediaSafely = (path?: string) => {
   try {
@@ -124,11 +150,9 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     },
     streamSelector: {
       position: 'absolute',
-      bottom: 88,
-      alignSelf: 'center',
+      right: 16,
+      bottom: 24,
       zIndex: 4,
-      width: 248,
-      maxWidth: '78%',
     },
     image: {
       width: '100%',
@@ -734,17 +758,17 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             const initialMetadata = metadata[
               selectedStreams.indexOf(initialCandidate.name)
             ];
-            setStreamOptions(
-              configuredStreamOptions.map((stream, index) => {
-                const codec = metadata[index]?.video[0]?.codec;
-                return {
-                  ...stream,
-                  label: codec
-                    ? `${stream.label} (${codec.toUpperCase()})`
-                    : stream.label,
-                };
-              }),
-            );
+            setStreamOptions(configuredStreamOptions.map((stream, index) => {
+              const candidate = plan.find(item => item.name === stream.name);
+              const video = metadata[index]?.video || [];
+              const descriptor = video.find(
+                item => item.codec === candidate?.codec,
+              ) || video[0];
+              return {
+                ...stream,
+                label: formatStreamOptionLabel(stream, descriptor),
+              };
+            }));
             setStreamNames(plan.map(candidate => candidate.name));
             setStreamIndex(0);
             setFirstCompatibleStreamIndex(
@@ -1099,9 +1123,19 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           livePhase === 'live' &&
           streamOptions.length > 1 &&
           server.profileId && (
-          <View testID="camera-preview-stream-selector" style={styles.streamSelector}>
+          <Animated.View
+            testID="camera-preview-stream-selector"
+            accessibilityElementsHidden={!transientOverlayVisible}
+            importantForAccessibility={
+              transientOverlayVisible ? 'yes' : 'no-hide-descendants'
+            }
+            pointerEvents={transientOverlayVisible ? 'auto' : 'none'}
+            style={[styles.streamSelector, {opacity: overlayOpacity}]}
+          >
             <Dropdown
               testID="camera-preview-stream-dropdown"
+              compact
+              icon="switcher"
               accessibilityLabel={intl.formatMessage({
                 id: 'cameraPreview.stream.select',
                 defaultMessage: 'Select live stream',
@@ -1137,7 +1171,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 );
               }}
             />
-          </View>
+          </Animated.View>
         )}
         {appActive &&
           playbackActive &&

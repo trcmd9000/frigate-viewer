@@ -73,4 +73,20 @@ describe('Dropdown', () => {
     fireEvent.press(enabled.getByLabelText('Close options'));
     expect(enabled.queryByLabelText('Close options')).toBeNull();
   });
+
+  it('uses an icon-only trigger in compact mode while retaining option labels', () => {
+    const {getByRole, getByText, queryByText} = render(
+      <Dropdown
+        compact
+        testID="compact-dropdown"
+        accessibilityLabel="Select live stream"
+        value="one"
+        options={[{value: 'one', label: 'Original - H.265, 3840 x 2160, 15 fps'}]}
+      />,
+    );
+
+    expect(queryByText('Original - H.265, 3840 x 2160, 15 fps')).toBeNull();
+    fireEvent.press(getByRole('button', {name: 'Select live stream'}));
+    expect(getByText('Original - H.265, 3840 x 2160, 15 fps')).toBeTruthy();
+  });
 });

@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {IconOutline, OutlineGlyphMapType} from '@ant-design/icons-react-native';
 import {
   FlatList,
   ListRenderItemInfo,
@@ -6,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextStyle,
   View,
 } from 'react-native';
 import {useFormsStyles} from './styles';
@@ -24,7 +26,10 @@ interface IDropdownProps<T extends DropdownValue> {
   onValueChange?: (value: T) => void;
   disabled?: boolean;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
   testID?: string;
+  compact?: boolean;
+  icon?: OutlineGlyphMapType;
 }
 
 const OPTION_HEIGHT = 56;
@@ -35,7 +40,10 @@ export const Dropdown = <T extends DropdownValue>({
   onValueChange,
   disabled = false,
   accessibilityLabel,
+  accessibilityHint,
   testID,
+  compact = false,
+  icon = 'switcher',
 }: IDropdownProps<T>) => {
   const formsStyles = useFormsStyles();
   const styles = useStyles(({theme}) => ({
@@ -58,6 +66,19 @@ export const Dropdown = <T extends DropdownValue>({
       backgroundColor: theme.highlighted,
       borderColor: theme.disabled,
       opacity: 0.6,
+    },
+    compactTrigger: {
+      width: 48,
+      height: 48,
+      minWidth: 48,
+      minHeight: 48,
+      justifyContent: 'center',
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      borderWidth: 0,
+      borderBottomWidth: 0,
+      borderRadius: 24,
+      backgroundColor: theme.mediaOverlay || theme.surface,
     },
     modal: {
       flex: 1,
@@ -179,25 +200,38 @@ export const Dropdown = <T extends DropdownValue>({
       <Pressable
         testID={testID}
         style={[
-          formsStyles.input,
+          !compact && formsStyles.input,
           styles.trigger,
+          compact && styles.compactTrigger,
           (disabled || options.length === 0) && styles.disabled,
         ]}
         onPress={() => setOpened(true)}
         disabled={disabled || options.length === 0}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel || selectedLabel || 'Select an option'}
+        accessibilityHint={accessibilityHint}
         accessibilityState={{
           disabled: disabled || options.length === 0,
           expanded: opened,
         }}
       >
-        <Text style={styles.triggerText} numberOfLines={2}>
-          {selectedLabel}
-        </Text>
-        <Text style={styles.chevron} accessible={false}>
-          ▾
-        </Text>
+        {compact ? (
+          <IconOutline
+            accessible={false}
+            name={icon}
+            color={(styles.triggerText as TextStyle).color as string}
+            size={22}
+          />
+        ) : (
+          <>
+            <Text style={styles.triggerText} numberOfLines={2}>
+              {selectedLabel}
+            </Text>
+            <Text style={styles.chevron} accessible={false}>
+              ▾
+            </Text>
+          </>
+        )}
       </Pressable>
       <Modal
         visible={opened}
