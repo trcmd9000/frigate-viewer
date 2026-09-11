@@ -42,6 +42,7 @@ import {
   hasAcceptedVideoMedia,
   openProtectedLiveSocket,
   selectProtectedLiveStream,
+  selectProtectedLiveStreamOptions,
   selectProtectedLiveStreams,
   summarizeAudioMedia,
   summarizeVideoMedia,
@@ -234,6 +235,31 @@ describe('protected live signaling', () => {
         'front',
       ),
     ).toBeUndefined();
+  });
+
+  it('preserves configured live-stream labels and order without duplicates', () => {
+    expect(
+      selectProtectedLiveStreamOptions(
+        {
+          cameras: {
+            front: {
+              live: {
+                streams: {
+                  Compatible: 'front_sub',
+                  Original: 'front_main',
+                  Duplicate: 'front_sub',
+                },
+              },
+            },
+          },
+          go2rtc: {streams: {front_sub: {}, front_main: {}}},
+        },
+        'front',
+      ),
+    ).toEqual([
+      {name: 'front_sub', label: 'Compatible'},
+      {name: 'front_main', label: 'Original'},
+    ]);
   });
 
   it('buffers an opening event emitted before the native identifier resolves', async () => {

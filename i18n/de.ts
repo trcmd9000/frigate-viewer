@@ -95,6 +95,8 @@ export default {
   'cameraPreview.audio.failure.focus-denied': 'Audiofokus wurde nicht gewährt. Zum Wiederholen tippen.',
   'cameraPreview.audio.failure.native': 'Audio konnte nicht aktiviert werden. Zum Wiederholen tippen.',
   'cameraPreview.audio.failure.timeout': 'Audioaktivierung hat zu lange gedauert. Zum Wiederholen tippen.',
+  'cameraPreview.stream.select': 'Live-Stream auswählen',
+  'cameraPreview.stream.auto': 'Automatisch (HEVC bevorzugen)',
   'cameraPreview.fallback.message':
     'Live-Stream nicht verfügbar. Stattdessen werden geschützte Standbilder angezeigt.',
   'cameraPreview.fallback.landscape':

@@ -10,9 +10,16 @@ const mockGet = jest.fn();
 const mockFetchStreamMetadata = jest.fn();
 const mockPrepareLocalRtspMedia = jest.fn();
 const mockProbeProtectedMseContract = jest.fn();
+const mockProbeDeviceCodecCapability = jest.fn();
+const mockPlanProtectedLiveStreams = jest.fn();
 const mockProtectedMseMediaUri = jest.fn();
+const mockDispatch = jest.fn();
 const mockLogInfo = jest.fn();
-const mockServer = {};
+const mockServer = {profileId: 'profile-id'};
+const mockSelectProtectedLiveStreams = jest.fn(() => ['front']);
+const mockSelectProtectedLiveStreamOptions = jest.fn(
+  (): Array<{name: string; label: string}> => [],
+);
 let mockPlaybackActive = true;
 let mockActivationId = 1;
 let mockPlayerShouldReportPlaying = true;
@@ -28,7 +35,17 @@ let mockPlayerProps:
   | undefined;
 
 jest.mock('../../../store/store', () => ({
-  useAppSelector: () => mockServer,
+  useAppDispatch: () => mockDispatch,
+  useAppSelector: (selector: (state: unknown) => unknown) =>
+    selector({
+      settings: {
+        v1: {
+          servers: [mockServer],
+          activeServerProfileId: 'profile-id',
+          liveStreamPreferences: {},
+        },
+      },
+    }),
 }));
 
 jest.mock('../../../helpers/colors', () => ({
@@ -57,7 +74,8 @@ jest.mock('../../../helpers/rest', () => ({
 
 jest.mock('../../../helpers/protectedLive', () => ({
   prepareLocalRtspMedia: mockPrepareLocalRtspMedia,
-  selectProtectedLiveStreams: jest.fn(() => ['front']),
+  selectProtectedLiveStreams: () => mockSelectProtectedLiveStreams(),
+  selectProtectedLiveStreamOptions: () => mockSelectProtectedLiveStreamOptions(),
 }));
 
 jest.mock('../../../helpers/playbackLifecycle', () => ({
@@ -73,6 +91,9 @@ jest.mock('../../../helpers/secureLogger', () => ({
 
 jest.mock('../../../helpers/hevcTransport', () => ({
   fetchStreamMetadata: mockFetchStreamMetadata,
+  planProtectedLiveStreams: (...args: unknown[]) =>
+    mockPlanProtectedLiveStreams(...args),
+  probeDeviceCodecCapability: () => mockProbeDeviceCodecCapability(),
   protectedMseProbeEnabled: () => mockMseProbeEnabled,
   protectedMseProbeFailure: () => 'unknown',
   probeProtectedMseContract: mockProbeProtectedMseContract,
@@ -255,6 +276,29 @@ describe('LivePreview audio render gate', () => {
     mockPlayerProps = undefined;
     mockGet.mockReset();
     mockFetchStreamMetadata.mockReset();
+    mockSelectProtectedLiveStreams.mockReset();
+    mockSelectProtectedLiveStreams.mockReturnValue(['front']);
+    mockSelectProtectedLiveStreamOptions.mockReset();
+    mockSelectProtectedLiveStreamOptions.mockReturnValue([]);
+    mockDispatch.mockReset();
+    mockProbeDeviceCodecCapability.mockReset();
+    mockProbeDeviceCodecCapability.mockResolvedValue({availability: 'supported'});
+    mockPlanProtectedLiveStreams.mockReset();
+    mockPlanProtectedLiveStreams.mockImplementation(({streams, mseEnabled}) => {
+      const first = streams[0];
+      const hevc = first?.metadata?.video?.some(
+        (descriptor: {codec: string}) => descriptor.codec === 'h265',
+      );
+      return first
+        ? [
+            {
+              name: first.name,
+              codec: hevc ? 'h265' : 'h264',
+              transport: hevc && mseEnabled ? 'mse' : 'webrtc',
+            },
+          ]
+        : [];
+    });
     mockPrepareLocalRtspMedia.mockReset();
     mockPrepareLocalRtspMedia.mockRejectedValue(new Error('no local route'));
     mockProbeProtectedMseContract.mockReset();
@@ -341,6 +385,88 @@ describe('LivePreview audio render gate', () => {
     });
     expect(mockPrepareLocalRtspMedia).not.toHaveBeenCalled();
     expect(view.queryByText(en['cameraPreview.fallback.codec'])).toBeNull();
+    view.unmount();
+  });
+
+  it('probes a non-primary HEVC candidate before starting the compatible stream', async () => {
+    mockMseProbeEnabled = true;
+    mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
+    mockFetchStreamMetadata.mockImplementation((_: unknown, streamName: string) =>
+      Promise.resolve({
+        video: [
+          {
+            kind: 'video',
+            codec: streamName === 'original' ? 'h265' : 'h264',
+          },
+        ],
+        audio: [],
+        malformed: false,
+      }),
+    );
+    mockPlanProtectedLiveStreams.mockImplementation(({streams}) => [
+      {name: streams[1].name, codec: 'h265', transport: 'mse'},
+      {name: streams[0].name, codec: 'h264', transport: 'webrtc'},
+    ]);
+    mockProbeProtectedMseContract.mockResolvedValue({
+      mimeH265: true,
+      ftyp: true,
+      moov: true,
+      moof: true,
+      mdat: true,
+      bytesObserved: 1024,
+    });
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() =>
+      expect(mockProbeProtectedMseContract).toHaveBeenCalledWith(
+        mockServer,
+        'original',
+      ),
+    );
+    expect(mockPrepareLocalRtspMedia).not.toHaveBeenCalled();
+    await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
+    view.unmount();
+  });
+
+  it('shows configured streams in the live view and persists a manual choice', async () => {
+    mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
+    mockSelectProtectedLiveStreamOptions.mockReturnValue([
+      {name: 'compatible', label: 'Compatible'},
+      {name: 'original', label: 'Original'},
+    ]);
+    mockFetchStreamMetadata.mockResolvedValue({
+      video: [{kind: 'video', codec: 'h264'}],
+      audio: [],
+      malformed: false,
+    });
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() =>
+      expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy(),
+    );
+    fireEvent.press(
+      view.getByRole('button', {name: 'Select live stream'}),
+    );
+    fireEvent.press(view.getByRole('radio', {name: 'Original (H264)'}));
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          profileId: 'profile-id',
+          cameraName: 'front',
+          preference: {mode: 'manual', streamName: 'original'},
+        },
+      }),
+    );
     view.unmount();
   });
 

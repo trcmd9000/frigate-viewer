@@ -89,6 +89,21 @@ export interface TransportEligibility {
   readonly transport: 'existing-webrtc' | 'existing-fallback';
 }
 
+export type LiveStreamSelection =
+  | {readonly mode: 'auto'}
+  | {readonly mode: 'manual'; readonly streamName: string};
+
+export interface LiveStreamMetadata {
+  readonly name: string;
+  readonly metadata?: StreamMetadata;
+}
+
+export interface PlannedLiveStream {
+  readonly name: string;
+  readonly codec: CodecFamily;
+  readonly transport: 'mse' | 'webrtc';
+}
+
 export interface ProtectedMseProbeResult {
   readonly mimeH265: boolean;
   readonly ftyp: boolean;
@@ -837,6 +852,55 @@ export const decideTransportEligibility = (input: {
     experimentEligible,
     transport: 'existing-fallback',
   };
+};
+
+export const planProtectedLiveStreams = (input: {
+  streams: readonly LiveStreamMetadata[];
+  device: DeviceCodecCapability;
+  selection: LiveStreamSelection;
+  mseEnabled: boolean;
+  webRtc?: WebRtcCodecEligibility;
+}): PlannedLiveStream[] => {
+  const planned: PlannedLiveStream[] = [];
+  input.streams.forEach(stream => {
+    if (!stream.metadata) {
+      return;
+    }
+    const eligibility = decideTransportEligibility({
+      metadata: stream.metadata,
+      device: input.device,
+      webRtc: input.webRtc,
+      experimentEnabled: input.mseEnabled,
+    });
+    if (eligibility.codec === 'h265' && eligibility.experimentEligible) {
+      planned.push({name: stream.name, codec: 'h265', transport: 'mse'});
+      return;
+    }
+    if (eligibility.existingWebRtcEligible) {
+      planned.push({
+        name: stream.name,
+        codec: eligibility.codec,
+        transport: 'webrtc',
+      });
+    }
+  });
+  const mseCandidates = planned.filter(candidate => candidate.transport === 'mse');
+  const webRtcCandidates = planned.filter(
+    candidate => candidate.transport === 'webrtc',
+  );
+  const selection = input.selection;
+  if (selection.mode === 'manual') {
+    const selected = planned.find(
+      candidate => candidate.name === selection.streamName,
+    );
+    return selected
+      ? [
+          selected,
+          ...webRtcCandidates.filter(candidate => candidate !== selected),
+        ]
+      : webRtcCandidates;
+  }
+  return [...mseCandidates, ...webRtcCandidates];
 };
 
 export const fetchStreamMetadata = async (

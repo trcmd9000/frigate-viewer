@@ -112,4 +112,28 @@ describe('settings persistence security boundary', () => {
       allowInsecureCredentials: false,
     });
   });
+
+  it('keeps only valid non-secret stream preferences for configured profiles', () => {
+    const server = {...emptyServer(), profileId: 'profile-valid'};
+    const persisted = stripCredentialsFromPersistence({
+      ...initialSettings,
+      servers: [server],
+      liveStreamPreferences: {
+        'profile-valid': {
+          front: {mode: 'manual', streamName: 'front_original'},
+          invalid: {mode: 'manual', streamName: '../front'},
+        },
+        'profile-removed': {
+          front: {mode: 'manual', streamName: 'private-stream'},
+        },
+      },
+    });
+
+    expect(persisted.liveStreamPreferences).toEqual({
+      'profile-valid': {
+        front: {mode: 'manual', streamName: 'front_original'},
+      },
+    });
+    expect(JSON.stringify(persisted)).not.toContain('private-stream');
+  });
 });

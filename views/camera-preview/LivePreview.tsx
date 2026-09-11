@@ -14,8 +14,12 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {useIntl} from 'react-intl';
-import {useAppSelector} from '../../store/store';
-import {selectServer} from '../../store/settings';
+import {useAppDispatch, useAppSelector} from '../../store/store';
+import {
+  selectLiveStreamPreference,
+  selectServer,
+  setLiveStreamPreference,
+} from '../../store/settings';
 import {buildServerApiUrl} from '../../helpers/rest';
 import {ZoomableImage} from '../../components/ZoomableImage';
 import {useStyles} from '../../helpers/colors';
@@ -30,8 +34,10 @@ import {SecureLogger} from '../../helpers/secureLogger';
 import {useRest} from '../../helpers/rest';
 import {
   prepareLocalRtspMedia,
+  selectProtectedLiveStreamOptions,
   selectProtectedLiveStreams,
 } from '../../helpers/protectedLive';
+import type {ProtectedLiveStream} from '../../helpers/protectedLive';
 import {ProtectedWebRTCPlayer} from '../../components/media/ProtectedWebRTCPlayer';
 import {LocalRtspPlayer} from '../../components/media/LocalRtspPlayer';
 import {
@@ -55,9 +61,12 @@ import type {PlayableMedia} from '../../components/media/PlayableMedia';
 import {LiveStatusBadge} from '../../components/media/LiveStatusBadge';
 import type {ProtectedLiveFailureReason} from '../../helpers/protectedLiveDiagnostics';
 import {LiveAudioControl} from './LiveAudioControl';
+import {Dropdown} from '../../components/forms/Dropdown';
 import type {ProtectedAudioStatus} from '../../helpers/protectedAudio';
 import {
   fetchStreamMetadata,
+  planProtectedLiveStreams,
+  probeDeviceCodecCapability,
   probeProtectedMseContract,
   protectedMseProbeEnabled,
   protectedMseProbeFailure,
@@ -112,6 +121,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       maxWidth: '52%',
       flexShrink: 0,
       alignItems: 'flex-end',
+    },
+    streamSelector: {
+      position: 'absolute',
+      bottom: 88,
+      alignSelf: 'center',
+      zIndex: 4,
+      width: 248,
+      maxWidth: '78%',
     },
     image: {
       width: '100%',
@@ -169,7 +186,11 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
 
   const [snapshotState, setSnapshotState] = useState<SnapshotHandoffState>({});
   const [mediaWidth, setMediaWidth] = useState<number>();
+  const dispatch = useAppDispatch();
   const server = useAppSelector(selectServer);
+  const streamPreference = useAppSelector(state =>
+    selectLiveStreamPreference(state, server.profileId, cameraName),
+  );
   const interval = useRef<NodeJS.Timeout>();
   const currentPath = useRef<string>();
   const requestId = useRef(0);
@@ -178,7 +199,12 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const getRef = useRef(useRest().get);
   const {active: playbackActive, activationId} = useScreenPlaybackLifecycle();
   const [streamNames, setStreamNames] = useState<string[]>([]);
+  const [streamOptions, setStreamOptions] = useState<ProtectedLiveStream[]>(
+    [],
+  );
   const [streamIndex, setStreamIndex] = useState(0);
+  const [firstCompatibleStreamIndex, setFirstCompatibleStreamIndex] =
+    useState(0);
   const streamName = streamNames[streamIndex];
   const [livePhase, setLivePhase] =
     useState<LivePreviewPhase>('snapshot');
@@ -419,6 +445,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       setFallbackReason(reason);
       if (transportRef.current === 'mse') {
         setMseMedia(undefined);
+        if (firstCompatibleStreamIndex < streamNames.length) {
+          setStreamIndex(firstCompatibleStreamIndex);
+          setActiveTransport('webrtc');
+          setConnectionAttempt(0);
+          reconnectAttempts.current = 0;
+          setLivePhase('connecting');
+          return;
+        }
         if (firstFrameTimer.current) {
           clearTimeout(firstFrameTimer.current);
           firstFrameTimer.current = undefined;
@@ -483,6 +517,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     },
     [
       playbackActive,
+      firstCompatibleStreamIndex,
       setActiveTransport,
       streamIndex,
       streamName,
@@ -573,6 +608,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     reconnectAttempts.current = 0;
     setConnectionAttempt(0);
     setStreamIndex(0);
+    setFirstCompatibleStreamIndex(0);
     setMuted(true);
     setWebrtcAudioAvailable(false);
     setWebrtcAudioStatus({state: 'inactive'});
@@ -583,6 +619,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     transportRef.current = undefined;
     setTransport(undefined);
     setStreamNames([]);
+    setStreamOptions([]);
     setFallbackReason(undefined);
     setLivePhase('snapshot');
     const armFirstFrameTimeout = () => {
@@ -614,12 +651,35 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         if (!active) {
           return;
         }
-        const selectedStreams = selectProtectedLiveStreams(config, cameraName);
+        const configuredStreamOptions = selectProtectedLiveStreamOptions(
+          config,
+          cameraName,
+        );
+        const selectedStreams = configuredStreamOptions.length > 0
+          ? configuredStreamOptions.map(stream => stream.name)
+          : selectProtectedLiveStreams(config, cameraName);
         if (selectedStreams.length === 0) {
           setLivePhase('fallback');
           return;
         }
-        setStreamNames(selectedStreams);
+        const effectiveStreamPreference =
+          streamPreference?.mode === 'manual' &&
+          !selectedStreams.includes(streamPreference.streamName)
+            ? {mode: 'auto'} as const
+            : streamPreference || {mode: 'auto'} as const;
+        if (
+          effectiveStreamPreference.mode === 'auto' &&
+          streamPreference?.mode === 'manual' &&
+          server.profileId
+        ) {
+          dispatch(
+            setLiveStreamPreference({
+              profileId: server.profileId,
+              cameraName,
+              preference: {mode: 'auto'},
+            }),
+          );
+        }
         setLivePhase('preparing');
         armFirstFrameTimeout();
 
@@ -636,10 +696,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 `streamIndex=${index}, metadataAvailable=true, malformed=${metadata.malformed}, aac=${audioCodecs.has('aac')}, opus=${audioCodecs.has('opus')}, pcma=${audioCodecs.has('pcma')}, pcmu=${audioCodecs.has('pcmu')}`,
                 'protected-live-codecs',
               );
-              if (active && index === 0) {
-                setMseAudioAvailable(audioCodecs.size > 0);
-              }
-                return metadata;
+              return metadata;
             })
             .catch(() => {
               if (active) {
@@ -653,20 +710,51 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           );
 
           (async () => {
-            const primaryMetadata = await metadataRequests[0];
+            const metadata = await Promise.all(metadataRequests);
             if (!active || firstFrameExpired.current) {
               return;
             }
-            if (
-              protectedMseProbeEnabled() &&
-              primaryMetadata?.video.some(
-                descriptor => descriptor.codec === 'h265',
-              )
-            ) {
+            const plan = planProtectedLiveStreams({
+              streams: selectedStreams.map((name, index) => ({
+                name,
+                metadata: metadata[index],
+              })),
+              device: await probeDeviceCodecCapability(),
+              selection: effectiveStreamPreference,
+              mseEnabled: protectedMseProbeEnabled(),
+            });
+            if (!active || firstFrameExpired.current || plan.length === 0) {
+              setLivePhase('fallback');
+              return;
+            }
+            const initialCandidate = plan[0];
+            const compatibleStreamIndex = plan.findIndex(
+              candidate => candidate.transport === 'webrtc',
+            );
+            const initialMetadata = metadata[
+              selectedStreams.indexOf(initialCandidate.name)
+            ];
+            setStreamOptions(
+              configuredStreamOptions.map((stream, index) => {
+                const codec = metadata[index]?.video[0]?.codec;
+                return {
+                  ...stream,
+                  label: codec
+                    ? `${stream.label} (${codec.toUpperCase()})`
+                    : stream.label,
+                };
+              }),
+            );
+            setStreamNames(plan.map(candidate => candidate.name));
+            setStreamIndex(0);
+            setFirstCompatibleStreamIndex(
+              compatibleStreamIndex >= 0 ? compatibleStreamIndex : plan.length,
+            );
+            if (initialCandidate.transport === 'mse') {
               try {
                 const result = await probeProtectedMseContract(
                   server,
-                  selectedStreams[0],
+                  initialCandidate.name,
                 );
                 if (active) {
                   SecureLogger.logInfo(
@@ -680,13 +768,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 ) {
                   const uri = await protectedMseMediaUri(
                     server,
-                    selectedStreams[0],
+                    initialCandidate.name,
                   );
                   if (!active || firstFrameExpired.current) {
                     releaseProtectedMediaUri(uri);
                     return;
                   }
                   armFirstFrameTimeout();
+                  setMseAudioAvailable((initialMetadata?.audio.length || 0) > 0);
                   setMseMedia({
                     uri,
                     mimeType: 'video/mp4',
@@ -705,11 +794,26 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                   );
                 }
               }
+              if (compatibleStreamIndex >= 0) {
+                armFirstFrameTimeout();
+                setStreamIndex(compatibleStreamIndex);
+                setActiveTransport('webrtc');
+                setConnectionAttempt(0);
+                setLivePhase('connecting');
+                return;
+              }
+              setLivePhase('fallback');
+              return;
             }
             if (!active || firstFrameExpired.current) {
               return;
             }
-            prepareLocalRtspMedia(server, config, cameraName)
+            prepareLocalRtspMedia(
+              server,
+              config,
+              cameraName,
+              initialCandidate.name,
+            )
               .then(media => {
                 if (!active || firstFrameExpired.current) {
                   releaseProtectedMediaUri(media.uri);
@@ -762,6 +866,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     playbackActive,
     setActiveTransport,
     server,
+    streamPreference,
+    dispatch,
   ]);
 
   useEffect(() => {
@@ -987,6 +1093,52 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             />
           </Animated.View>
         </View>
+        {appActive &&
+          playbackActive &&
+          decoded &&
+          livePhase === 'live' &&
+          streamOptions.length > 1 &&
+          server.profileId && (
+          <View testID="camera-preview-stream-selector" style={styles.streamSelector}>
+            <Dropdown
+              testID="camera-preview-stream-dropdown"
+              accessibilityLabel={intl.formatMessage({
+                id: 'cameraPreview.stream.select',
+                defaultMessage: 'Select live stream',
+              })}
+              value={
+                streamPreference?.mode === 'manual'
+                  ? streamPreference.streamName
+                  : 'auto'
+              }
+              options={[
+                {
+                  value: 'auto',
+                  label: intl.formatMessage({
+                    id: 'cameraPreview.stream.auto',
+                    defaultMessage: 'Auto (prefer HEVC)',
+                  }),
+                },
+                ...streamOptions.map(stream => ({
+                  value: stream.name,
+                  label: stream.label,
+                })),
+              ]}
+              onValueChange={value => {
+                dispatch(
+                  setLiveStreamPreference({
+                    profileId: server.profileId as string,
+                    cameraName,
+                    preference:
+                      value === 'auto'
+                        ? {mode: 'auto'}
+                        : {mode: 'manual', streamName: value as string},
+                  }),
+                );
+              }}
+            />
+          </View>
+        )}
         {appActive &&
           playbackActive &&
           decoded &&

@@ -16,6 +16,7 @@ import {
   fetchStreamMetadata,
   parseStreamMetadata,
   parseStreamMetadataJson,
+  planProtectedLiveStreams,
   probeProtectedMseContract,
   protectedMseProbeEnabled,
   protectedMseProbeFailure,
@@ -220,6 +221,89 @@ describe('HEVC transport observation model', () => {
         transport: 'existing-webrtc',
       });
     }
+  });
+
+  it('prefers a non-primary eligible HEVC stream in Auto mode', () => {
+    const plan = planProtectedLiveStreams({
+      streams: [
+        {
+          name: 'compatible-a',
+          metadata: parseStreamMetadata({video: 'H264', audio: 'AAC, Opus'}),
+        },
+        {
+          name: 'compatible-b',
+          metadata: parseStreamMetadata({video: 'H264', audio: 'AAC, Opus'}),
+        },
+        {
+          name: 'original',
+          metadata: parseStreamMetadata({video: 'H265', audio: 'AAC, Opus'}),
+        },
+      ],
+      device: device(),
+      selection: {mode: 'auto'},
+      mseEnabled: true,
+    });
+
+    expect(plan).toEqual([
+      {name: 'original', codec: 'h265', transport: 'mse'},
+      {name: 'compatible-a', codec: 'h264', transport: 'webrtc'},
+      {name: 'compatible-b', codec: 'h264', transport: 'webrtc'},
+    ]);
+  });
+
+  it('keeps a manual stream first and falls back only to compatible streams', () => {
+    const streams = [
+      {
+        name: 'compatible',
+        metadata: parseStreamMetadata({video: 'H264', audio: 'AAC, Opus'}),
+      },
+      {
+        name: 'original',
+        metadata: parseStreamMetadata({video: 'H265', audio: 'AAC, Opus'}),
+      },
+    ];
+
+    expect(
+      planProtectedLiveStreams({
+        streams,
+        device: device(),
+        selection: {mode: 'manual', streamName: 'compatible'},
+        mseEnabled: true,
+      }),
+    ).toEqual([
+      {name: 'compatible', codec: 'h264', transport: 'webrtc'},
+    ]);
+    expect(
+      planProtectedLiveStreams({
+        streams,
+        device: device(),
+        selection: {mode: 'manual', streamName: 'original'},
+        mseEnabled: true,
+      }),
+    ).toEqual([
+      {name: 'original', codec: 'h265', transport: 'mse'},
+      {name: 'compatible', codec: 'h264', transport: 'webrtc'},
+    ]);
+  });
+
+  it('does not plan HEVC when native capability is unknown', () => {
+    expect(
+      planProtectedLiveStreams({
+        streams: [
+          {
+            name: 'compatible',
+            metadata: parseStreamMetadata({video: 'H264'}),
+          },
+          {
+            name: 'original',
+            metadata: parseStreamMetadata({video: 'H265'}),
+          },
+        ],
+        device: device('unknown'),
+        selection: {mode: 'auto'},
+        mseEnabled: true,
+      }),
+    ).toEqual([{name: 'compatible', codec: 'h264', transport: 'webrtc'}]);
   });
 
   it('rejects HEVC dimensions and rates above observed device limits', () => {

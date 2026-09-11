@@ -91,6 +91,8 @@ export default {
   'cameraPreview.audio.failure.focus-denied': 'Audio focus was not granted. Tap to retry.',
   'cameraPreview.audio.failure.native': 'Audio could not be activated. Tap to retry.',
   'cameraPreview.audio.failure.timeout': 'Audio activation timed out. Tap to retry.',
+  'cameraPreview.stream.select': 'Select live stream',
+  'cameraPreview.stream.auto': 'Auto (prefer HEVC)',
   'cameraPreview.fallback.message':
     'Live stream unavailable. Protected snapshots are shown instead.',
   'cameraPreview.fallback.landscape':

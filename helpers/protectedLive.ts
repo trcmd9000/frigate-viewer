@@ -61,29 +61,58 @@ export interface FrigateLiveConfig {
   };
 }
 
-export const selectProtectedLiveStreams = (
+export interface ProtectedLiveStream {
+  readonly name: string;
+  readonly label: string;
+}
+
+const displayLabel = (label: string, fallback: string): string => {
+  const trimmed = label.trim();
+  const hasControlCharacter = Array.from(trimmed).some(character => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+  return trimmed && trimmed.length <= 128 && !hasControlCharacter
+    ? trimmed
+    : fallback;
+};
+
+export const selectProtectedLiveStreamOptions = (
   config: FrigateLiveConfig,
   cameraName: string,
-): string[] => {
+): ProtectedLiveStream[] => {
   const availableStreams = config.go2rtc?.streams || {};
-  const configuredStreams = Object.values(
+  const configuredStreams = Object.entries(
     config.cameras?.[cameraName]?.live?.streams || {},
   );
-  const streamNames = configuredStreams.filter(
-    (candidate, index) =>
+  const streamOptions: ProtectedLiveStream[] = [];
+  configuredStreams.forEach(([label, candidate]) => {
+    if (
       validStreamName(candidate) &&
       Object.prototype.hasOwnProperty.call(availableStreams, candidate) &&
-      configuredStreams.indexOf(candidate) === index,
-  );
+      !streamOptions.some(stream => stream.name === candidate)
+    ) {
+      streamOptions.push({
+        name: candidate,
+        label: displayLabel(label, candidate),
+      });
+    }
+  });
   if (
     validStreamName(cameraName) &&
     Object.prototype.hasOwnProperty.call(availableStreams, cameraName) &&
-    !streamNames.includes(cameraName)
+    !streamOptions.some(stream => stream.name === cameraName)
   ) {
-    streamNames.push(cameraName);
+    streamOptions.push({name: cameraName, label: cameraName});
   }
-  return streamNames;
+  return streamOptions;
 };
+
+export const selectProtectedLiveStreams = (
+  config: FrigateLiveConfig,
+  cameraName: string,
+): string[] =>
+  selectProtectedLiveStreamOptions(config, cameraName).map(stream => stream.name);
 
 export const selectProtectedLiveStream = (
   config: FrigateLiveConfig,
@@ -94,8 +123,13 @@ export const prepareLocalRtspMedia = async (
   server: Server,
   config: FrigateLiveConfig,
   cameraName: string,
+  preferredStreamName?: string,
 ): Promise<PlayableMedia> => {
-  const streamName = selectProtectedLiveStream(config, cameraName);
+  const streamName =
+    preferredStreamName &&
+    selectProtectedLiveStreams(config, cameraName).includes(preferredStreamName)
+      ? preferredStreamName
+      : selectProtectedLiveStream(config, cameraName);
   if (!streamName) {
     throw new Error('No configured local RTSP stream is available');
   }

@@ -1,12 +1,15 @@
 import {
   initialSettings,
   emptyServer,
+  clearLiveStreamPreference,
   getFallbackActiveServerProfileId,
   settingsMigrations,
   settingsStore,
   setServerClientCertConfig,
   setActiveServerProfileId,
   removeServerProfile,
+  selectLiveStreamPreference,
+  setLiveStreamPreference,
   selectActiveServerProfileId,
   selectServer,
 } from '../../store/settings';
@@ -182,6 +185,73 @@ describe('Settings Store Reducer', () => {
       );
 
       expect(newState.v1.servers).toHaveLength(0);
+    });
+  });
+
+  describe('Live stream preferences', () => {
+    it('stores preferences by opaque server profile and removes them with the profile', () => {
+      const first = {...emptyServer(), profileId: 'profile-a'};
+      const second = {...emptyServer(), profileId: 'profile-b'};
+      const withServers = settingsStore.reducer(
+        initialState,
+        settingsStore.actions.saveSettings({
+          ...initialState.v1,
+          servers: [first, second],
+        }),
+      );
+      const withPreferences = settingsStore.reducer(
+        withServers,
+        setLiveStreamPreference({
+          profileId: 'profile-a',
+          cameraName: 'front',
+          preference: {mode: 'manual', streamName: 'front_original'},
+        }),
+      );
+      const rootState = {settings: withPreferences} as never;
+
+      expect(
+        selectLiveStreamPreference(rootState, 'profile-a', 'front'),
+      ).toEqual({mode: 'manual', streamName: 'front_original'});
+      expect(
+        selectLiveStreamPreference(rootState, 'profile-b', 'front'),
+      ).toBeUndefined();
+
+      const removed = settingsStore.reducer(
+        withPreferences,
+        removeServerProfile('profile-a'),
+      );
+      expect(removed.v1.liveStreamPreferences['profile-a']).toBeUndefined();
+    });
+
+    it('rejects malformed preferences and clears a camera back to Auto', () => {
+      const server = {...emptyServer(), profileId: 'profile-a'};
+      const withServer = settingsStore.reducer(
+        initialState,
+        settingsStore.actions.saveSettings({...initialState.v1, servers: [server]}),
+      );
+      const rejected = settingsStore.reducer(
+        withServer,
+        setLiveStreamPreference({
+          profileId: 'profile-a',
+          cameraName: 'front',
+          preference: {mode: 'manual', streamName: '../invalid'},
+        }),
+      );
+      expect(rejected.v1.liveStreamPreferences).toEqual({});
+
+      const selected = settingsStore.reducer(
+        withServer,
+        setLiveStreamPreference({
+          profileId: 'profile-a',
+          cameraName: 'front',
+          preference: {mode: 'auto'},
+        }),
+      );
+      const cleared = settingsStore.reducer(
+        selected,
+        clearLiveStreamPreference({profileId: 'profile-a', cameraName: 'front'}),
+      );
+      expect(cleared.v1.liveStreamPreferences).toEqual({});
     });
   });
 

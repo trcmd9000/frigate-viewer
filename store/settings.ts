@@ -98,6 +98,15 @@ export interface RtspSettings {
   allowInsecureCredentials: boolean;
 }
 
+export type LiveStreamPreference =
+  | {mode: 'auto'}
+  | {mode: 'manual'; streamName: string};
+
+export type LiveStreamPreferences = Record<
+  string,
+  Record<string, LiveStreamPreference>
+>;
+
 export interface Server {
   /**
    * Opaque, non-secret identifier for this configured profile. It is used to
@@ -160,6 +169,7 @@ export interface ISettings {
     /** @deprecated Ignored when settings are migrated. */
     actionWhenPressed?: 'events' | 'preview';
   };
+  liveStreamPreferences: LiveStreamPreferences;
   events: {
     numColumns: number;
     snapshotHeight: number;
@@ -254,6 +264,7 @@ export const initialSettings: ISettings = {
     numColumns: 1,
     previewHeight: 222,
   },
+  liveStreamPreferences: {},
   events: {
     numColumns: 1,
     snapshotHeight: 222,
@@ -294,6 +305,73 @@ const fillGaps: <T extends object>(initial: T, current?: Partial<T>) => T = <
 
 const validProfileId = (profileId: unknown): profileId is string =>
   typeof profileId === 'string' && profileId.trim().length > 0;
+
+const validPreferenceName = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  value.length > 0 &&
+  value.length <= 128 &&
+  ![...value].some(
+    character =>
+      character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+  );
+
+const validStreamName = (value: unknown): value is string =>
+  typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value);
+
+const normalizeLiveStreamPreference = (
+  value: unknown,
+): LiveStreamPreference | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const candidate = value as Partial<LiveStreamPreference>;
+  if (candidate.mode === 'auto') {
+    return {mode: 'auto'};
+  }
+  return candidate.mode === 'manual' && validStreamName(candidate.streamName)
+    ? {mode: 'manual', streamName: candidate.streamName}
+    : undefined;
+};
+
+export const normalizeLiveStreamPreferences = (
+  value: unknown,
+  servers: readonly Server[],
+): LiveStreamPreferences => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const validProfileIds = new Set(
+    servers
+      .map(server => server.profileId)
+      .filter(validProfileId)
+      .map(profileId => profileId.trim()),
+  );
+  return Object.entries(value as Record<string, unknown>).reduce<
+    LiveStreamPreferences
+  >((preferences, [profileId, cameraPreferences]) => {
+    if (!validProfileIds.has(profileId) ||
+      !cameraPreferences || typeof cameraPreferences !== 'object' ||
+      Array.isArray(cameraPreferences)) {
+      return preferences;
+    }
+    const normalizedCameras = Object.entries(
+      cameraPreferences as Record<string, unknown>,
+    ).reduce<Record<string, LiveStreamPreference>>(
+      (cameras, [cameraName, preference]) => {
+        const normalized = normalizeLiveStreamPreference(preference);
+        if (validPreferenceName(cameraName) && normalized) {
+          cameras[cameraName] = normalized;
+        }
+        return cameras;
+      },
+      {},
+    );
+    if (Object.keys(normalizedCameras).length > 0) {
+      preferences[profileId] = normalizedCameras;
+    }
+    return preferences;
+  }, {});
+};
 
 const profileMigrationSeed = (server: Server): string =>
   JSON.stringify({
@@ -527,7 +605,7 @@ const v1Migrations = (settings?: ISettings): ISettings | undefined => {
   interface DeprecatedV1Settings {
     server?: Server;
   }
-  const {server, servers, activeServerProfileId, ...restSettings} = settings as ISettings &
+  const {server, servers, activeServerProfileId, liveStreamPreferences, ...restSettings} = settings as ISettings &
     DeprecatedV1Settings;
   delete (restSettings as ISettings & {clientCertPasswordCache?: unknown})
     .clientCertPasswordCache;
@@ -573,6 +651,10 @@ const v1Migrations = (settings?: ISettings): ISettings | undefined => {
   return {
     ...restSettings,
     servers: serversWithLegacyServer,
+    liveStreamPreferences: normalizeLiveStreamPreferences(
+      liveStreamPreferences,
+      serversWithLegacyServer,
+    ),
     activeServerProfileId: getFallbackActiveServerProfileId(
       serversWithLegacyServer,
       uniquelySelectedProfileId,
@@ -609,6 +691,43 @@ export const settingsStore = createSlice({
     },
     setEventSnapshotHeight: (state, action: PayloadAction<number>) => {
       state.v1.events.snapshotHeight = action.payload;
+    },
+    setLiveStreamPreference: (
+      state,
+      action: PayloadAction<{
+        profileId: string;
+        cameraName: string;
+        preference: LiveStreamPreference;
+      }>,
+    ) => {
+      const {profileId, cameraName, preference} = action.payload;
+      const normalized = normalizeLiveStreamPreference(preference);
+      if (
+        !validProfileId(profileId) ||
+        !validPreferenceName(cameraName) ||
+        !normalized ||
+        !state.v1.servers.some(server => server.profileId === profileId)
+      ) {
+        return;
+      }
+      state.v1.liveStreamPreferences[profileId] = {
+        ...state.v1.liveStreamPreferences[profileId],
+        [cameraName]: normalized,
+      };
+    },
+    clearLiveStreamPreference: (
+      state,
+      action: PayloadAction<{profileId: string; cameraName: string}>,
+    ) => {
+      const {profileId, cameraName} = action.payload;
+      const preferences = state.v1.liveStreamPreferences[profileId];
+      if (!preferences || !validPreferenceName(cameraName)) {
+        return;
+      }
+      delete preferences[cameraName];
+      if (Object.keys(preferences).length === 0) {
+        delete state.v1.liveStreamPreferences[profileId];
+      }
     },
     setServerClientCertConfig: (
       state,
@@ -655,6 +774,7 @@ export const settingsStore = createSlice({
         return;
       }
       state.v1.servers = remainingServers;
+      delete state.v1.liveStreamPreferences[profileId];
       state.v1.activeServerProfileId = getFallbackActiveServerProfileId(
         remainingServers,
         state.v1.activeServerProfileId,
@@ -671,6 +791,8 @@ export const {
   saveSettings,
   setCameraPreviewHeight,
   setEventSnapshotHeight,
+  setLiveStreamPreference,
+  clearLiveStreamPreference,
   setServerClientCertConfig,
   setActiveServerProfileId,
   setActiveServerProfile,
@@ -684,6 +806,15 @@ export const {
 const settingsState = (state: RootState) => state.settings;
 
 export const selectSettings = (state: RootState) => settingsState(state).v1;
+
+export const selectLiveStreamPreference = (
+  state: RootState,
+  profileId: string | undefined,
+  cameraName: string,
+): LiveStreamPreference | undefined =>
+  profileId && validPreferenceName(cameraName)
+    ? selectSettings(state).liveStreamPreferences[profileId]?.[cameraName]
+    : undefined;
 
 /* server */
 

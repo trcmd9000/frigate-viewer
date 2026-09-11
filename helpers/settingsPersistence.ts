@@ -7,7 +7,10 @@ import type {
   RouteTlsSettings,
   Server,
 } from '../store/settings';
-import {getFallbackActiveServerProfileId} from '../store/settings';
+import {
+  getFallbackActiveServerProfileId,
+  normalizeLiveStreamPreferences,
+} from '../store/settings';
 import {serverIdentity, serverUsesClientCertificate} from './serverIdentity';
 
 /**
@@ -118,6 +121,10 @@ export const stripCredentialsFromPersistence = (
   delete cameras.liveView;
   delete cameras.actionWhenPressed;
   stateWithoutLegacyCache.cameras = cameras;
+  stateWithoutLegacyCache.liveStreamPreferences = normalizeLiveStreamPreferences(
+    stateWithoutLegacyCache.liveStreamPreferences,
+    Array.isArray(inboundState.servers) ? inboundState.servers : [],
+  );
 
   if (!Array.isArray(inboundState.servers)) {
     return stateWithoutLegacyCache;
