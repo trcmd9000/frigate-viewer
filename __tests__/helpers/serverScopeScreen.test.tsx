@@ -67,11 +67,17 @@ jest.mock('react-intl', () => ({
   defineMessages: (messages: unknown) => messages,
 }));
 jest.mock('../../views/camera-preview/LivePreview', () => ({
-  LivePreview: () => {
+  LivePreview: ({cameraName}: {cameraName: string}) => {
     const ReactModule = require('react');
     mockContentRender();
     ReactModule.useEffect(() => () => mockCleanup(), []);
-    return ReactModule.createElement(require('react-native').Text, null, 'live-media');
+    const {Text} = require('react-native');
+    return ReactModule.createElement(
+      ReactModule.Fragment,
+      null,
+      ReactModule.createElement(Text, null, cameraName),
+      ReactModule.createElement(Text, null, 'live-media'),
+    );
   },
 }));
 jest.mock('../../components/forms/Section', () => ({

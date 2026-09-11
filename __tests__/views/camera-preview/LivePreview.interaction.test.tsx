@@ -7,6 +7,7 @@ import {LivePreview} from '../../../views/camera-preview/LivePreview';
 
 const mockGet = jest.fn();
 const mockDownload = jest.fn();
+const mockDispatch = jest.fn();
 const mockServer = {
   protocol: 'https',
   host: 'frigate.example.test',
@@ -17,6 +18,7 @@ const mockServer = {
 };
 
 jest.mock('../../../store/store', () => ({
+  useAppDispatch: () => mockDispatch,
   useAppSelector: () => mockServer,
 }));
 jest.mock('../../../store/settings', () => ({selectServer: jest.fn()}));
@@ -29,6 +31,7 @@ jest.mock('../../../helpers/playbackLifecycle', () => ({
 }));
 jest.mock('../../../helpers/protectedLive', () => ({
   selectProtectedLiveStreams: () => [],
+  selectProtectedLiveStreamOptions: () => [],
   prepareLocalRtspMedia: jest.fn(),
 }));
 jest.mock('../../../helpers/mediaDownload', () => ({
