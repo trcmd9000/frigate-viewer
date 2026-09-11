@@ -63,6 +63,21 @@ describe('LiveStatusBadge', () => {
     expect(getByLabelText('Live stream')).toBeTruthy();
   });
 
+  it('shows the active configured stream next to a live transport label', () => {
+    const {getByLabelText, getByText} = render(
+      <IntlProvider locale="en" messages={en}>
+        <LiveStatusBadge
+          state="live"
+          transport="webrtc"
+          streamLabel="Compatible live"
+        />
+      </IntlProvider>,
+    );
+
+    expect(getByText('WebRTC · Compatible live')).toBeTruthy();
+    expect(getByLabelText('WebRTC live stream: Compatible live')).toBeTruthy();
+  });
+
   it.each([
     ['snapshot', 'Standbilder'],
     ['preparing', 'Live-Stream wird vorbereitet'],

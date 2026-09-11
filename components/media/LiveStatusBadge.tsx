@@ -18,6 +18,7 @@ import type {
 interface LiveStatusBadgeProps {
   state: LivePreviewState;
   transport?: LivePreviewTransport;
+  streamLabel?: string;
   viewportWidth?: number;
 }
 
@@ -37,6 +38,7 @@ const defaultStatusMessages: Record<string, string> = {
 export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
   state,
   transport,
+  streamLabel,
   viewportWidth,
 }) => {
   const {width: windowWidth} = useWindowDimensions();
@@ -77,7 +79,15 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
         ? 'HEVC'
         : 'RTSP'
       : label;
-  const isLongLabel = compactLabel.length > 18;
+  const displayLabel =
+    state === 'live' && transport && streamLabel
+      ? `${compactLabel} · ${streamLabel}`
+      : compactLabel;
+  const accessibilityLabel =
+    state === 'live' && transport && streamLabel
+      ? `${label}: ${streamLabel}`
+      : label;
+  const isLongLabel = displayLabel.length > 18;
   const width =
     typeof viewportWidth === 'number' &&
     Number.isFinite(viewportWidth) &&
@@ -95,7 +105,7 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
     <View
       accessible
       accessibilityRole="text"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       testID="live-status-badge"
       style={{...styles.badge, maxWidth: badgeMaxWidth}}
     >
@@ -122,8 +132,10 @@ export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
             ? {...styles.text, maxWidth: textMaxWidth}
             : styles.text
         }
+        numberOfLines={1}
+        ellipsizeMode="tail"
       >
-        {compactLabel}
+        {displayLabel}
       </Text>
     </View>
   );

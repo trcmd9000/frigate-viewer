@@ -131,6 +131,10 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       position: 'relative',
       backgroundColor: theme.mediaBackground,
     },
+    mediaTapSurface: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 2,
+    },
     topOverlay: {
       position: 'absolute',
       top: 12,
@@ -231,10 +235,16 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [streamOptions, setStreamOptions] = useState<ProtectedLiveStream[]>(
     [],
   );
+  const [streamOptionLabels, setStreamOptionLabels] = useState<
+    Record<string, string>
+  >({});
   const [streamIndex, setStreamIndex] = useState(0);
   const [firstCompatibleStreamIndex, setFirstCompatibleStreamIndex] =
     useState(0);
   const streamName = streamNames[streamIndex];
+  const activeStreamLabel = streamOptions.find(
+    stream => stream.name === streamName,
+  )?.label;
   const [livePhase, setLivePhase] =
     useState<LivePreviewPhase>('snapshot');
   const [rtspMedia, setRtspMedia] = useState<PlayableMedia>();
@@ -649,6 +659,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setTransport(undefined);
     setStreamNames([]);
     setStreamOptions([]);
+    setStreamOptionLabels({});
     setFallbackReason(undefined);
     setLivePhase('snapshot');
     const armFirstFrameTimeout = () => {
@@ -763,17 +774,20 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             const initialMetadata = metadata[
               selectedStreams.indexOf(initialCandidate.name)
             ];
-            setStreamOptions(configuredStreamOptions.map((stream, index) => {
+            setStreamOptions(configuredStreamOptions);
+            setStreamOptionLabels(Object.fromEntries(
+              configuredStreamOptions.map((stream, index) => {
               const candidate = plan.find(item => item.name === stream.name);
               const video = metadata[index]?.video || [];
               const descriptor = video.find(
                 item => item.codec === candidate?.codec,
               ) || video[0];
-              return {
-                ...stream,
-                label: formatStreamOptionLabel(stream, descriptor),
-              };
-            }));
+              return [
+                stream.name,
+                formatStreamOptionLabel(stream, descriptor),
+              ];
+            }),
+            ));
             setStreamNames(plan.map(candidate => candidate.name));
             setStreamIndex(0);
             setFirstCompatibleStreamIndex(
@@ -1054,6 +1068,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             onAudioStatusChange={handleWebRtcAudioStatusChange}
           />
         )}
+      {playbackActive && decoded && livePhase === 'live' && (
+        <Pressable
+          testID="camera-preview-media-tap"
+          accessible={false}
+          style={styles.mediaTapSurface}
+          onPress={revealTransientOverlays}
+        />
+      )}
       {playbackActive &&
         (livePhase === 'degraded' || livePhase === 'fallback') && (
           <Animated.View
@@ -1118,6 +1140,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             <LiveStatusBadge
               state={livePhase}
               transport={transport}
+              streamLabel={activeStreamLabel}
               viewportWidth={mediaWidth}
             />
           </Animated.View>
@@ -1160,7 +1183,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 },
                 ...streamOptions.map(stream => ({
                   value: stream.name,
-                  label: stream.label,
+                  label: streamOptionLabels[stream.name] || stream.label,
                 })),
               ]}
               onValueChange={value => {

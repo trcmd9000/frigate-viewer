@@ -460,6 +460,8 @@ describe('LivePreview audio render gate', () => {
     await waitFor(() =>
       expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy(),
     );
+    fireEvent.press(view.getByTestId('camera-preview-media-tap'));
+    expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy();
     fireEvent.press(
       view.getByRole('button', {name: 'Select live stream'}),
     );
