@@ -21,6 +21,7 @@ export const FilterSwitch: FC<IFilterSwitchProps> = ({
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      minHeight: 48,
       paddingHorizontal: 26,
       paddingVertical: 10,
       backgroundColor: theme.background,
@@ -46,7 +47,13 @@ export const FilterSwitch: FC<IFilterSwitchProps> = ({
   return (
     <View style={styles.wrapper}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <Switch onValueChange={onValueChange} {...switchProps} />
+      <Switch
+        onValueChange={onValueChange}
+        {...switchProps}
+        accessibilityRole="switch"
+        accessibilityLabel={typeof label === 'string' ? label : undefined}
+        accessibilityState={{checked: switchProps.value}}
+      />
     </View>
   );
 };

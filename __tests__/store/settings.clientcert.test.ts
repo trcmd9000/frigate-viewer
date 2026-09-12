@@ -25,7 +25,6 @@ describe('ClientCertConfig Redux', () => {
 
       const certConfig = {
         alias: 'my-client-cert',
-        password: 'cert-password',
         allowSelfSignedServer: false,
       };
 
@@ -173,7 +172,7 @@ describe('ClientCertConfig Redux', () => {
       );
     });
 
-    it('should preserve existing cert config when updating password only', () => {
+    it('should preserve existing cert config when updating its options', () => {
       const initialState = settingsStore.getInitialState();
 
       const stateWithCert = settingsStore.reducer(
@@ -199,7 +198,6 @@ describe('ClientCertConfig Redux', () => {
 
       const updatedConfig = {
         alias: 'my-cert',
-        password: 'new-password',
         allowSelfSignedServer: true,
       };
 
@@ -212,9 +210,6 @@ describe('ClientCertConfig Redux', () => {
       );
 
       expect(newState.v1.servers[0].clientCertConfig?.alias).toBe('my-cert');
-      expect(newState.v1.servers[0].clientCertConfig?.password).toBe(
-        'new-password',
-      );
       expect(newState.v1.servers[0].clientCertConfig?.allowSelfSignedServer).toBe(
         true,
       );
@@ -333,7 +328,6 @@ describe('ClientCertConfig Redux', () => {
           serverIndex: 2,
           clientCertConfig: {
             alias: 'cert-3',
-            password: 'secret',
           },
         }),
       );
@@ -347,7 +341,6 @@ describe('ClientCertConfig Redux', () => {
         true,
       );
       expect(state.v1.servers[2].clientCertConfig?.alias).toBe('cert-3');
-      expect(state.v1.servers[2].clientCertConfig?.password).toBe('secret');
     });
 
     it('should clear specific certificate without affecting others', () => {

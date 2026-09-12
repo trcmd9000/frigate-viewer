@@ -1,11 +1,12 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {RootState} from './store';
 
 /**
  * STORE MODEL
  **/
 
 export interface IEventsState {
+  /** Runtime-only epoch for data belonging to the effective active server. */
+  scopeGeneration: number;
   available: {
     cameras: string[];
     labels: string[];
@@ -20,6 +21,7 @@ export interface IEventsState {
 }
 
 export const initialState: IEventsState = {
+  scopeGeneration: 0,
   available: {
     cameras: [],
     labels: [],
@@ -41,6 +43,18 @@ export const eventsStore = createSlice({
   name: 'events',
   initialState,
   reducers: {
+    setAvailableForScope: (
+      state,
+      action: PayloadAction<{
+        generation: number;
+        available: IEventsState['available'];
+      }>,
+    ) => {
+      if (action.payload.generation !== state.scopeGeneration) {
+        return;
+      }
+      state.available = action.payload.available;
+    },
     setAvailableCameras: (state, action: PayloadAction<string[]>) => {
       state.available.cameras = action.payload;
     },
@@ -70,6 +84,7 @@ export const eventsStore = createSlice({
  **/
 
 export const {
+  setAvailableForScope,
   setAvailableCameras,
   setAvailableLabels,
   setAvailableZones,
@@ -83,34 +98,42 @@ export const {
  * SELECTORS
  **/
 
-const eventsState = (state: RootState) => state.events;
+interface EventsRootState {
+  events: IEventsState;
+}
+
+const eventsState = (state: EventsRootState) => state.events;
+
+export const selectServerScopeGeneration = (state: EventsRootState): number =>
+  eventsState(state).scopeGeneration;
 
 /* available */
 
-export const selectAvailable = (state: RootState) =>
+export const selectAvailable = (state: EventsRootState) =>
   eventsState(state).available;
 
-export const selectAvailableCameras = (state: RootState) =>
+export const selectAvailableCameras = (state: EventsRootState) =>
   selectAvailable(state).cameras;
 
-export const selectAvailableLabels = (state: RootState) =>
+export const selectAvailableLabels = (state: EventsRootState) =>
   selectAvailable(state).labels;
 
-export const selectAvailableZones = (state: RootState) =>
+export const selectAvailableZones = (state: EventsRootState) =>
   selectAvailable(state).zones;
 
 /* filters */
 
-export const selectFilters = (state: RootState) => eventsState(state).filters;
+export const selectFilters = (state: EventsRootState) =>
+  eventsState(state).filters;
 
-export const selectFiltersCameras = (state: RootState) =>
+export const selectFiltersCameras = (state: EventsRootState) =>
   selectFilters(state).cameras;
 
-export const selectFiltersLabels = (state: RootState) =>
+export const selectFiltersLabels = (state: EventsRootState) =>
   selectFilters(state).labels;
 
-export const selectFiltersZones = (state: RootState) =>
+export const selectFiltersZones = (state: EventsRootState) =>
   selectFilters(state).zones;
 
-export const selectFiltersRetained = (state: RootState) =>
+export const selectFiltersRetained = (state: EventsRootState) =>
   selectFilters(state).retained;

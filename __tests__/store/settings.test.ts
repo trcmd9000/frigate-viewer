@@ -1,4 +1,19 @@
-import {settingsStore, setServerClientCertConfig} from '../../store/settings';
+import {
+  initialSettings,
+  emptyServer,
+  clearLiveStreamPreference,
+  getFallbackActiveServerProfileId,
+  settingsMigrations,
+  settingsStore,
+  setServerClientCertConfig,
+  setActiveServerProfileId,
+  removeServerProfile,
+  selectLiveStreamPreference,
+  setLiveStreamPreference,
+  selectActiveServerProfileId,
+  selectServer,
+} from '../../store/settings';
+import {eventsStore} from '../../store/events';
 import {ISettings} from '../../store/settings';
 
 describe('Settings Store Reducer', () => {
@@ -173,6 +188,73 @@ describe('Settings Store Reducer', () => {
     });
   });
 
+  describe('Live stream preferences', () => {
+    it('stores preferences by opaque server profile and removes them with the profile', () => {
+      const first = {...emptyServer(), profileId: 'profile-a'};
+      const second = {...emptyServer(), profileId: 'profile-b'};
+      const withServers = settingsStore.reducer(
+        initialState,
+        settingsStore.actions.saveSettings({
+          ...initialState.v1,
+          servers: [first, second],
+        }),
+      );
+      const withPreferences = settingsStore.reducer(
+        withServers,
+        setLiveStreamPreference({
+          profileId: 'profile-a',
+          cameraName: 'front',
+          preference: {mode: 'manual', streamName: 'front_original'},
+        }),
+      );
+      const rootState = {settings: withPreferences} as never;
+
+      expect(
+        selectLiveStreamPreference(rootState, 'profile-a', 'front'),
+      ).toEqual({mode: 'manual', streamName: 'front_original'});
+      expect(
+        selectLiveStreamPreference(rootState, 'profile-b', 'front'),
+      ).toBeUndefined();
+
+      const removed = settingsStore.reducer(
+        withPreferences,
+        removeServerProfile('profile-a'),
+      );
+      expect(removed.v1.liveStreamPreferences['profile-a']).toBeUndefined();
+    });
+
+    it('rejects malformed preferences and clears a camera back to Auto', () => {
+      const server = {...emptyServer(), profileId: 'profile-a'};
+      const withServer = settingsStore.reducer(
+        initialState,
+        settingsStore.actions.saveSettings({...initialState.v1, servers: [server]}),
+      );
+      const rejected = settingsStore.reducer(
+        withServer,
+        setLiveStreamPreference({
+          profileId: 'profile-a',
+          cameraName: 'front',
+          preference: {mode: 'manual', streamName: '../invalid'},
+        }),
+      );
+      expect(rejected.v1.liveStreamPreferences).toEqual({});
+
+      const selected = settingsStore.reducer(
+        withServer,
+        setLiveStreamPreference({
+          profileId: 'profile-a',
+          cameraName: 'front',
+          preference: {mode: 'auto'},
+        }),
+      );
+      const cleared = settingsStore.reducer(
+        selected,
+        clearLiveStreamPreference({profileId: 'profile-a', cameraName: 'front'}),
+      );
+      expect(cleared.v1.liveStreamPreferences).toEqual({});
+    });
+  });
+
   describe('Client Cert Config Updates', () => {
     it('should set client cert config for a server', () => {
       const stateWithServer = settingsStore.reducer(
@@ -307,7 +389,6 @@ describe('Settings Store Reducer', () => {
       );
 
       expect(newState.v1.servers[0].clientCertConfig?.alias).toBe('my-cert');
-      expect(newState.v1.servers[0].clientCertConfig?.password).toBeUndefined();
     });
 
     it('should not modify state for invalid server index', () => {
@@ -480,6 +561,292 @@ describe('Settings Store Reducer', () => {
   });
 
   describe('Migrations', () => {
+    it('defaults local routing, RTSP, and insecure credential consent off', () => {
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [
+          {
+            protocol: 'https',
+            host: 'example.com',
+            port: 443,
+            path: '',
+            auth: 'none',
+            credentials: {username: '', password: ''},
+          },
+        ],
+      });
+
+      expect(migrated.servers[0].localRoutingEnabled).toBe(false);
+      expect(migrated.servers[0].localEndpoint).toBeUndefined();
+      expect(migrated.servers[0].localTls).toEqual({
+        mtlsEnabled: false,
+        allowSelfSignedServer: false,
+      });
+      expect(migrated.servers[0].rtsp).toEqual({
+        enabled: false,
+        port: 8554,
+        allowInsecureCredentials: false,
+      });
+    });
+
+    it('keeps valid local TLS settings typed and strips invalid local routes', () => {
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [
+          {
+            ...emptyServer(),
+            localRoutingEnabled: true,
+            localEndpoint: {
+              protocol: 'https',
+              host: '192.168.1.20',
+              port: 8971,
+              basePath: '/frigate',
+            },
+            localTls: {
+              mtlsEnabled: true,
+              allowSelfSignedServer: true,
+              clientCertConfig: {alias: 'local-identity'},
+            },
+            rtsp: {
+              enabled: true,
+              port: 8554,
+              allowInsecureCredentials: true,
+            },
+          },
+          {
+            ...emptyServer(),
+            localRoutingEnabled: true,
+            localEndpoint: {
+              protocol: 'https',
+              host: 'https://attacker.invalid',
+              port: 8971,
+              basePath: '',
+            },
+            rtsp: {
+              enabled: true,
+              port: 8554,
+              allowInsecureCredentials: true,
+            },
+          },
+        ],
+      });
+
+      expect(migrated.servers[0].localRoutingEnabled).toBe(true);
+      expect(migrated.servers[0].localTls?.clientCertConfig).toEqual({
+        alias: 'local-identity',
+      });
+      expect(migrated.servers[0].rtsp).toEqual({
+        enabled: true,
+        port: 8554,
+        allowInsecureCredentials: true,
+      });
+      expect(migrated.servers[1].localRoutingEnabled).toBe(false);
+      expect(migrated.servers[1].localEndpoint).toBeUndefined();
+      expect(migrated.servers[1].rtsp).toEqual({
+        enabled: false,
+        port: 8554,
+        allowInsecureCredentials: false,
+      });
+    });
+
+    it('clears stale RTSP consent whenever local routing is disabled', () => {
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [
+          {
+            ...emptyServer(),
+            localRoutingEnabled: false,
+            localEndpoint: {
+              protocol: 'https',
+              host: '192.168.1.20',
+              port: 8971,
+              basePath: '',
+            },
+            rtsp: {
+              enabled: true,
+              port: 8554,
+              allowInsecureCredentials: true,
+            },
+          },
+        ],
+      });
+
+      expect(migrated.servers[0].rtsp).toEqual({
+        enabled: false,
+        port: 8554,
+        allowInsecureCredentials: false,
+      });
+    });
+
+    it('keeps duplicate profile IDs distinct when local security differs', () => {
+      const first = {
+        ...emptyServer(),
+        localRoutingEnabled: true,
+        localEndpoint: {
+          protocol: 'https' as const,
+          host: '192.168.1.20',
+          port: 8971,
+          basePath: '',
+        },
+      };
+      const second = {
+        ...first,
+        localTls: {
+          mtlsEnabled: true,
+          allowSelfSignedServer: false,
+          clientCertConfig: {alias: 'second-identity'},
+        },
+      };
+      delete first.profileId;
+      delete second.profileId;
+
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [first, second],
+      });
+
+      expect(migrated.servers[0].profileId).not.toBe(
+        migrated.servers[1].profileId,
+      );
+    });
+
+    it('assigns deterministic unique profile IDs to legacy duplicate profiles', () => {
+      const first = {...emptyServer(), host: 'same.example.test'};
+      const second = {...first};
+      delete first.profileId;
+      delete second.profileId;
+      const legacySettings = {
+        ...initialSettings,
+        servers: [first, second],
+      };
+
+      const migrated = settingsMigrations(legacySettings);
+      const migratedAgain = settingsMigrations(legacySettings);
+
+      expect(migrated.servers[0].profileId).toBeTruthy();
+      expect(migrated.servers[0].profileId).not.toBe(
+        migrated.servers[1].profileId,
+      );
+      expect(migrated.servers.map(server => server.profileId)).toEqual(
+        migratedAgain.servers.map(server => server.profileId),
+      );
+    });
+
+    it('selects the first profile when active selection is missing', () => {
+      const first = {...emptyServer(), profileId: 'profile-first'};
+      const second = {...emptyServer(), profileId: 'profile-second'};
+
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [first, second],
+      });
+
+      expect(migrated.activeServerProfileId).toBe('profile-first');
+    });
+
+    it.each([
+      ['missing', 'profile-removed'],
+      ['malformed', ''],
+      ['duplicated', 'profile-duplicate'],
+    ])('falls back deterministically for %s active IDs', (_case, selected) => {
+      const first = {...emptyServer(), profileId: 'profile-first'};
+      const second = {...emptyServer(), profileId: 'profile-duplicate'};
+      const duplicate = {...emptyServer(), profileId: 'profile-duplicate'};
+
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        activeServerProfileId: selected,
+        servers:
+          selected === 'profile-duplicate'
+            ? [first, second, duplicate]
+            : [first, second],
+      });
+
+      expect(migrated.activeServerProfileId).toBe('profile-first');
+      expect(migrated.servers).toHaveLength(
+        selected === 'profile-duplicate' ? 3 : 2,
+      );
+    });
+
+    it('keeps distinct same-origin profiles and supports active deletion fallback', () => {
+      const first = {...emptyServer(), profileId: 'profile-first'};
+      const second = {...first, profileId: 'profile-second'};
+      const settings = settingsMigrations({
+        ...initialSettings,
+        activeServerProfileId: 'profile-second',
+        servers: [first, second],
+      });
+
+      expect(
+        getFallbackActiveServerProfileId(settings.servers, 'profile-second'),
+      ).toBe('profile-second');
+      const configured = settingsStore.reducer(
+        initialState,
+        settingsStore.actions.saveSettings(settings),
+      );
+      const selected = settingsStore.reducer(
+        configured,
+        setActiveServerProfileId('profile-second'),
+      );
+      expect(selected.v1.activeServerProfileId).toBe('profile-second');
+      const rootState = {
+        settings: {
+          ...selected,
+          _persist: {version: -1, rehydrated: true},
+        },
+        events: eventsStore.getInitialState(),
+      };
+      expect(selectActiveServerProfileId(rootState)).toBe('profile-second');
+      expect(selectServer(rootState).profileId).toBe('profile-second');
+
+      const afterDeletion = settingsStore.reducer(
+        selected,
+        removeServerProfile('profile-second'),
+      );
+      expect(afterDeletion.v1.servers).toHaveLength(1);
+      expect(afterDeletion.v1.activeServerProfileId).toBe('profile-first');
+    });
+
+    it('enables mTLS for legacy profiles with a certificate alias', () => {
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [
+          {
+            protocol: 'https',
+            host: 'example.com',
+            port: 443,
+            path: '',
+            auth: 'none',
+            credentials: {username: '', password: ''},
+            clientCertConfig: {alias: 'legacy-cert'},
+          },
+        ],
+      });
+
+      expect(migrated.servers[0].mtlsEnabled).toBe(true);
+      expect(migrated.servers[0].clientCertConfig?.alias).toBe('legacy-cert');
+    });
+
+    it('disables mTLS and removes stale config for legacy profiles without an alias', () => {
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [
+          {
+            protocol: 'https',
+            host: 'example.com',
+            port: 443,
+            path: '',
+            auth: 'none',
+            credentials: {username: '', password: ''},
+            clientCertConfig: {alias: ''},
+          },
+        ],
+      });
+
+      expect(migrated.servers[0].mtlsEnabled).toBe(false);
+      expect(migrated.servers[0].clientCertConfig).toBeUndefined();
+    });
+
     it('should handle legacy settings without clientCertConfig', () => {
       const legacySettings: ISettings = {
         ...initialState.v1,
@@ -516,7 +883,6 @@ describe('Settings Store Reducer', () => {
             credentials: {username: 'admin', password: 'secret'},
             clientCertConfig: {
               alias: 'production-cert',
-              password: 'cert-pass',
               allowSelfSignedServer: true,
             },
           },

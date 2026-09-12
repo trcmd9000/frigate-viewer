@@ -16,7 +16,7 @@ key to JavaScript or app storage.
 
 ## Prerequisites
 
-- An Android device running API 23 or newer.
+- An Android device running API 24 or newer.
 - A client identity containing both the certificate and private key, normally
   distributed as a password-protected PKCS#12 (`.p12` or `.pfx`) file.
 - A Frigate endpoint or reverse proxy configured to request and validate that
@@ -41,12 +41,14 @@ or retain it.
 
 1. Add or edit a server.
 2. Use `https` and enter the server connection details.
-3. In **Client Certificate (mTLS)**, choose **Select certificate**.
-4. Select the installed identity in Android's system dialog.
+3. Enable **Use mutual TLS** in **Client Certificate (mTLS)**.
+4. Choose a certificate and select the installed identity in Android's system
+   dialog.
 5. Save the server.
 
 Cancelling the system dialog leaves the existing selection unchanged. Use the
-remove action in the server form to stop using the selected identity.
+remove action in the server form to stop using the selected identity. Disabling
+**Use mutual TLS** also removes the certificate from the saved server profile.
 
 Each configured server can use a different Android identity.
 
@@ -57,10 +59,17 @@ Client authentication and server authentication are independent:
 - The client certificate proves the app's identity to the server.
 - The server certificate proves the server's identity to the app.
 
-Server certificate and hostname validation remains enabled by default. Prefer a
-certificate trusted by Android. The **Allow self-signed server certificate**
-option disables those server checks for the selected server and should be used
-only when the risk is understood and the network is otherwise trusted.
+Native mTLS server certificate and hostname validation remain enabled by
+default. Prefer a certificate trusted by Android's system store. The **Allow
+self-signed server certificate** option disables those native checks for the
+selected server and should be used only when the risk is understood and the
+network is otherwise trusted.
+
+The Android manifest currently permits cleartext traffic so an explicitly
+configured legacy `http` Frigate server continues to work. This is a
+compatibility exception, not a strict global Android networking default.
+Tightening that policy requires either removing HTTP support or adding an
+approved per-server transport policy.
 
 ## Troubleshooting
 

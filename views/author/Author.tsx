@@ -1,10 +1,9 @@
 import React, {useEffect} from 'react';
 import {useIntl} from 'react-intl';
-import {Image, ImageStyle, Text, View} from 'react-native';
+import {Image, ImageStyle, Pressable, Text, View} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {menuButton, useMenu} from '../menu/menuHelpers';
 import {messages} from './messages';
-import {UsedLibs} from './UsedLibs';
 import {useOpenLink} from './useOpenLink';
 import {ScrollView} from 'react-native-gesture-handler';
 import {palette, useStyles} from '../../helpers/colors';
@@ -35,23 +34,44 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
       marginHorizontal: 12,
       resizeMode: 'contain',
     },
-    link: {
-      color: theme.link,
+    content: {
+      padding: 20,
     },
-    item: {
-      marginVertical: 10,
-      marginHorizontal: 20,
-    },
-    itemLabel: {
-      fontWeight: '500',
+    heading: {
       color: theme.text,
-    },
-    itemValue: {
-      color: theme.text,
+      fontSize: 20,
+      fontWeight: '700',
+      marginTop: 12,
       textAlign: 'center',
     },
-    repository: {
-      flexDirection: 'column',
+    body: {
+      color: theme.text,
+      lineHeight: 21,
+      marginTop: 16,
+    },
+    row: {
+      minHeight: 48,
+      justifyContent: 'center',
+      marginTop: 8,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      backgroundColor: theme.surfaceElevated,
+    },
+    rowLabel: {
+      color: theme.link,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    rowHint: {
+      color: theme.textSecondary,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    section: {
+      color: theme.text,
+      fontSize: 16,
+      fontWeight: '700',
+      marginTop: 24,
     },
   }));
 
@@ -71,59 +91,59 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
       <View style={styles.authorInfo}>
         <View style={styles.logoWrapper}>
           <Image
-            source={require('./sp-engineering-logo.png')}
+            source={require('./frigate-viewer-icon.png')}
             style={styles.logo as ImageStyle}
           />
         </View>
-        <Text style={styles.item}>
-          <Text style={styles.itemLabel}>
-            {intl.formatMessage(messages['info.authorLabel'])}:{' '}
-          </Text>
-          <Text style={styles.itemValue}>trcmd9000</Text>
+        <Text style={styles.heading}>
+          {intl.formatMessage(messages.identity)}
         </Text>
-        <Text style={styles.item}>
-          <Text style={styles.itemLabel}>
-            {intl.formatMessage(messages['info.contactLabel'])}:{' '}
-          </Text>
-          <Text
-            style={[styles.itemValue, styles.link]}
-            onPress={openLink('mailto:trcmd9000@gmail.com')}
-          >
-            trcmd9000@gmail.com
-          </Text>
-        </Text>
-        <Text
-          style={[styles.item, styles.itemValue, styles.link]}
+      </View>
+      <View style={styles.content}>
+        <Text style={styles.body}>{intl.formatMessage(messages.disclaimer)}</Text>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={intl.formatMessage(messages.contact)}
+          onPress={openLink('mailto:trcmd9000@gmail.com')}
+          style={styles.row}
+        >
+          <Text style={styles.rowLabel}>{intl.formatMessage(messages.maintainer)}</Text>
+          <Text style={styles.rowHint}>trcmd9000@gmail.com</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={intl.formatMessage(messages.privacy)}
           onPress={openLink(
             'https://trcmd9000.github.io/frigate-viewer/privacy/',
           )}
+          style={styles.row}
         >
-          {intl.formatMessage(messages['info.privacyPolicyLabel'])}
+          <Text style={styles.rowLabel}>{intl.formatMessage(messages.privacy)}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={intl.formatMessage(messages.source)}
+          onPress={openLink('https://github.com/trcmd9000/frigate-viewer')}
+          style={styles.row}
+        >
+          <Text style={styles.rowLabel}>{intl.formatMessage(messages.source)}</Text>
+          <Text style={styles.rowHint}>
+            github.com/trcmd9000/frigate-viewer · GPL-3.0
+          </Text>
+        </Pressable>
+        <Text style={styles.section}>{intl.formatMessage(messages.upstream)}</Text>
+        <Text style={styles.body}>
+          {intl.formatMessage(messages.upstreamDescription)}
         </Text>
-        <Text style={styles.item}>
-          <Text style={styles.itemLabel}>Repository: </Text>
-          <Text
-            style={[styles.itemValue, styles.link]}
-            onPress={openLink('https://github.com/trcmd9000/frigate-viewer')}
-          >
-            github.com/trcmd9000/frigate-viewer
-          </Text>
-        </Text>
-        <View style={[styles.item, styles.repository]}>
-          <Text style={styles.itemValue}>
-            {intl.formatMessage(messages['info.opensourceLabel'])}
-          </Text>
-          <Text
-            style={[styles.itemValue, styles.link]}
-            onPress={openLink(
-              'https://github.com/sp-engineering/frigate-viewer',
-            )}
-          >
-            Based on the original open-source project by SP engineering
-          </Text>
-        </View>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="sp-engineering/frigate-viewer"
+          onPress={openLink('https://github.com/sp-engineering/frigate-viewer')}
+          style={styles.row}
+        >
+          <Text style={styles.rowLabel}>sp-engineering/frigate-viewer</Text>
+        </Pressable>
       </View>
-      <UsedLibs />
     </ScrollView>
   );
 };

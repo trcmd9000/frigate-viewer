@@ -1,6 +1,6 @@
 {
   "name": "FrigateViewer",
-  "version": "14.3.1",
+  "version": "18.0.1",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -22,6 +22,7 @@
     "buffer": "^6.0.3",
     "date-fns": "^2.30.0",
     "formik": "^2.4.5",
+    "lucide-react-native": "^1.45.0",
     "react": "18.3.1",
     "react-intl": "^6.4.7",
     "react-native": "0.75.2",
@@ -32,8 +33,11 @@
     "react-native-reanimated": "^3.15.2",
     "react-native-reanimated-table": "^0.0.2",
     "react-native-share": "^11.0.3",
+    "react-native-svg": "^15.15.5",
     "react-native-svg-charts": "github:piwko28/react-native-svg-charts",
     "react-native-ui-lib": "^7.9.1",
+    "react-native-video": "6.19.2",
+    "react-native-webrtc": "^124.0.8",
     "react-redux": "^8.1.2",
     "redux": "^4.2.1",
     "redux-persist": "^6.0.0",

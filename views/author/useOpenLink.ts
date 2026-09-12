@@ -15,6 +15,6 @@ export const useOpenLink = () => {
         Alert.alert(intl.formatMessage(messages['error.cantOpenLink']));
       }
     },
-    [],
+    [intl],
   );
 };

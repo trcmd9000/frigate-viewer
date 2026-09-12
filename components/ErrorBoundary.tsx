@@ -1,5 +1,5 @@
 import React, {ReactNode} from 'react';
-import {Text, View} from 'react-native';
+import {Pressable, Text, View} from 'react-native';
 import {useStyles} from '../helpers/colors';
 import {AppError, ErrorCode, createError} from '../helpers/errorHandler';
 import {SecureLogger} from '../helpers/secureLogger';
@@ -110,8 +110,12 @@ const ErrorBoundaryFallback: React.FC<{
     },
     retryButton: {
       marginTop: 16,
+      minWidth: 48,
+      minHeight: 48,
       paddingHorizontal: 24,
       paddingVertical: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
       backgroundColor: theme.link,
       borderRadius: 8,
     },
@@ -131,14 +135,14 @@ const ErrorBoundaryFallback: React.FC<{
         <Text style={styles.message}>{error.message}</Text>
         <Text style={styles.codeLabel}>Error Code: {error.code}</Text>
 
-        <View
+        <Pressable
           style={styles.retryButton}
-          onTouchEnd={onRetry}
+          onPress={onRetry}
           accessibilityRole="button"
           accessibilityLabel="Retry"
         >
           <Text style={styles.retryText}>Try Again</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );

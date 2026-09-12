@@ -63,6 +63,36 @@ describe('errorHandler', () => {
       expect(result.message).toContain('timed out');
     });
 
+    it('should normalize a native HTTP timeout without treating it as a certificate error', () => {
+      const error = new Error('Connection timed out') as Error & {
+        code: string;
+      };
+      error.code = 'HTTP_TIMEOUT';
+      const result = normalizeError(error);
+      expect(result.code).toBe(ErrorCode.TIMEOUT);
+      expect(result.message).toContain('address, port');
+    });
+
+    it('should normalize a native TLS handshake error', () => {
+      const error = new Error('TLS handshake failed') as Error & {
+        code: string;
+      };
+      error.code = 'TLS_HANDSHAKE_ERROR';
+      const result = normalizeError(error);
+      expect(result.code).toBe(ErrorCode.TLS_HANDSHAKE);
+      expect(result.message).toContain('TLS handshake failed');
+    });
+
+    it('should preserve a response format error', () => {
+      const error = new Error(
+        'Server returned HTTP 200 with text/html instead of JSON.',
+      );
+      error.name = ErrorCode.RESPONSE_FORMAT;
+      const result = normalizeError(error);
+      expect(result.code).toBe(ErrorCode.RESPONSE_FORMAT);
+      expect(result.message).toContain('text/html');
+    });
+
     it('should normalize certificate expired error', () => {
       const error = new Error('Certificate expired');
       const result = normalizeError(error);
@@ -75,6 +105,27 @@ describe('errorHandler', () => {
       const result = normalizeError(error);
       expect(result.code).toBe(ErrorCode.CERT_NOT_FOUND);
       expect(result.message).toContain('not found');
+    });
+
+    it('should normalize the native missing identity code', () => {
+      const error = new Error('The selected client certificate is unavailable') as
+        Error & {code: string};
+      error.code = 'CERT_IDENTITY_UNAVAILABLE';
+
+      const result = normalizeError(error);
+
+      expect(result.code).toBe(ErrorCode.CERT_NOT_FOUND);
+    });
+
+    it('should normalize secure storage unavailability', () => {
+      const error = new Error(
+        'Platform secure credential storage is unavailable',
+      ) as Error & {code: string};
+      error.code = 'SECURE_STORAGE_UNAVAILABLE';
+
+      const result = normalizeError(error);
+
+      expect(result.code).toBe(ErrorCode.SECURE_STORAGE);
     });
 
     it('should normalize certificate invalid error', () => {
@@ -151,6 +202,17 @@ describe('errorHandler', () => {
       const error = createError(ErrorCode.NETWORK_ERROR, 'Connection failed');
       const message = getUserFriendlyMessage(error);
       expect(message).toBe('Connection failed');
+    });
+
+    it('should redact URLs and credentials from displayed errors', () => {
+      const error = createError(
+        ErrorCode.UNKNOWN,
+        'Request https://private.example/api failed with password=secret',
+      );
+
+      expect(getUserFriendlyMessage(error)).toBe(
+        'Request [URL] failed with password=******',
+      );
     });
   });
 

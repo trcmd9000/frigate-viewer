@@ -13,6 +13,9 @@ export enum ErrorCode {
   CERT_NOT_FOUND = 'ERR_CERT_NOT_FOUND',
   CERT_EXPIRED = 'ERR_CERT_EXPIRED',
   CERT_INVALID = 'ERR_CERT_INVALID',
+  TLS_HANDSHAKE = 'ERR_TLS_HANDSHAKE',
+  RESPONSE_FORMAT = 'ERR_RESPONSE_FORMAT',
+  SECURE_STORAGE = 'ERR_SECURE_STORAGE',
   AUTH_FAILED = 'ERR_AUTH',
   UNAUTHORIZED = 'ERR_UNAUTHORIZED',
   INVALID_CONFIG = 'ERR_CONFIG',
@@ -91,6 +94,61 @@ export const normalizeError = (error: unknown): AppError => {
  */
 const normalizeStandardError = (error: Error): AppError => {
   const message = error.message || 'Unknown error';
+  const nativeCode = (error as Error & {code?: string}).code;
+
+  if (nativeCode === 'HTTP_TIMEOUT') {
+    return createError(
+      ErrorCode.TIMEOUT,
+      'Connection timed out. Check the server address, port, and network access.',
+      'error',
+      {originalMessage: message},
+    );
+  }
+
+  if (nativeCode === 'TLS_HANDSHAKE_ERROR') {
+    return createError(
+      ErrorCode.TLS_HANDSHAKE,
+      'TLS handshake failed. Check the server certificate and client identity.',
+      'error',
+      {originalMessage: message},
+    );
+  }
+
+  if (nativeCode === 'CERT_IDENTITY_UNAVAILABLE') {
+    return createError(
+      ErrorCode.CERT_NOT_FOUND,
+      'The selected client identity is unavailable. Select it again in Android.',
+      'error',
+      {originalMessage: message},
+    );
+  }
+
+  if (nativeCode === 'SECURE_STORAGE_UNAVAILABLE') {
+    return createError(
+      ErrorCode.SECURE_STORAGE,
+      'Secure credential storage is unavailable on this device.',
+      'error',
+      {originalMessage: message},
+    );
+  }
+
+  if (nativeCode === 'HTTP_IO_ERROR') {
+    return createError(
+      ErrorCode.NETWORK_ERROR,
+      'The server connection failed. Check the server address and network access.',
+      'error',
+      {originalMessage: message},
+    );
+  }
+
+  if (error.name === ErrorCode.RESPONSE_FORMAT) {
+    return createError(
+      ErrorCode.RESPONSE_FORMAT,
+      message,
+      'error',
+      {originalMessage: message},
+    );
+  }
 
   // Network errors
   if (
@@ -256,7 +314,12 @@ export const handleError = async (
  */
 export const getUserFriendlyMessage = (appError: AppError): string => {
   // Already in user-friendly format from normalization
-  return appError.message;
+  return appError.message
+    .replace(/https?:\/\/[^\s"'<>)]+/gi, '[URL]')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[IP]')
+    .replace(/Bearer\s+[^\s]+/gi, '******')
+    .replace(/Basic\s+[^\s]+/gi, 'Basic [TOKEN]')
+    .replace(/password[=:]\s*[^\s,"'<>)]+/gi, 'password=******');
 };
 
 /**

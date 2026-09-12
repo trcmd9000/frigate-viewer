@@ -1,25 +1,32 @@
 import React from 'react';
+import {View} from 'react-native';
 import {NavigationFunctionComponent} from 'react-native-navigation';
 import {useStyles} from '../../helpers/colors';
+import {
+  ServerScopeScreenProps,
+  withServerScopeScreen,
+} from '../../helpers/serverScopeScreen';
 import {LivePreview} from './LivePreview';
-import {View} from 'react-native-ui-lib';
 
-interface CameraPreviewProps {
+interface CameraPreviewProps extends ServerScopeScreenProps {
   cameraName: string;
 }
 
-export const CameraPreview: NavigationFunctionComponent<CameraPreviewProps> = ({
+const CameraPreviewContent: NavigationFunctionComponent<CameraPreviewProps> = ({
   cameraName,
 }) => {
   const styles = useStyles(({theme}) => ({
     wrapper: {
-      backgroundColor: theme.background,
+      flex: 1,
+      backgroundColor: theme.mediaBackground,
     },
   }));
 
   return (
-    <View style={styles.wrapper}>
+    <View testID="camera-preview-screen" style={styles.wrapper}>
       <LivePreview cameraName={cameraName} />
     </View>
   );
 };
+
+export const CameraPreview = withServerScopeScreen(CameraPreviewContent);

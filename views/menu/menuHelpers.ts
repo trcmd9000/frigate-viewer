@@ -1,5 +1,9 @@
 import {useEffect} from 'react';
-import {Navigation, OptionsTopBarButton} from 'react-native-navigation';
+import {
+  Navigation,
+  OptionsTopBarButton,
+} from 'react-native-navigation';
+import type {OptionsModalPresentationStyle} from 'react-native-navigation';
 import {SecureLogger} from '../../helpers/secureLogger';
 
 export type MenuId =
@@ -21,28 +25,50 @@ export const useSelectedMenuItem = (current?: MenuId) => {
   }, [current]);
 };
 
-export const useMenu = (componentId: string, current?: MenuId) => {
+export const useMenu = (_componentId: string, current?: MenuId) => {
   SecureLogger.logRequest('GET', `/view/${current || 'unknown'}`);
   useSelectedMenuItem(current);
+};
 
-  useEffect(() => {
-    Navigation.mergeOptions(componentId, {
-      sideMenu: {
-        left: {
-          enabled: true,
-        },
-      },
-    });
-    return () => {
-      Navigation.mergeOptions(componentId, {
-        sideMenu: {
-          left: {
-            enabled: false,
+let pendingSecondaryMenu = false;
+
+export const openSecondaryMenu = () => {
+  if (pendingSecondaryMenu) {
+    return;
+  }
+  pendingSecondaryMenu = true;
+  try {
+    void Promise.resolve(
+      Navigation.showModal({
+        component: {
+          name: 'Menu',
+          options: {
+            // A transparent native modal lets the component provide a compact
+            // bottom sheet and keeps outside-tap dismissal consistent on both
+            // platforms.
+            modalPresentationStyle:
+              'overFullScreen' as OptionsModalPresentationStyle,
+            modal: {
+              swipeToDismiss: true,
+            },
+            layout: {
+              backgroundColor: 'transparent',
+              componentBackgroundColor: 'transparent',
+            },
           },
         },
+      }),
+    )
+      .finally(() => {
+        pendingSecondaryMenu = false;
+      })
+      .catch(error => {
+        SecureLogger.logError(error as Error, 'navigation.show-secondary-menu');
       });
-    };
-  }, [componentId, current]);
+  } catch (error) {
+    pendingSecondaryMenu = false;
+    SecureLogger.logError(error as Error, 'navigation.show-secondary-menu');
+  }
 };
 
 export const menuButton: OptionsTopBarButton = {
@@ -50,16 +76,8 @@ export const menuButton: OptionsTopBarButton = {
   component: {
     name: 'TopBarButton',
     passProps: {
-      icon: 'menu',
-      onPress: () => {
-        Navigation.mergeOptions('Menu', {
-          sideMenu: {
-            left: {
-              visible: true,
-            },
-          },
-        });
-      },
+      icon: 'ellipsis',
+      onPress: openSecondaryMenu,
     },
   },
 };

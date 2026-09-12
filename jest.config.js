@@ -26,4 +26,7 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.test.{ts,tsx}',
   ],
+  moduleNameMapper: {
+    '^lucide-react-native$': '<rootDir>/__mocks__/lucide-react-native.tsx',
+  },
 };

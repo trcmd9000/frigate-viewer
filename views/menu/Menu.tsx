@@ -1,33 +1,53 @@
 import {IconOutline, OutlineGlyphMapType} from '@ant-design/icons-react-native';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useIntl} from 'react-intl';
 import {
-  Image,
-  ImageStyle,
+  BackHandler,
+  Pressable,
+  StyleSheet,
   Text,
-  TouchableNativeFeedback,
   View,
+  ViewStyle,
 } from 'react-native';
-import {Navigation} from 'react-native-navigation';
+import {
+  Navigation,
+  NavigationFunctionComponent,
+} from 'react-native-navigation';
 import {ScrollView} from 'react-native-gesture-handler';
+import {ICameraEventsProps} from '../camera-events/CameraEvents';
+import {useDesignTokens} from '../../helpers/designTokens';
+import {SecureLogger} from '../../helpers/secureLogger';
+import {
+  currentServerScopeGeneration,
+  dismissModalWhenServerScopeChanges,
+  isCurrentServerScope,
+  useServerScopeOwner,
+} from '../../helpers/serverScopeScreen';
 import {MenuId} from './menuHelpers';
 import {MessageKey, messages} from './messages';
-import {ICameraEventsProps} from '../camera-events/CameraEvents';
-import {useAppColorScheme, useTheme, useStyles} from '../../helpers/colors';
 
 interface IMenuProps {
-  current: string;
+  current?: MenuId;
 }
 
-interface IMenuItem<P = unknown> {
+export interface IMenuItem<P = unknown> {
   id: MenuId;
   icon: OutlineGlyphMapType;
   label?: string;
   view?: string;
   passProps?: P;
   modal?: boolean;
+  disabled?: boolean;
 }
 
+export interface MenuSection {
+  id: string;
+  label: MessageKey;
+  items: readonly IMenuItem[];
+}
+
+// These are retained for the Settings screen, which intentionally keeps
+// secondary links reachable without opening the overflow menu first.
 export const camerasListMenuItem: IMenuItem = {
   id: 'camerasList',
   icon: 'video-camera',
@@ -86,126 +106,310 @@ export const reportProblemMenuItem: IMenuItem = {
   view: 'Report',
 };
 
+/**
+ * The overflow is deliberately limited to destinations which are not already
+ * represented by the Cameras, Events, and Settings bottom tabs.
+ */
+export const secondaryMenuSections: readonly MenuSection[] = [
+  {
+    id: 'saved',
+    label: 'section.saved',
+    items: [retainedMenuItem],
+  },
+  {
+    id: 'diagnostics',
+    label: 'section.diagnostics',
+    items: [storageMenuItem, systemMenuItem, logsMenuItem],
+  },
+  {
+    id: 'support',
+    label: 'section.support',
+    items: [reportProblemMenuItem, authorMenuItem],
+  },
+];
+
+const pendingNavigations = new Set<string>();
+
 export const navigateToMenuItem =
-  ({view, modal, passProps}: IMenuItem) =>
-  () => {
-    if (view) {
-      if (modal) {
+  (
+    {view, modal, passProps}: IMenuItem,
+    ownerScopeGeneration = currentServerScopeGeneration(),
+  ) =>
+  (): Promise<void> => {
+    const scoped = view === 'CameraEvents' || view === 'CameraPreview' || view === 'CameraEventClip';
+    if (!view || (scoped && !isCurrentServerScope(ownerScopeGeneration))) {
+      return Promise.resolve();
+    }
+
+    const navigationKey = `${modal ? 'modal' : 'secondary'}:${view}`;
+    if (pendingNavigations.has(navigationKey)) {
+      return Promise.resolve();
+    }
+
+    pendingNavigations.add(navigationKey);
+    const clearPendingNavigation = () => {
+      pendingNavigations.delete(navigationKey);
+    };
+
+    try {
+      return Promise.resolve(
         Navigation.showModal({
           component: {
             name: view,
-            passProps,
+            passProps: scoped
+              ? {...(passProps as object), ownerScopeGeneration}
+              : passProps,
           },
+        }),
+      )
+        .then(componentId => {
+          if (view === 'CameraEvents') {
+            dismissModalWhenServerScopeChanges(componentId, ownerScopeGeneration);
+          }
+        })
+        .finally(clearPendingNavigation)
+        .catch(error => {
+          SecureLogger.logError(error as Error, 'navigation.show-secondary');
         });
-      } else {
-        Navigation.push('MainMenu', {
-          component: {
-            name: view,
-            passProps,
-            options: {
-              sideMenu: {
-                left: {
-                  visible: false,
-                },
-              },
-            },
-          },
-        });
-      }
+    } catch (error) {
+      clearPendingNavigation();
+      SecureLogger.logError(error as Error, 'navigation.show-secondary');
+      return Promise.resolve();
     }
   };
 
-export const Menu: FC<IMenuProps> = ({current}) => {
+export const Menu: NavigationFunctionComponent<IMenuProps> = ({
+  current,
+  componentId,
+}) => {
   const intl = useIntl();
+  const tokens = useDesignTokens();
+  const dismissalInFlight = useRef(false);
+  const {generation} = useServerScopeOwner();
 
-  const theme = useTheme();
-  const appColorScheme = useAppColorScheme();
+  const dismissMenu = useCallback((): Promise<void> => {
+    if (dismissalInFlight.current) {
+      return Promise.resolve();
+    }
 
-  const styles = useStyles(({theme: palette}) => ({
-    menuWrapper: {
-      backgroundColor: palette.background,
-      width: '100%',
-      height: '100%',
-    },
-    menuLogo: {
-      width: 150,
-      height: 80,
-      resizeMode: 'contain',
-      marginHorizontal: 10,
-    },
-    menuItem: {
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    menuItemCurrent: {
-      backgroundColor: palette.highlighted,
-    },
-    menuItemIcon: {
-      fontSize: 20,
-      marginRight: 20,
-    },
-    menuItemText: {
-      fontSize: 20,
-      color: palette.text,
-    },
-  }));
+    dismissalInFlight.current = true;
+    try {
+      return Promise.resolve(Navigation.dismissModal(componentId))
+        .then(() => undefined)
+        .finally(() => {
+          dismissalInFlight.current = false;
+        })
+        .catch(error => {
+          SecureLogger.logError(error as Error, 'navigation.dismiss-secondary-menu');
+        });
+    } catch (error) {
+      dismissalInFlight.current = false;
+      SecureLogger.logError(error as Error, 'navigation.dismiss-secondary-menu');
+      return Promise.resolve();
+    }
+  }, [componentId]);
 
-  const menuItems: IMenuItem[] = useMemo(
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        void dismissMenu();
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [dismissMenu]);
+
+  const sections = useMemo(
     () =>
-      [
-        camerasListMenuItem,
-        cameraEventsMenuItem,
-        retainedMenuItem,
-        storageMenuItem,
-        systemMenuItem,
-        logsMenuItem,
-        settingsMenuItem,
-        reportProblemMenuItem,
-        authorMenuItem,
-      ].map(item => ({
-        ...item,
-        label: intl.formatMessage(
-          messages[`item.${item.id}.label` as MessageKey],
-        ),
+      secondaryMenuSections.map(section => ({
+        ...section,
+        label: intl.formatMessage(messages[section.label]),
+        items: section.items.map(item => ({
+          ...item,
+          label: intl.formatMessage(
+            messages[`item.${item.id}.label` as MessageKey],
+          ),
+        })),
       })),
     [intl],
   );
 
   const navigate = useCallback(
-    (item: IMenuItem) => navigateToMenuItem(item),
-    [],
+    (item: IMenuItem) => () => {
+      if (item.disabled || dismissalInFlight.current) {
+        return;
+      }
+
+      const navigateToItem = navigateToMenuItem(item, generation);
+      void dismissMenu().then(() => {
+        if (isCurrentServerScope(generation)) {
+          return navigateToItem();
+        }
+        return undefined;
+      });
+    },
+    [dismissMenu, generation],
   );
 
-  const logo = useMemo(
-    () =>
-      appColorScheme === 'light'
-        ? require('./logo.png')
-        : require('./logo-dark.png'),
-    [appColorScheme],
+  const styles = useMemo(
+    () => ({
+      root: {
+        flex: 1,
+        justifyContent: 'flex-end',
+      } as ViewStyle,
+      scrim: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: tokens.colors.scrim,
+      } as ViewStyle,
+      sheet: {
+        maxHeight: '84%',
+        paddingTop: tokens.spacing.sm,
+        paddingBottom: tokens.spacing.lg,
+        backgroundColor: tokens.colors.surfaceElevated,
+        borderTopLeftRadius: tokens.geometry.cardRadius,
+        borderTopRightRadius: tokens.geometry.cardRadius,
+      } as ViewStyle,
+      handle: {
+        alignSelf: 'center',
+        width: 36,
+        height: 4,
+        marginBottom: tokens.spacing.sm,
+        borderRadius: tokens.geometry.pillRadius,
+        backgroundColor: tokens.colors.outline,
+      } as ViewStyle,
+      header: {
+        minHeight: tokens.geometry.minimumTouchTarget,
+        paddingHorizontal: tokens.spacing.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
+      } as ViewStyle,
+      title: {
+        flex: 1,
+        ...tokens.typography.sectionTitle,
+        color: tokens.colors.textPrimary,
+      } as ViewStyle,
+      close: {
+        minWidth: tokens.geometry.minimumTouchTarget,
+        minHeight: tokens.geometry.minimumTouchTarget,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: tokens.geometry.controlRadius,
+      } as ViewStyle,
+      sectionLabel: {
+        paddingHorizontal: tokens.spacing.lg,
+        paddingTop: tokens.spacing.md,
+        paddingBottom: tokens.spacing.xs,
+        ...tokens.typography.label,
+        color: tokens.colors.textSecondary,
+      } as ViewStyle,
+      row: {
+        minHeight: tokens.geometry.minimumTouchTarget,
+        paddingHorizontal: tokens.spacing.lg,
+        paddingVertical: tokens.spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: tokens.geometry.controlRadius,
+      } as ViewStyle,
+      selectedRow: {
+        backgroundColor: tokens.colors.accentContainer,
+      } as ViewStyle,
+      disabledRow: {
+        opacity: 0.5,
+      } as ViewStyle,
+      icon: {
+        marginRight: tokens.spacing.lg,
+      } as ViewStyle,
+      rowLabel: {
+        ...tokens.typography.body,
+        color: tokens.colors.textPrimary,
+      } as ViewStyle,
+    }),
+    [tokens],
   );
 
   return (
-    <ScrollView style={[styles.menuWrapper]}>
-      <Image source={logo} style={styles.menuLogo as ImageStyle} />
-      {menuItems.map(item => (
-        <TouchableNativeFeedback onPress={navigate(item)} key={item.id}>
-          <View
-            style={[
-              styles.menuItem,
-              item.id === current ? styles.menuItemCurrent : undefined,
-            ]}
+    <View
+      testID="secondary-menu"
+      style={styles.root}
+      accessibilityViewIsModal
+      importantForAccessibility="yes"
+    >
+      <Pressable
+        testID="secondary-menu-scrim"
+        style={styles.scrim}
+        onPress={() => {
+          void dismissMenu();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={intl.formatMessage(messages['close.label'])}
+        accessibilityHint={intl.formatMessage(messages['close.hint'])}
+      />
+      <View style={styles.sheet} accessibilityViewIsModal>
+        <View style={styles.handle} accessible={false} />
+        <View style={styles.header}>
+          <Text style={styles.title}>{intl.formatMessage(messages.title)}</Text>
+          <Pressable
+            onPress={() => {
+              void dismissMenu();
+            }}
+            style={styles.close}
+            accessibilityRole="button"
+            accessibilityLabel={intl.formatMessage(messages['close.label'])}
           >
             <IconOutline
-              name={item.icon}
-              color={theme.text}
-              style={[styles.menuItemIcon]}
+              name="close"
+              size={22}
+              color={tokens.colors.textPrimary}
+              accessible={false}
             />
-            <Text style={[styles.menuItemText]}>{item.label}</Text>
-          </View>
-        </TouchableNativeFeedback>
-      ))}
-    </ScrollView>
+          </Pressable>
+        </View>
+        <ScrollView
+          accessibilityLabel={intl.formatMessage(messages['items.label'])}
+          showsVerticalScrollIndicator={false}
+        >
+          {sections.map(section => (
+            <View key={section.id}>
+              <Text style={styles.sectionLabel}>{section.label}</Text>
+              {section.items.map(item => {
+                const selected = item.id === current;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={navigate(item)}
+                    disabled={item.disabled}
+                    style={[
+                      styles.row,
+                      selected && styles.selectedRow,
+                      item.disabled && styles.disabledRow,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.label}
+                    accessibilityState={{
+                      selected,
+                      disabled: item.disabled,
+                    }}
+                  >
+                    <IconOutline
+                      name={item.icon}
+                      size={22}
+                      color={
+                        item.disabled
+                          ? tokens.colors.textSecondary
+                          : tokens.colors.textPrimary
+                      }
+                      accessible={false}
+                      style={styles.icon}
+                    />
+                    <Text style={styles.rowLabel}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    </View>
   );
 };

@@ -1,18 +1,24 @@
-import {FC, useCallback, useMemo, useState} from 'react';
+import {FC, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActionSheet, Dialog} from 'react-native-ui-lib';
 import {useIntl} from 'react-intl';
-import RNBlobUtil from 'react-native-blob-util';
 import RNShare from 'react-native-share';
 import {ActivityIndicator, Text, ToastAndroid} from 'react-native';
 import {ICameraEvent} from './CameraEvent';
 import {messages} from './messages';
-import {authorizationHeader, buildServerApiUrl} from '../../helpers/rest';
+import {buildServerApiUrl} from '../../helpers/rest';
 import {selectServer} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
 import {clipFilename, snapshotFilename} from './eventHelpers';
-import {useStyles} from '../../helpers/colors';
+import {useStyles, useTheme} from '../../helpers/colors';
 import {handleError, getUserFriendlyMessage} from '../../helpers/errorHandler';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {
+  downloadMedia,
+  fileUri,
+  removeDownloadedMedia,
+  releaseDownloadedMedia,
+  retainDownloadedMedia,
+} from '../../helpers/mediaDownload';
 
 interface ShareProps {
   event?: ICameraEvent;
@@ -24,49 +30,83 @@ const stall = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 export const Share: FC<ShareProps> = ({event, onDismiss}) => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const mounted = useRef(true);
   const intl = useIntl();
   const server = useAppSelector(selectServer);
+  const theme = useTheme();
 
-  const styles = useStyles(() => ({
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
+
+  const styles = useStyles(({theme: palette}) => ({
     loadingText: {
       textAlign: 'center',
-      color: 'white',
+      color: palette.text,
     },
   }));
 
   const download = useCallback(
-    async (filename: string, url: string): Promise<string | undefined> => {
+    async (url: string): Promise<string | undefined> => {
       try {
         SecureLogger.logRequest('GET', '/events/media');
-        setLoading(true);
-        const dirs = RNBlobUtil.fs.dirs;
-        const filePath = `${dirs.CacheDir}/${filename}`;
-        const downloader = RNBlobUtil.config({
-          fileCache: true,
-          session: 'share',
-          path: filePath,
-        });
-        await downloader
-          .fetch('GET', url, authorizationHeader(server))
-          .progress((received: number | string, total: number | string) => {
-            const totalBytes = Number(total);
-            const receivedBytes = Number(received);
-            const nextProgress =
-              totalBytes > 0
-                ? Math.round((receivedBytes / totalBytes) * 100)
-                : 0;
-            setProgress(nextProgress);
-          });
-        setLoading(false);
+        if (mounted.current) {
+          setProgress(0);
+          setLoading(true);
+        }
+        const filePath = await downloadMedia(server, url);
+        if (!mounted.current) {
+          await removeDownloadedMedia(filePath);
+          return undefined;
+        }
+        if (mounted.current) {
+          setProgress(100);
+          setLoading(false);
+        }
         return filePath;
       } catch (err) {
         const appError = await handleError(err, 'Share.download');
-        setLoading(false);
-        ToastAndroid.show(getUserFriendlyMessage(appError), ToastAndroid.LONG);
+        if (mounted.current) {
+          setLoading(false);
+          ToastAndroid.show(
+            getUserFriendlyMessage(appError),
+            ToastAndroid.LONG,
+          );
+        }
         return undefined;
       }
     },
     [server],
+  );
+
+  const shareFile = useCallback(
+    async (path: string, filename: string, type: string) => {
+      try {
+        await stall(200);
+        if (!mounted.current) {
+          return;
+        }
+        await RNShare.open({
+          url: fileUri(path),
+          filename,
+          type,
+        });
+      } catch (error) {
+        const appError = await handleError(error, 'Share.open');
+        if (mounted.current) {
+          ToastAndroid.show(
+            getUserFriendlyMessage(appError),
+            ToastAndroid.LONG,
+          );
+        }
+      } finally {
+        await releaseDownloadedMedia(path, 'share');
+      }
+    },
+    [],
   );
 
   const shareSnapshot = useCallback(async () => {
@@ -77,19 +117,14 @@ export const Share: FC<ShareProps> = ({event, onDismiss}) => {
     const apiUrl = buildServerApiUrl(server);
     const filename = snapshotFilename(event);
     const path = await download(
-      filename,
       `${apiUrl}/events/${event.id}/snapshot.jpg?bbox=1`,
     );
     if (!path) {
       return;
     }
-    await stall(200);
-    RNShare.open({
-      url: `file://${path}`,
-    }).then(() => {
-      RNBlobUtil.session('share').dispose();
-    });
-  }, [download, event, server]);
+    retainDownloadedMedia(path, 'share');
+    await shareFile(path, filename, 'image/jpeg');
+  }, [download, event, server, shareFile]);
 
   const shareClip = useCallback(async () => {
     if (!event) {
@@ -98,20 +133,13 @@ export const Share: FC<ShareProps> = ({event, onDismiss}) => {
 
     const apiUrl = buildServerApiUrl(server);
     const filename = clipFilename(event);
-    const path = await download(
-      filename,
-      `${apiUrl}/events/${event.id}/clip.mp4`,
-    );
+    const path = await download(`${apiUrl}/events/${event.id}/clip.mp4`);
     if (!path) {
       return;
     }
-    await stall(200);
-    RNShare.open({
-      url: `file://${path}`,
-    }).then(() => {
-      RNBlobUtil.session('share').dispose();
-    });
-  }, [download, event, server]);
+    retainDownloadedMedia(path, 'share');
+    await shareFile(path, filename, 'video/mp4');
+  }, [download, event, server, shareFile]);
 
   const options = useMemo(
     () => [
@@ -147,8 +175,12 @@ export const Share: FC<ShareProps> = ({event, onDismiss}) => {
         options={options}
         onDismiss={close}
       />
-      <Dialog visible={loading} ignoreBackgroundPress>
-        <ActivityIndicator size="large" color="white" />
+      <Dialog
+        visible={loading}
+        ignoreBackgroundPress
+        containerStyle={{backgroundColor: theme.surface}}
+      >
+        <ActivityIndicator size="large" color={theme.link} />
         <Text style={styles.loadingText}>{progress}%</Text>
       </Dialog>
     </>

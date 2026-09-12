@@ -1,7 +1,6 @@
 import React, {FC, ComponentType, useCallback, useMemo, useState} from 'react';
-import {Image, TouchableWithoutFeedback, View, ViewStyle} from 'react-native';
+import {Image, Pressable, Text, View, ViewStyle} from 'react-native';
 import {useIntl} from 'react-intl';
-import {Colors} from 'react-native-ui-lib';
 import {useRest} from '../../helpers/rest';
 import {
   selectEventsSnapshotHeight,
@@ -13,8 +12,10 @@ import {EventLabels} from './EventLabels';
 import {EventTitle} from './EventTitle';
 import {messages} from './messages';
 import {EventSnapshot} from './EventSnapshot';
-import {useStyles} from '../../helpers/colors';
+import {useStyles, useTheme} from '../../helpers/colors';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {handleError} from '../../helpers/errorHandler';
+import {MediaSurface, SurfaceCard} from '../../components/primitives';
 
 interface DrawerItemProps {
   text: string;
@@ -59,19 +60,35 @@ interface ICameraEventProps extends ICameraEvent {
   onSnapshotDimensions: (width: number, height: number) => void;
   onEventPress: (event: ICameraEvent) => void;
   onShare: (event: ICameraEvent) => void;
+  mediaEnabled: boolean;
 }
 
 export const CameraEvent: FC<ICameraEventProps> = props => {
-  const styles = useStyles(({theme}) => ({
+  const theme = useTheme();
+  const styles = useStyles(({theme: palette}) => ({
     cameraEvent: {
-      paddingVertical: 1,
-      paddingHorizontal: 2,
-      backgroundColor: theme.background,
+      backgroundColor: palette.surface,
+      flex: 1,
+    },
+    metadata: {
+      padding: 12,
+      gap: 4,
+    },
+    cameraName: {
+      color: palette.text,
+      fontSize: 16,
+      fontWeight: '700',
     },
   }));
 
-  const {onDelete, onSnapshotDimensions, onEventPress, onShare, ...event} =
-    props;
+  const {
+    onDelete,
+    onSnapshotDimensions,
+    onEventPress,
+    onShare,
+    mediaEnabled,
+    ...event
+  } = props;
   const {
     id,
     has_snapshot,
@@ -107,14 +124,16 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     () => ({
       text: intl.formatMessage(messages['action.delete']),
       icon: require('./icons/delete.png'),
-      background: Colors.red30,
+      background: theme.error,
       onPress: () => {
-        del(server, `events/${id}`, {json: false}).then(() => {
-          onDelete([id]);
-        });
+        void del(server, `events/${id}`, {json: false})
+          .then(() => {
+            onDelete([id]);
+          })
+          .catch(error => handleError(error, 'CameraEvent.delete'));
       },
     }),
-    [del, id, intl, onDelete, server],
+    [del, id, intl, onDelete, server, theme],
   );
 
   const retainDrawerItem: DrawerItemProps = useMemo(
@@ -123,31 +142,35 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
         ? {
             text: intl.formatMessage(messages['action.unretain']),
             icon: require('./icons/star.png'),
-            background: Colors.red40,
+            background: theme.error,
             onPress: () => {
-              del(server, `events/${id}/retain`, {json: false}).then(() => {
-                setRetained(false);
-              });
+              void del(server, `events/${id}/retain`, {json: false})
+                .then(() => {
+                  setRetained(false);
+                })
+                .catch(error => handleError(error, 'CameraEvent.unretain'));
             },
           }
         : {
             text: intl.formatMessage(messages['action.retain']),
             icon: require('./icons/star.png'),
-            background: Colors.green30,
+            background: theme.success,
             onPress: () => {
-              post(server, `events/${id}/retain`, {json: false}).then(() => {
-                setRetained(true);
-              });
+              void post(server, `events/${id}/retain`, {json: false})
+                .then(() => {
+                  setRetained(true);
+                })
+                .catch(error => handleError(error, 'CameraEvent.retain'));
             },
           },
-    [del, id, intl, post, retained, server],
+    [del, id, intl, post, retained, server, theme],
   );
 
   const shareDrawerItem: DrawerItemProps = useMemo(
     () => ({
       text: intl.formatMessage(messages['action.share']),
       icon: require('./icons/share.png'),
-      background: Colors.blue10,
+      background: theme.info,
       onPress: () => {
         onShare(event);
       },
@@ -161,38 +184,51 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
       rightItems={[shareDrawerItem, retainDrawerItem]}
       style={{
         width: `${100 / numColumns}%`,
-        height: snapshotHeight,
+        padding: 6,
       }}
     >
-      <TouchableWithoutFeedback onPress={() => onEventPress(event)}>
-        <View
-          style={[
-            styles.cameraEvent,
-            {
+      <SurfaceCard style={{padding: 0, overflow: 'hidden'}}>
+      <Pressable
+        onPress={() => onEventPress(event)}
+        accessibilityRole="button"
+        accessibilityLabel={`${event.camera}, ${label} event`}
+        accessibilityHint={intl.formatMessage(messages['action.open'])}
+      >
+        <View style={styles.cameraEvent}>
+          <MediaSurface
+            style={{
+              aspectRatio: undefined,
               height: snapshotHeight,
-            },
-          ]}
-        >
+            }}
+            accessible
+            accessibilityLabel={`${event.camera} ${label} event thumbnail`}
+          >
           <EventSnapshot
             id={id}
             hasSnapshot={has_snapshot}
+            enabled={mediaEnabled}
             onSnapshotLoad={onSnapshotLoad}
           />
-          <EventTitle
-            startTime={start_time}
-            endTime={end_time}
-            retained={retained}
-            numColumns={numColumns}
-          />
-          <EventLabels
-            endTime={end_time}
-            label={label}
-            zones={zones}
-            topScore={data.top_score}
-            numColumns={numColumns}
-          />
+          </MediaSurface>
+          <View style={styles.metadata}>
+            <Text style={styles.cameraName}>{event.camera}</Text>
+            <EventLabels
+              endTime={end_time}
+              label={label}
+              zones={zones}
+              topScore={data.top_score}
+              numColumns={numColumns}
+            />
+            <EventTitle
+              startTime={start_time}
+              endTime={end_time}
+              retained={retained}
+              numColumns={numColumns}
+            />
+          </View>
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
+      </SurfaceCard>
     </Drawer>
   );
 };

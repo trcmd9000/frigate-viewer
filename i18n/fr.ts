@@ -3,17 +3,7 @@ export default {
     "Erreur d'autorisation, vérifiez vos identifiants.",
   'api.error.unauthorized':
     "Identifiants incorrects lors de la tentative d'atteindre {url}.",
-  'author.topBar.title': 'Auteur',
-  'author.info.authorLabel': 'Auteur',
-  'author.info.contactLabel': 'Contact',
-  'author.info.opensourceLabel': 'Ce projet est open source.',
-  'author.info.githubLabel': 'Voir sur github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Le projet a été créé à des fins d’apprentissage et je n’ai pas l’intention de profiter de l’octroi de licences.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Vous aimez cette application',
-  'author.buyMeCoffee.sayThankYouLabel': 'et voulez dire "merci"?',
-  'author.buyMeCoffee.buttonText': 'Achète-moi un café',
-  'author.usedLibs.header': 'Liste des bibliothèques utilisées:',
+  'author.topBar.title': 'À propos',
   'author.error.cantOpenLink':
     'Impossible de trouver une application pour ouvrir ce lien.',
   'camerasList.topBar.title': 'Liste des caméras',
@@ -44,7 +34,7 @@ export default {
   'menu.item.system.label': 'Système',
   'menu.item.logs.label': 'Journaux',
   'menu.item.settings.label': 'Paramètres',
-  'menu.item.author.label': 'Auteur',
+  'menu.item.author.label': 'À propos',
   'menu.item.report.label': 'Signaler un problème',
   'report.topBar.title': 'Signaler un problème',
   'report.introduction.info':
@@ -75,7 +65,6 @@ export default {
   'settings.server.auth.option.none': 'Aucune',
   'settings.server.username.label': 'Nom d’utilisateur',
   'settings.server.password.label': 'Mot de passe',
-  'settings.server.useDemoServerButton': 'Utilisez le serveur démo',
   'settings.locale.header': 'Régionaux',
   'settings.locale.region.label': 'Région',
   'settings.locale.region.option.en_AU': 'Australie (anglais)',
@@ -119,7 +108,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Affichage des dates',
   'settings.locale.datesDisplay.option.descriptive': 'Descriptif',
   'settings.locale.datesDisplay.option.numeric': 'Numérique',
-  'settings.app.header': 'Application',
   'settings.app.colorScheme.label': 'Schéma de couleurs',
   'settings.app.colorScheme.option.auto': 'Auto',
   'settings.app.colorScheme.option.light': 'Clair',
@@ -128,13 +116,7 @@ export default {
   'settings.cameras.header': 'Caméras',
   'settings.cameras.imageRefreshFrequency.label':
     'Fréquence d’actualisation des images (secondes)',
-  'settings.cameras.liveView.label': 'Vue en direct',
-  'settings.cameras.liveView.disclaimer':
-    'Gardez à l’esprit que la fréquence de rafraîchissement dépend de la latence de votre réseau',
   'settings.cameras.numberOfColumns.label': 'Nombre de colonnes',
-  'settings.cameras.actionWhenPressed.label': 'Action lorsque pressé',
-  'settings.cameras.actionWhenPressed.option.events': 'Liste des événements',
-  'settings.cameras.actionWhenPressed.option.preview': 'Aperçu de la caméra',
   'settings.events.header': 'Événements',
   'settings.events.numberOfColumns.label': 'Nombre de colonnes',
   'settings.events.photoPreference.label': 'Préférences de photo',

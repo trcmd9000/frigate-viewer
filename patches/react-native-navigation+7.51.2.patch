@@ -102,3 +102,59 @@ index ea8516f..551f72b 100644
          mJSTouchDispatcher.handleTouchEvent(event, getEventDispatcher())
          super.onTouchEvent(event)
          return true
+diff --git a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/SystemUiUtils.kt b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/SystemUiUtils.kt
+index 0000000..0000000 100644
+--- a/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/SystemUiUtils.kt
++++ b/node_modules/react-native-navigation/lib/android/app/src/main/java/com/reactnativenavigation/utils/SystemUiUtils.kt
+@@ -2,14 +2,13 @@ package com.reactnativenavigation.utils
+
+ import android.app.Activity
+ import android.graphics.Color
+-import android.graphics.Rect
+ import android.view.View
+ import android.view.Window
+ import androidx.annotation.ColorInt
++import androidx.core.view.ViewCompat
+ import androidx.core.view.WindowCompat
+ import androidx.core.view.WindowInsetsCompat
+ import androidx.core.view.WindowInsetsControllerCompat
+-import kotlin.math.abs
+ import kotlin.math.ceil
+
+ object SystemUiUtils {
+@@ -21,19 +20,26 @@ object SystemUiUtils {
+
+     @JvmStatic
+     fun getStatusBarHeight(activity: Activity?): Int {
++        activity?.let { currentActivity ->
++            ViewCompat.getRootWindowInsets(currentActivity.window.decorView)?.let { insets ->
++                val statusBarInset = maxOf(
++                    insets.getInsets(WindowInsetsCompat.Type.statusBars()).top,
++                    insets.getInsets(WindowInsetsCompat.Type.displayCutout()).top
++                )
++                if (statusBarInset > 0) {
++                    statusBarHeight = statusBarInset
++                    return statusBarInset
++                }
++            }
++        }
++
+         val res = if (statusBarHeight > 0) {
+             statusBarHeight
+         } else {
+             statusBarHeight = activity?.let {
+-                val rectangle = Rect()
+-                val window: Window = activity.window
+-                window.decorView.getWindowVisibleDisplayFrame(rectangle)
+-                val statusBarHeight: Int = rectangle.top
+-                val contentView = window.findViewById<View>(Window.ID_ANDROID_CONTENT)
+-                contentView?.let {
+-                    val contentViewTop = contentView.top
+-                    abs(contentViewTop - statusBarHeight)
+-                }
++                val resourceId = it.resources.getIdentifier("status_bar_height", "dimen", "android")
++                if (resourceId != 0) it.resources.getDimensionPixelSize(resourceId)
++                else UiUtils.dpToPx(it, STATUS_BAR_HEIGHT_M.toFloat()).toInt()
+             } ?: STATUS_BAR_HEIGHT_M
+             statusBarHeight
+         }

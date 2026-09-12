@@ -2,9 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [18.0.1] - 2026-09-12
 
-No unreleased changes.
+- Fixed an Android release startup crash where R8 removed React Native inspector
+  JNI classes required by the native runtime.
+
+## [18.0.0] - 2026-09-12
+
+- Added per-camera, per-server-profile live stream selection with an `Auto`
+  default that prefers a verified H.265 MSE stream and otherwise selects a
+  compatible H.264, VP8, or VP9 WebRTC stream.
+- Added a guarded native H.265 MSE path for Android. Decoder capability,
+  stream metadata, the protected fMP4 contract, and the first decoded frame
+  must all succeed; a failure falls back to a compatible stream or snapshots.
+- Consolidated camera title, transport status, and audio controls into one
+  bounded live-preview overlay and removed the duplicate native `LIVE` badge.
+- Added a compact, theme-aware stream selector behind a player gear control and
+  replaced the ambiguous audio glyph with conventional speaker icons.
+- Hid Android system bars for live and event playback modals while preserving
+  Android predictive-back behavior.
+- Reduced repeated live-start preparation by reusing validated stream metadata
+  briefly within the active server profile.
+- Switched event clip playback to protected Frigate VOD HLS through the
+  Media3/react-native-video transport extension.
+- Added Android Frigate/go2rtc WebRTC live preview with native protected
+  WebSocket signaling, muted startup, bounded reconnects, and authenticated
+  snapshot fallback.
+- Raised the minimum Android version to API 24 for the current WebRTC runtime.
 
 ## [14.3.1] - 2026-08-26
 
@@ -31,7 +55,9 @@ No unreleased changes.
 ### Security
 
 - Removed the global TLS and hostname-verification bypass.
-- Kept normal server certificate validation strict by default.
+- Kept native mTLS server certificate validation strict by default.
+- Documented the unresolved Android cleartext compatibility exception; HTTP
+  remains available only when explicitly configured by the user.
 - Removed silent fallback to unauthenticated HTTP after an mTLS failure.
 - Removed Firebase and Crashlytics dependencies and automatic telemetry.
 - Sanitized development logging and retained production error visibility.

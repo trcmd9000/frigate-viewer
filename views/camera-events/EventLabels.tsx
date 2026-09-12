@@ -1,40 +1,8 @@
 import React, {FC, useMemo} from 'react';
 import {useIntl} from 'react-intl';
-import {StyleProp, StyleSheet, Text, View, ViewStyle} from 'react-native';
+import {StyleProp, Text, View, ViewStyle} from 'react-native';
 import {messages} from './messages';
-
-const stylesFn = (numColumns: number) =>
-  StyleSheet.create({
-    wrapper: {
-      position: 'absolute',
-      left: 2,
-      bottom: 1,
-      width: '100%',
-      padding: 2,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    label: {
-      paddingVertical: 1,
-      paddingHorizontal: 2,
-      margin: 1,
-      color: 'white',
-      backgroundColor: 'blue',
-      fontSize: 10 / (numColumns / 1.5),
-      fontWeight: '600',
-      opacity: 0.7,
-    },
-    zone: {
-      backgroundColor: 'black',
-    },
-    score: {
-      backgroundColor: 'gray',
-    },
-    inProgress: {
-      color: 'black',
-      backgroundColor: 'gold',
-    },
-  });
+import {useDesignTokens} from '../../helpers/designTokens';
 
 interface IEventLabelsProps {
   endTime: number;
@@ -51,7 +19,6 @@ export const EventLabels: FC<IEventLabelsProps> = ({
   zones,
   topScore,
   style,
-  numColumns,
 }) => {
   const score = useMemo(() => {
     return `${Math.round(topScore * 100)}%`;
@@ -59,19 +26,70 @@ export const EventLabels: FC<IEventLabelsProps> = ({
   const isInProgress = useMemo(() => !endTime, [endTime]);
   const intl = useIntl();
 
-  const styles = useMemo(() => stylesFn(numColumns || 1), [numColumns]);
+  const tokens = useDesignTokens();
 
   return (
-    <View style={[styles.wrapper, style]}>
-      <Text style={[styles.label]}>{label}</Text>
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: tokens.spacing.sm,
+        },
+        style,
+      ]}
+    >
+      <Text
+        style={{
+          ...tokens.typography.label,
+          color: tokens.colors.textOnAccent,
+          backgroundColor: tokens.colors.accent,
+          paddingHorizontal: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.xs,
+          borderRadius: tokens.geometry.controlRadius,
+        }}
+      >
+        {label}
+      </Text>
       {zones.map(zone => (
-        <Text style={[styles.label, styles.zone]} key={zone}>
+        <Text
+          style={{
+            ...tokens.typography.label,
+            color: tokens.colors.textOnMedia,
+            backgroundColor: tokens.colors.mediaBackground,
+            paddingHorizontal: tokens.spacing.sm,
+            paddingVertical: tokens.spacing.xs,
+            borderRadius: tokens.geometry.controlRadius,
+          }}
+          key={zone}
+        >
           {zone}
         </Text>
       ))}
-      <Text style={[styles.label, styles.score]}>{score}</Text>
+      <Text
+        style={{
+          ...tokens.typography.label,
+          color: tokens.colors.textSecondary,
+          backgroundColor: tokens.colors.surfaceElevated,
+          paddingHorizontal: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.xs,
+          borderRadius: tokens.geometry.controlRadius,
+        }}
+      >
+        {score}
+      </Text>
       {isInProgress && (
-        <Text style={[styles.label, styles.inProgress]}>
+        <Text
+          style={{
+            ...tokens.typography.label,
+            color: tokens.colors.textOnWarning,
+            backgroundColor: tokens.colors.warningContainer,
+            paddingHorizontal: tokens.spacing.sm,
+            paddingVertical: tokens.spacing.xs,
+            borderRadius: tokens.geometry.controlRadius,
+          }}
+        >
           {intl.formatMessage(messages['labels.inProgressLabel'])}
         </Text>
       )}

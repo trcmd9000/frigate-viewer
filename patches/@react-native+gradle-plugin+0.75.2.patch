@@ -1,0 +1,209 @@
+diff --git a/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml b/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml
+index 026a927..ace65a8 100644
+--- a/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml
++++ b/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml
+@@ -4,7 +4,7 @@ gson = "2.8.9"
+ guava = "31.0.1-jre"
+ javapoet = "1.13.0"
+ junit = "4.13.2"
+-kotlin = "1.9.24"
++kotlin = "2.3.20"
+ assertj = "3.25.1"
+ 
+ [libraries]
+diff --git a/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts b/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts
+index 8528900..72410be 100644
+--- a/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts
++++ b/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts
+@@ -5,9 +5,9 @@
+  * LICENSE file in the root directory of this source tree.
+  */
+ 
+-import org.gradle.api.internal.classpath.ModuleRegistry
+ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+-import org.gradle.configurationcache.extensions.serviceOf
++import org.jetbrains.kotlin.gradle.dsl.JvmTarget
++import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ 
+ plugins {
+@@ -52,14 +52,6 @@ dependencies {
+   testImplementation(libs.junit)
+   testImplementation(libs.assertj)
+   testImplementation(project(":shared-testutil"))
+-
+-  testRuntimeOnly(
+-      files(
+-          serviceOf<ModuleRegistry>()
+-              .getModule("gradle-tooling-api-builders")
+-              .classpath
+-              .asFiles
+-              .first()))
+ }
+ 
+ // We intentionally don't build for Java 17 as users will see a cryptic bytecode version
+@@ -70,11 +62,12 @@ java { targetCompatibility = JavaVersion.VERSION_11 }
+ kotlin { jvmToolchain(17) }
+ 
+ tasks.withType<KotlinCompile>().configureEach {
+-  kotlinOptions {
+-    apiVersion = "1.6"
++  compilerOptions {
++    apiVersion.set(KotlinVersion.KOTLIN_2_1)
+     // See comment above on JDK 11 support
+-    jvmTarget = "11"
+-    allWarningsAsErrors = true
++    jvmTarget.set(JvmTarget.JVM_11)
++    allWarningsAsErrors.set(
++      project.properties["enableWarningsAsErrors"]?.toString()?.toBoolean() ?: false)
+   }
+ }
+ 
+diff --git a/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/tasks/BundleHermesCTask.kt b/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/tasks/BundleHermesCTask.kt
+index 78e5a9b..e0a5f8e 100644
+--- a/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/tasks/BundleHermesCTask.kt
++++ b/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/tasks/BundleHermesCTask.kt
+@@ -12,6 +12,7 @@ import com.facebook.react.utils.detectOSAwareHermesCommand
+ import com.facebook.react.utils.moveTo
+ import com.facebook.react.utils.windowsAwareCommandLine
+ import java.io.File
++import javax.inject.Inject
+ import org.gradle.api.DefaultTask
+ import org.gradle.api.file.ConfigurableFileTree
+ import org.gradle.api.file.DirectoryProperty
+@@ -19,6 +20,7 @@ import org.gradle.api.file.RegularFileProperty
+ import org.gradle.api.provider.ListProperty
+ import org.gradle.api.provider.Property
+ import org.gradle.api.tasks.*
++import org.gradle.process.ExecOperations
+ 
+ abstract class BundleHermesCTask : DefaultTask() {
+ 
+@@ -26,6 +28,8 @@ abstract class BundleHermesCTask : DefaultTask() {
+     group = "react"
+   }
+ 
++  @get:Inject abstract val execOperations: ExecOperations
++
+   @get:Internal abstract val root: DirectoryProperty
+ 
+   @get:InputFiles
+@@ -127,9 +131,9 @@ abstract class BundleHermesCTask : DefaultTask() {
+       File(jsIntermediateSourceMapsDir.get().asFile, "$bundleAssetName.compiler.map")
+ 
+   private fun runCommand(command: List<Any>) {
+-    project.exec {
+-      it.workingDir(root.get().asFile)
+-      it.commandLine(command)
++    execOperations.exec { exec ->
++      exec.workingDir(root.get().asFile)
++      exec.commandLine(command)
+     }
+   }
+ 
+diff --git a/node_modules/@react-native/gradle-plugin/settings-plugin/build.gradle.kts b/node_modules/@react-native/gradle-plugin/settings-plugin/build.gradle.kts
+index 92a44ac..e8a6da4 100644
+--- a/node_modules/@react-native/gradle-plugin/settings-plugin/build.gradle.kts
++++ b/node_modules/@react-native/gradle-plugin/settings-plugin/build.gradle.kts
+@@ -5,9 +5,9 @@
+  * LICENSE file in the root directory of this source tree.
+  */
+ 
+-import org.gradle.api.internal.classpath.ModuleRegistry
+ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+-import org.gradle.configurationcache.extensions.serviceOf
++import org.jetbrains.kotlin.gradle.dsl.JvmTarget
++import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ 
+ plugins {
+@@ -41,14 +41,6 @@ dependencies {
+ 
+   testImplementation(libs.junit)
+   testImplementation(project(":shared-testutil"))
+-
+-  testRuntimeOnly(
+-      files(
+-          serviceOf<ModuleRegistry>()
+-              .getModule("gradle-tooling-api-builders")
+-              .classpath
+-              .asFiles
+-              .first()))
+ }
+ 
+ // We intentionally don't build for Java 17 as users will see a cryptic bytecode version
+@@ -59,11 +51,12 @@ java { targetCompatibility = JavaVersion.VERSION_11 }
+ kotlin { jvmToolchain(17) }
+ 
+ tasks.withType<KotlinCompile>().configureEach {
+-  kotlinOptions {
+-    apiVersion = "1.6"
++  compilerOptions {
++    apiVersion.set(KotlinVersion.KOTLIN_2_1)
+     // See comment above on JDK 11 support
+-    jvmTarget = "11"
+-    allWarningsAsErrors = true
++    jvmTarget.set(JvmTarget.JVM_11)
++    allWarningsAsErrors.set(
++      project.properties["enableWarningsAsErrors"]?.toString()?.toBoolean() ?: false)
+   }
+ }
+ 
+diff --git a/node_modules/@react-native/gradle-plugin/shared-testutil/build.gradle.kts b/node_modules/@react-native/gradle-plugin/shared-testutil/build.gradle.kts
+index 5f447e8..49ce7e5 100644
+--- a/node_modules/@react-native/gradle-plugin/shared-testutil/build.gradle.kts
++++ b/node_modules/@react-native/gradle-plugin/shared-testutil/build.gradle.kts
+@@ -6,6 +6,8 @@
+  */
+ 
+ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
++import org.jetbrains.kotlin.gradle.dsl.JvmTarget
++import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ 
+ plugins { alias(libs.plugins.kotlin.jvm) }
+@@ -21,10 +23,11 @@ java { targetCompatibility = JavaVersion.VERSION_11 }
+ kotlin { jvmToolchain(17) }
+ 
+ tasks.withType<KotlinCompile>().configureEach {
+-  kotlinOptions {
+-    apiVersion = "1.6"
+-    jvmTarget = "11"
+-    allWarningsAsErrors = true
++  compilerOptions {
++    apiVersion.set(KotlinVersion.KOTLIN_2_1)
++    jvmTarget.set(JvmTarget.JVM_11)
++    allWarningsAsErrors.set(
++      project.properties["enableWarningsAsErrors"]?.toString()?.toBoolean() ?: false)
+   }
+ }
+ 
+diff --git a/node_modules/@react-native/gradle-plugin/shared/build.gradle.kts b/node_modules/@react-native/gradle-plugin/shared/build.gradle.kts
+index fa76599..5af4aad 100644
+--- a/node_modules/@react-native/gradle-plugin/shared/build.gradle.kts
++++ b/node_modules/@react-native/gradle-plugin/shared/build.gradle.kts
+@@ -6,6 +6,8 @@
+  */
+ 
+ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
++import org.jetbrains.kotlin.gradle.dsl.JvmTarget
++import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ 
+ plugins { alias(libs.plugins.kotlin.jvm) }
+@@ -26,10 +28,11 @@ java { targetCompatibility = JavaVersion.VERSION_11 }
+ kotlin { jvmToolchain(17) }
+ 
+ tasks.withType<KotlinCompile>().configureEach {
+-  kotlinOptions {
+-    apiVersion = "1.6"
+-    jvmTarget = "11"
+-    allWarningsAsErrors = true
++  compilerOptions {
++    apiVersion.set(KotlinVersion.KOTLIN_2_1)
++    jvmTarget.set(JvmTarget.JVM_11)
++    allWarningsAsErrors.set(
++      project.properties["enableWarningsAsErrors"]?.toString()?.toBoolean() ?: false)
+   }
+ }
+ 

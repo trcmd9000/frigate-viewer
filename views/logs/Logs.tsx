@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {Text, View} from 'react-native';
@@ -18,6 +19,8 @@ import {Log, LogPreview} from './LogPreview';
 import {refreshButton} from '../../helpers/buttonts';
 import {useTheme, useStyles} from '../../helpers/colors';
 import {useRest} from '../../helpers/rest';
+import {RetryState} from '../../components/RetryState';
+import {handleError, getUserFriendlyMessage} from '../../helpers/errorHandler';
 
 interface TabControllerItemProps {
   label: string;
@@ -52,18 +55,38 @@ export const Logs: NavigationFunctionComponent = ({componentId}) => {
   useMenu(componentId, 'logs');
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>();
   const server = useAppSelector(selectServer);
   const intl = useIntl();
   const {get} = useRest();
+  const getRef = useRef(get);
+  const mounted = useRef(true);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    getRef.current = get;
+  }, [get]);
+
+  useEffect(() => () => {
+    mounted.current = false;
+    requestId.current += 1;
+  }, []);
 
   const refresh = useCallback(() => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setError(false);
+    setErrorMessage(undefined);
     const logsTypes = ['frigate', 'go2rtc', 'nginx'];
     Promise.allSettled(
       logsTypes.map(logType =>
-        get<string>(server, `logs/${logType}`, {json: false}),
+        getRef.current<string>(server, `logs/${logType}`, {json: false}),
       ),
-    ).then(logsData => {
+    ).then(async logsData => {
+      if (!mounted.current || currentRequest !== requestId.current) {
+        return;
+      }
       const updatedLogs: Log[] = logsTypes
         .map((logType, index) => ({logType, result: logsData[index]}))
         .filter(log => log.result.status === 'fulfilled')
@@ -73,10 +96,27 @@ export const Logs: NavigationFunctionComponent = ({componentId}) => {
             .split('\n')
             .reverse(),
         }));
-      setLogs(updatedLogs);
-      setLoading(false);
+      if (updatedLogs.length === 0) {
+        const rejected = logsData.find(
+          result => result.status === 'rejected',
+        ) as PromiseRejectedResult | undefined;
+        if (rejected) {
+          const appError = await handleError(rejected.reason, 'Logs.refresh');
+          if (mounted.current && currentRequest === requestId.current) {
+            setErrorMessage(getUserFriendlyMessage(appError));
+            setError(true);
+          }
+        } else {
+          setError(true);
+        }
+      } else {
+        setLogs(updatedLogs);
+      }
+      if (mounted.current && currentRequest === requestId.current) {
+        setLoading(false);
+      }
     });
-  }, [get, server]);
+  }, [server]);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
@@ -109,11 +149,18 @@ export const Logs: NavigationFunctionComponent = ({componentId}) => {
     [logs, theme],
   );
 
-  return loading ? (
+  return loading && logs.length === 0 && !error ? (
     <LoaderScreen
       backgroundColor={theme.background}
       loaderColor={theme.text}
       overlay
+    />
+  ) : error && logs.length === 0 ? (
+    <RetryState
+      message={errorMessage || intl.formatMessage(messages.error)}
+      retryLabel={intl.formatMessage(messages.retry)}
+      testID="logs-retry"
+      onRetry={refresh}
     />
   ) : logs.length > 1 ? (
     <TabController items={tabBarItems}>

@@ -37,6 +37,21 @@ class SecureLoggerService {
   }
 
   /**
+   * Logs an already-aggregated diagnostic without depending on development mode.
+   * Callers must pass counts/booleans rather than media or network identifiers.
+   */
+  logInfo(message: string, context?: string): void {
+    const sanitizedMessage = this.removeUrlsAndIps(String(message)).slice(0, 512);
+    const sanitizedContext = context
+      ? this.sanitizeContext(context)
+      : undefined;
+    const output = sanitizedContext
+      ? `[SecureLogger] ${sanitizedContext}: ${sanitizedMessage}`
+      : `[SecureLogger] ${sanitizedMessage}`;
+    console.log(output);
+  }
+
+  /**
    * Logs authentication actions without exposing credentials
    * @param action - Auth action like 'login', 'logout', 'token-refresh'
    */

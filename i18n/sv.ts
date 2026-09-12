@@ -2,17 +2,7 @@ export default {
   'api.frigateAuth.wrongCredentials':
     'Auktoriseringsfel, kontrollera dina uppgifter.',
   'api.error.unauthorized': 'Felaktiga uppgifter vid försök att nå {url}.',
-  'author.topBar.title': 'Författare',
-  'author.info.authorLabel': 'Författare',
-  'author.info.contactLabel': 'Kontakt',
-  'author.info.opensourceLabel': 'Projektet är öppen källkod.',
-  'author.info.githubLabel': 'Se på github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Projektet skapades för inlärningsändamål och jag har inte för avsikt att dra nytta av att bevilja licenser.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Gillar du den här applikationen',
-  'author.buyMeCoffee.sayThankYouLabel': 'och vill säga ”tack”?',
-  'author.buyMeCoffee.buttonText': 'Köp mig en kaffe',
-  'author.usedLibs.header': 'Lista över använda bibliotek:',
+  'author.topBar.title': 'Om appen',
   'author.error.cantOpenLink':
     'Det går inte att hitta någon app för att öppna den här länken.',
   'camerasList.topBar.title': 'Lista över kameror',
@@ -43,7 +33,7 @@ export default {
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Loggar',
   'menu.item.settings.label': 'Inställningar',
-  'menu.item.author.label': 'Författare',
+  'menu.item.author.label': 'Om appen',
   'menu.item.report.label': 'Rapportera problem',
   'report.topBar.title': 'Rapportera problem',
   'report.introduction.info':
@@ -74,7 +64,6 @@ export default {
   'settings.server.auth.option.none': 'Ingen',
   'settings.server.username.label': 'Användarnamn',
   'settings.server.password.label': 'Lösenord',
-  'settings.server.useDemoServerButton': 'Använd demoserver',
   'settings.locale.header': 'Språkinställning',
   'settings.locale.region.label': 'Region',
   'settings.locale.region.option.en_AU': 'Australien (engelska)',
@@ -118,7 +107,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Datum visas',
   'settings.locale.datesDisplay.option.descriptive': 'Beskrivande',
   'settings.locale.datesDisplay.option.numeric': 'Numeriskt',
-  'settings.app.header': 'Ansökan',
   'settings.app.colorScheme.label': 'Färgschema',
   'settings.app.colorScheme.option.auto': 'Bil',
   'settings.app.colorScheme.option.light': 'Ljus',
@@ -127,14 +115,7 @@ export default {
   'settings.cameras.header': 'Kameror',
   'settings.cameras.imageRefreshFrequency.label':
     'Uppdateringsfrekvens för bilder (sekunder)',
-  'settings.cameras.liveView.label': 'Livevisning',
-  'settings.cameras.liveView.disclaimer':
-    'Tänk på att uppdateringsfrekvensen beror på nätverkets latens',
   'settings.cameras.numberOfColumns.label': 'Antal kolumner',
-  'settings.cameras.actionWhenPressed.label': 'Åtgärd när du trycker',
-  'settings.cameras.actionWhenPressed.option.events': 'Lista över händelser',
-  'settings.cameras.actionWhenPressed.option.preview':
-    'Förhandsvisning av kamera',
   'settings.events.header': 'Händelser',
   'settings.events.numberOfColumns.label': 'Antal kolumner',
   'settings.events.photoPreference.label': 'Fotoinställning',

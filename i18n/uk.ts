@@ -3,17 +3,7 @@ export default {
     'Помилка авторизації, перевірте свої облікові дані.',
   'api.error.unauthorized':
     'Неправильні облікові дані при спробі доступу до {url}.',
-  'author.topBar.title': 'Автор',
-  'author.info.authorLabel': 'Автор',
-  'author.info.contactLabel': 'Контакти',
-  'author.info.opensourceLabel': 'Цей проект є відкритим вихідним кодом.',
-  'author.info.githubLabel': 'Дивись на github',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Проект був створений для навчальних цілей, і я не маю наміру отримувати прибуток від надання ліцензій.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Вам подобається цей додаток',
-  'author.buyMeCoffee.sayThankYouLabel': 'і хочете сказати «спасибі»?',
-  'author.buyMeCoffee.buttonText': 'Купи мені каву',
-  'author.usedLibs.header': 'Список використаних бібліотек:',
+  'author.topBar.title': 'Про застосунок',
   'author.error.cantOpenLink':
     'Не можете знайти додаток, щоб відкрити це посилання.',
   'camerasList.topBar.title': 'Список камер',
@@ -44,7 +34,7 @@ export default {
   'menu.item.system.label': 'Система',
   'menu.item.logs.label': 'Журнали',
   'menu.item.settings.label': 'Налаштування',
-  'menu.item.author.label': 'Автор',
+  'menu.item.author.label': 'Про застосунок',
   'menu.item.report.label': 'Повідомити про проблему',
   'report.topBar.title': 'Повідомити про проблему',
   'report.introduction.info':
@@ -75,7 +65,6 @@ export default {
   'settings.server.auth.option.none': 'Немає',
   'settings.server.username.label': "Ім'я користувача",
   'settings.server.password.label': 'Пароль',
-  'settings.server.useDemoServerButton': 'Використовувати демо-сервер',
   'settings.locale.header': 'Локаль',
   'settings.locale.region.label': 'Регіон',
   'settings.locale.region.option.en_AU': 'Австралія (англійська)',
@@ -119,7 +108,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Відображення дат',
   'settings.locale.datesDisplay.option.descriptive': 'Описовий',
   'settings.locale.datesDisplay.option.numeric': 'Числівник',
-  'settings.app.header': 'застосування',
   'settings.app.colorScheme.label': 'Колірна гамма',
   'settings.app.colorScheme.option.auto': 'Авто',
   'settings.app.colorScheme.option.light': 'світло',
@@ -128,14 +116,7 @@ export default {
   'settings.cameras.header': 'Камери',
   'settings.cameras.imageRefreshFrequency.label':
     'Частота оновлення зображення (секунди)',
-  'settings.cameras.liveView.label': 'Живий перегляд',
-  'settings.cameras.liveView.disclaimer':
-    'Майте на увазі, що частота оновлення залежить від затримки мережі',
   'settings.cameras.numberOfColumns.label': 'Кількість стовпців',
-  'settings.cameras.actionWhenPressed.label': 'Дія при натисканні',
-  'settings.cameras.actionWhenPressed.option.events': 'Список подій',
-  'settings.cameras.actionWhenPressed.option.preview':
-    'Попередній перегляд камери',
   'settings.events.header': 'Події',
   'settings.events.numberOfColumns.label': 'Кількість стовпців',
   'settings.events.photoPreference.label': 'Перевага фото',

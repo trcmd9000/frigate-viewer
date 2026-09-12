@@ -1,0 +1,148 @@
+import {IconOutline} from '@ant-design/icons-react-native';
+import React, {FC} from 'react';
+import {
+  ActivityIndicator,
+  Text,
+  TextStyle,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import {useIntl} from 'react-intl';
+import {useStyles} from '../../helpers/colors';
+import {livePreviewStatus} from '../../helpers/livePreviewStatus';
+import type {
+  LivePreviewState,
+  LivePreviewTransport,
+} from '../../helpers/livePreviewStatus';
+
+interface LiveStatusBadgeProps {
+  state: LivePreviewState;
+  transport?: LivePreviewTransport;
+  streamType?: string;
+  frameRate?: number;
+  viewportWidth?: number;
+}
+
+const defaultStatusMessages: Record<string, string> = {
+  'cameraPreview.status.snapshot': 'Snapshots',
+  'cameraPreview.status.preparing': 'Preparing live stream',
+  'cameraPreview.status.connecting': 'Connecting to live stream',
+  'cameraPreview.status.rtsp': 'RTSP live stream',
+  'cameraPreview.status.webrtc': 'WebRTC live stream',
+  'cameraPreview.status.mse': 'HEVC live stream',
+  'cameraPreview.status.live': 'Live stream',
+  'cameraPreview.status.reconnecting': 'Reconnecting to live stream',
+  'cameraPreview.status.degraded': 'Live degraded; showing snapshots',
+  'cameraPreview.status.fallback': 'Snapshot fallback',
+};
+
+export const LiveStatusBadge: FC<LiveStatusBadgeProps> = ({
+  state,
+  transport,
+  streamType,
+  frameRate,
+  viewportWidth,
+}) => {
+  const {width: windowWidth} = useWindowDimensions();
+  const styles = useStyles(({theme: palette}) => ({
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-end',
+      flexShrink: 0,
+      minWidth: 0,
+      overflow: 'hidden',
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 4,
+      backgroundColor: palette.mediaOverlay,
+    },
+    icon: {
+      marginRight: 5,
+    },
+    text: {
+      flexShrink: 1,
+      minWidth: 0,
+      color: palette.mediaText,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'right',
+    },
+  }));
+  const intl = useIntl();
+  const status = livePreviewStatus(state, transport);
+  const label = intl.formatMessage({
+    id: status.messageId,
+    defaultMessage: defaultStatusMessages[status.messageId],
+  });
+  const compactLabel =
+    state === 'live' && transport
+      ? transport === 'webrtc'
+        ? 'WebRTC'
+        : transport === 'mse'
+        ? 'HEVC'
+        : 'RTSP'
+      : label;
+  const displayLabel =
+    state === 'live' && transport && streamType
+      ? `${compactLabel} · ${streamType}${
+          frameRate ? ` · ${Number(frameRate.toFixed(1))} FPS` : ''
+        }`
+      : compactLabel;
+  const accessibilityLabel =
+    state === 'live' && transport && streamType
+      ? `${label}: ${streamType}${frameRate ? `, ${frameRate} FPS` : ''}`
+      : label;
+  const isLongLabel = displayLabel.length > 18;
+  const width =
+    typeof viewportWidth === 'number' &&
+    Number.isFinite(viewportWidth) &&
+    viewportWidth > 0
+      ? viewportWidth
+      : windowWidth;
+  const badgeMaxWidth = Math.max(1, Math.min(width - 32, width * 0.68));
+  const textMaxWidth = Math.max(1, badgeMaxWidth - 27);
+  const connecting =
+    state === 'preparing' ||
+    state === 'connecting' ||
+    state === 'reconnecting';
+
+  return (
+    <View
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+      testID="live-status-badge"
+      style={{...styles.badge, maxWidth: badgeMaxWidth}}
+    >
+      {connecting ? (
+        <ActivityIndicator
+          testID="live-status-activity-indicator"
+          accessibilityElementsHidden
+          animating
+          color={(styles.text as TextStyle).color as string}
+          size="small"
+          style={styles.icon}
+        />
+      ) : (
+        <IconOutline
+          name={status.icon}
+          color={(styles.text as TextStyle).color as string}
+          size={14}
+          style={styles.icon}
+        />
+      )}
+      <Text
+        style={
+          isLongLabel
+            ? {...styles.text, maxWidth: textMaxWidth}
+            : styles.text
+        }
+        numberOfLines={state === 'live' ? 1 : 2}
+        ellipsizeMode="tail"
+      >
+        {displayLabel}
+      </Text>
+    </View>
+  );
+};

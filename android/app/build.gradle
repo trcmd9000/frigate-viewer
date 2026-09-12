@@ -55,7 +55,8 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
+def enableProtectedMseProbe = (findProperty("enableProtectedMseProbe") ?: "true").toBoolean()
 def signingProperties = new Properties()
 def signingPropertiesFile = rootProject.file("signing.properties")
 if (signingPropertiesFile.exists()) {
@@ -86,13 +87,31 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    buildFeatures {
+        buildConfig true
+        resValues true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     namespace "com.trcmd9000.frigateviewer"
     defaultConfig {
         applicationId "com.trcmd9000.frigateviewer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
-        versionName "14.3.1"
+        versionCode 24
+        versionName "18.0.1"
+        buildConfigField "boolean", "ENABLE_PROTECTED_MSE_PROBE", enableProtectedMseProbe.toString()
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
     signingConfigs {
         if (hasReleaseSigning) {
@@ -110,7 +129,8 @@ android {
                 signingConfig signingConfigs.release
             }
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            shrinkResources enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
 }
@@ -136,6 +156,14 @@ dependencies {
     
     // OkHttp for client certificate HTTP requests
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    // Media3 APIs used by the project-owned protected data-source extension.
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-datasource:$media3Version")
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-rtsp:$media3Version")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.11.0")
+    testImplementation("org.robolectric:robolectric:4.13")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

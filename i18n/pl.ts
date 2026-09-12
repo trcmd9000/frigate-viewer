@@ -3,17 +3,7 @@ export default {
     'Błąd autoryzacji, sprawdź swoje dane logowania.',
   'api.error.unauthorized':
     'Nieprawidłowe dane logowania podczas próby dotarcia do {url}.',
-  'author.topBar.title': 'Autor',
-  'author.info.authorLabel': 'Autor',
-  'author.info.contactLabel': 'Kontakt',
-  'author.info.opensourceLabel': 'To jest projekt otwarto-źródłowy.',
-  'author.info.githubLabel': 'Zobacz na githubie',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Ten projekt został stworzony w celu nauki i nie zamierzam czerpać korzyści ze sprzedaży licencji.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Lubisz tę aplikację',
-  'author.buyMeCoffee.sayThankYouLabel': 'i chcesz podziękować?',
-  'author.buyMeCoffee.buttonText': 'Kup mi kawę',
-  'author.usedLibs.header': 'Użyte biblioteki:',
+  'author.topBar.title': 'O aplikacji',
   'author.error.cantOpenLink':
     'Nie można znaleźć żadnej aplikacji, aby otworzyć ten link.',
   'camerasList.topBar.title': 'Lista kamer',
@@ -44,7 +34,7 @@ export default {
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Dzienniki',
   'menu.item.settings.label': 'Ustawienia',
-  'menu.item.author.label': 'Autor',
+  'menu.item.author.label': 'O aplikacji',
   'menu.item.report.label': 'Zgłoś problem',
   'report.topBar.title': 'Zgłoś problem',
   'report.introduction.info':
@@ -75,7 +65,6 @@ export default {
   'settings.server.auth.option.none': 'Brak',
   'settings.server.username.label': 'Nazwa użytkownika',
   'settings.server.password.label': 'Hasło',
-  'settings.server.useDemoServerButton': 'Użyj serwera demonstracyjnego',
   'settings.locale.header': 'Lokalizacja',
   'settings.locale.region.label': 'Region',
   'settings.locale.region.option.en_AU': 'Australia (angielski)',
@@ -119,7 +108,6 @@ export default {
   'settings.locale.datesDisplay.label': 'Wyświetlanie daty',
   'settings.locale.datesDisplay.option.descriptive': 'Opisowo',
   'settings.locale.datesDisplay.option.numeric': 'Numerycznie',
-  'settings.app.header': 'Aplikacja',
   'settings.app.colorScheme.label': 'Schemat kolorów',
   'settings.app.colorScheme.option.auto': 'Automatyczny',
   'settings.app.colorScheme.option.light': 'Jasny',
@@ -128,13 +116,7 @@ export default {
   'settings.cameras.header': 'Kamery',
   'settings.cameras.imageRefreshFrequency.label':
     'Częstotliwość odświeżania obrazu (sekundy)',
-  'settings.cameras.liveView.label': 'Podgląd na żywo',
-  'settings.cameras.liveView.disclaimer':
-    'Weź pod uwagę, że częstotliwość odświeżania zależy od opóźnień w twojej sieci',
   'settings.cameras.numberOfColumns.label': 'Liczba kolumn',
-  'settings.cameras.actionWhenPressed.label': 'Akcja po naciśnięciu',
-  'settings.cameras.actionWhenPressed.option.events': 'Lista zdarzeń',
-  'settings.cameras.actionWhenPressed.option.preview': 'Podgląd kamery',
   'settings.events.header': 'Zdarzenia',
   'settings.events.numberOfColumns.label': 'Liczba kolumn',
   'settings.events.photoPreference.label': 'Preferowane zdjęcie',

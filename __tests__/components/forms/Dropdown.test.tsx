@@ -1,0 +1,109 @@
+import React from 'react';
+import {fireEvent, render} from '@testing-library/react-native';
+import {Dropdown} from '../../../components/forms/Dropdown';
+
+jest.mock('../../../helpers/colors', () => ({
+  useTheme: () => ({
+    background: '#fff',
+    text: '#000',
+    link: '#06c',
+    border: '#ccc',
+    highlighted: '#eee',
+    disabled: '#888',
+    overlay: '#0008',
+  }),
+  useStyles: (factory: (arg: {theme: Record<string, string>}) => unknown) =>
+    factory({
+      theme: {
+        background: '#fff',
+        text: '#000',
+        link: '#06c',
+        border: '#ccc',
+        highlighted: '#eee',
+        disabled: '#888',
+        overlay: '#0008',
+      },
+    }),
+}));
+
+describe('Dropdown', () => {
+  it('opens a marked single-choice list and closes after selecting', () => {
+    const onValueChange = jest.fn();
+    const {getByTestId, getAllByText, getByText} = render(
+      <Dropdown
+        testID="dropdown"
+        value="one"
+        options={[
+          {value: 'one', label: 'First'},
+          {value: 'two', label: 'Second'},
+        ]}
+        onValueChange={onValueChange}
+      />,
+    );
+
+    fireEvent.press(getByTestId('dropdown'));
+    expect(getAllByText('First').length).toBeGreaterThan(0);
+    expect(getByText('✓')).toBeTruthy();
+
+    fireEvent.press(getByText('Second'));
+    expect(onValueChange).toHaveBeenCalledWith('two');
+  });
+
+  it('closes on backdrop press and honors disabled state', () => {
+    const {getByTestId, queryByLabelText} = render(
+      <Dropdown
+        testID="dropdown"
+        value="one"
+        disabled
+        options={[{value: 'one', label: 'First'}]}
+      />,
+    );
+
+    fireEvent.press(getByTestId('dropdown'));
+    expect(queryByLabelText('Close options')).toBeNull();
+
+    const enabled = render(
+      <Dropdown
+        testID="enabled-dropdown"
+        value="one"
+        options={[{value: 'one', label: 'First'}]}
+      />,
+    );
+    fireEvent.press(enabled.getByTestId('enabled-dropdown'));
+    fireEvent.press(enabled.getByLabelText('Close options'));
+    expect(enabled.queryByLabelText('Close options')).toBeNull();
+  });
+
+  it('uses an icon-only trigger in compact mode while retaining option labels', () => {
+    const {getByRole, getByText, queryByText} = render(
+      <Dropdown
+        compact
+        testID="compact-dropdown"
+        accessibilityLabel="Select live stream"
+        value="one"
+        options={[{value: 'one', label: 'Original - H.265, 3840 x 2160, 15 fps'}]}
+      />,
+    );
+
+    expect(queryByText('Original - H.265, 3840 x 2160, 15 fps')).toBeNull();
+    fireEvent.press(getByRole('button', {name: 'Select live stream'}));
+    expect(getByText('Original - H.265, 3840 x 2160, 15 fps')).toBeTruthy();
+  });
+
+  it('supports opening the selection list from an external media gesture', () => {
+    const onOpenChange = jest.fn();
+    const {getAllByText} = render(
+      <Dropdown
+        open
+        onOpenChange={onOpenChange}
+        value="one"
+        options={[{value: 'one', label: 'First'}]}
+      />,
+    );
+
+    const firstLabels = getAllByText('First');
+    expect(firstLabels).toHaveLength(2);
+    fireEvent.press(firstLabels[1]);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});

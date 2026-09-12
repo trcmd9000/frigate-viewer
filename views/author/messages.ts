@@ -1,17 +1,16 @@
 import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('author', {
-  'topBar.title': 'Author',
-  'info.authorLabel': 'Author',
-  'info.contactLabel': 'Contact',
-  'info.privacyPolicyLabel': 'Privacy Policy',
-  'info.opensourceLabel': 'This is open source project.',
-  'info.githubLabel': 'See on github',
-  'buyMeCoffee.nonProfitLabel':
-    "The project was created for learning purposes and I don't intend to profit from granting licences.",
-  'buyMeCoffee.doYouLikeLabel': 'Do you like this application',
-  'buyMeCoffee.sayThankYouLabel': 'and want to say "thank you"?',
-  'buyMeCoffee.buttonText': 'Buy me a coffee',
-  'usedLibs.header': 'Used libraries:',
+  'topBar.title': 'About',
+  identity: 'Frigate Viewer',
+  maintainer: 'Maintained by trcmd9000',
+  contact: 'Contact maintainer',
+  privacy: 'Privacy policy',
+  source: 'Source code and license',
+  disclaimer:
+    'Frigate Viewer is an independent client compatible with Frigate. It is not affiliated with or endorsed by the Frigate project.',
+  upstream: 'Original upstream attribution',
+  upstreamDescription:
+    'Originally based on sp-engineering/frigate-viewer. This attribution does not imply endorsement.',
   'error.cantOpenLink': "Can't find any app to open this link.",
 });

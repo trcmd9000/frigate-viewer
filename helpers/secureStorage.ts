@@ -1,20 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform} from 'react-native';
-import {
-  ISecureStorageProvider,
-  getStorageProvider,
-} from './storage/StorageProvider';
+import {SecureLogger} from './secureLogger';
 
 let KeychainModule: any = null;
 
-// Try to load react-native-keychain, gracefully fallback if not available
+// Try to load react-native-keychain. Secure credentials never use AsyncStorage.
 try {
   KeychainModule = require('react-native-keychain');
-} catch (error) {
-  console.warn(
-    'react-native-keychain not available, using AsyncStorage fallback:',
-    error,
-  );
+} catch {
   KeychainModule = null;
 }
 
@@ -24,8 +17,7 @@ export interface Credentials {
 }
 
 /**
- * Secure Storage Helper - Uses Keychain on iOS and Keystore on Android
- * Falls back to AsyncStorage if native modules are not available (development mode)
+ * Secure Storage Helper - Uses Keychain on iOS and Keystore on Android.
  *
  * This module serves as the main API for all secure storage operations,
  * delegating to the appropriate storage provider based on platform.
@@ -34,6 +26,12 @@ export interface Credentials {
 const isKeychainAvailable = (): boolean => {
   return KeychainModule !== null;
 };
+
+const secureStorageUnavailable = (): Error & {code: string} =>
+  Object.assign(
+    new Error('Platform secure credential storage is unavailable'),
+    {code: 'SECURE_STORAGE_UNAVAILABLE'},
+  );
 
 // Platform detection
 export const getPlatform = (): 'ios' | 'android' | 'unknown' => {
@@ -47,190 +45,95 @@ export const getPlatform = (): 'ios' | 'android' | 'unknown' => {
 };
 
 const KEYCHAIN_PREFIX = 'frigate_';
-const CERT_PASSWORD_PREFIX = 'cert_password_';
 
 /**
- * Generates a unique keychain service identifier for a server
+ * Generates a unique keychain service identifier for a profile or legacy key.
  */
-const getServiceKey = (serverUrl: string): string => {
-  return `${KEYCHAIN_PREFIX}${serverUrl}`;
-};
-
-// Singleton instance for storage provider
-let storageProvider: ISecureStorageProvider | null = null;
-
-const getStorageProviderInstance = (): ISecureStorageProvider => {
-  if (!storageProvider) {
-    storageProvider = getStorageProvider();
-  }
-  return storageProvider;
+const getServiceKey = (storageKey: string): string => {
+  return `${KEYCHAIN_PREFIX}${storageKey}`;
 };
 
 /**
- * Save credentials securely to Keychain/Keystore or AsyncStorage (fallback)
+ * Save credentials securely to Keychain/Keystore.
  */
 export const saveCredentials = async (
-  serverUrl: string,
+  storageKey: string,
   credentials: Credentials,
 ): Promise<void> => {
   try {
-    if (isKeychainAvailable()) {
-      // Use Keychain on iOS and Keystore on Android
-      const service = getServiceKey(serverUrl);
-      const credentialString = JSON.stringify(credentials);
-
-      await KeychainModule.setGenericPassword(
-        credentials.username,
-        credentialString,
-        {
-          service,
-          accessible: Platform.select({
-            ios: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
-            android: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
-          }),
-          storage: Platform.select({
-            android: KeychainModule.STORAGE_TYPE.AES,
-          }),
-        },
-      );
-    } else {
-      // Fallback to AsyncStorage for development
-      const key = `${KEYCHAIN_PREFIX}${serverUrl}`;
-      await AsyncStorage.setItem(key, JSON.stringify(credentials));
+    if (!isKeychainAvailable()) {
+      throw secureStorageUnavailable();
     }
+    const service = getServiceKey(storageKey);
+    const credentialString = JSON.stringify(credentials);
+
+    await KeychainModule.setGenericPassword(
+      credentials.username,
+      credentialString,
+      {
+        service,
+        accessible: Platform.select({
+          ios: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
+          android: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
+        }),
+        storage: Platform.select({
+          android: KeychainModule.STORAGE_TYPE.AES,
+        }),
+      },
+    );
   } catch (error) {
-    console.error(`Failed to save credentials for ${serverUrl}:`, error);
+    SecureLogger.logError(error as Error, 'secure-storage.save');
     throw error;
   }
 };
 
 /**
- * Load credentials from Keychain/Keystore or AsyncStorage (fallback)
+ * Load credentials from Keychain/Keystore.
  */
 export const loadCredentials = async (
-  serverUrl: string,
+  storageKey: string,
 ): Promise<Credentials | null> => {
   try {
-    if (isKeychainAvailable()) {
-      const service = getServiceKey(serverUrl);
-      const credentials = await KeychainModule.getGenericPassword({service});
+    if (!isKeychainAvailable()) {
+      throw secureStorageUnavailable();
+    }
+    const service = getServiceKey(storageKey);
+    const credentials = await KeychainModule.getGenericPassword({service});
 
-      if (!credentials) {
-        return null;
-      }
+    if (!credentials) {
+      return null;
+    }
 
-      // Credentials are stored as JSON string in password field
-      try {
-        return JSON.parse(credentials.password);
-      } catch {
-        // Fallback to old format (if upgrading from old version)
-        return {
-          username: credentials.username,
-          password: credentials.password,
-        };
-      }
-    } else {
-      // Fallback to AsyncStorage for development
-      const key = `${KEYCHAIN_PREFIX}${serverUrl}`;
-      const data = await AsyncStorage.getItem(key);
-      return data ? JSON.parse(data) : null;
+    // Credentials are stored as JSON string in the Keychain password field.
+    try {
+      return JSON.parse(credentials.password);
+    } catch {
+      // Preserve compatibility with the old Keychain format.
+      return {
+        username: credentials.username,
+        password: credentials.password,
+      };
     }
   } catch (error) {
-    console.error(`Failed to load credentials for ${serverUrl}:`, error);
-    return null;
+    SecureLogger.logError(error as Error, 'secure-storage.load');
+    throw error;
   }
 };
 
 /**
- * Remove credentials from Keychain/Keystore or AsyncStorage (fallback)
+ * Remove credentials from Keychain/Keystore.
  */
-export const removeCredentials = async (serverUrl: string): Promise<void> => {
+export const removeCredentials = async (storageKey: string): Promise<void> => {
   try {
-    if (isKeychainAvailable()) {
-      const service = getServiceKey(serverUrl);
-      await KeychainModule.resetGenericPassword({service});
-    } else {
-      const key = `${KEYCHAIN_PREFIX}${serverUrl}`;
-      await AsyncStorage.removeItem(key);
+    if (!isKeychainAvailable()) {
+      throw secureStorageUnavailable();
     }
+    const service = getServiceKey(storageKey);
+    await KeychainModule.resetGenericPassword({service});
   } catch (error) {
-    console.error(`Failed to remove credentials for ${serverUrl}:`, error);
+    SecureLogger.logError(error as Error, 'secure-storage.remove');
+    throw error;
   }
-};
-
-/**
- * Save certificate password (RAM-only, not persisted across app restarts)
- * This is stored in-memory only for security
- */
-const certPasswordCache = new Map<string, string>();
-
-export const saveCertificatePassword = async (
-  serverId: string,
-  password: string,
-): Promise<void> => {
-  const key = `${CERT_PASSWORD_PREFIX}${serverId}`;
-  certPasswordCache.set(key, password);
-};
-
-/**
- * Alias for saveCertificatePassword with old signature for backward compatibility
- */
-export const saveCertPassword = async (
-  serverUrl: string,
-  certAlias: string,
-  password: string,
-): Promise<void> => {
-  const key = `${CERT_PASSWORD_PREFIX}${serverUrl}:${certAlias}`;
-  certPasswordCache.set(key, password);
-};
-
-/**
- * Load certificate password from RAM cache (not persistent)
- */
-export const loadCertificatePassword = async (
-  serverId: string,
-): Promise<string | null> => {
-  const key = `${CERT_PASSWORD_PREFIX}${serverId}`;
-  return certPasswordCache.get(key) || null;
-};
-
-/**
- * Alias for loadCertificatePassword with old signature for backward compatibility
- */
-export const loadCertPassword = async (
-  serverUrl: string,
-  certAlias: string,
-): Promise<string | null> => {
-  const key = `${CERT_PASSWORD_PREFIX}${serverUrl}:${certAlias}`;
-  return certPasswordCache.get(key) || null;
-};
-
-/**
- * Remove certificate password from RAM cache
- */
-export const clearCertificatePassword = async (
-  serverId: string,
-): Promise<void> => {
-  const key = `${CERT_PASSWORD_PREFIX}${serverId}`;
-  certPasswordCache.delete(key);
-};
-
-/**
- * Alias for clearCertificatePassword with old signature for backward compatibility
- */
-export const removeCertPassword = async (
-  serverUrl: string,
-  certAlias: string,
-): Promise<void> => {
-  const key = `${CERT_PASSWORD_PREFIX}${serverUrl}:${certAlias}`;
-  certPasswordCache.delete(key);
-};
-
-/**
- * Clear all certificate passwords from RAM cache
- */
-export const clearAllCertPasswords = (): void => {
-  certPasswordCache.clear();
 };
 
 /**
@@ -239,7 +142,7 @@ export const clearAllCertPasswords = (): void => {
  */
 export const migrateAsyncStorageCredentials = async (): Promise<void> => {
   if (!isKeychainAvailable()) {
-    return; // No migration needed if keychain is not available
+    throw secureStorageUnavailable();
   }
 
   try {
@@ -250,50 +153,37 @@ export const migrateAsyncStorageCredentials = async (): Promise<void> => {
     );
 
     let migratedCount = 0;
+    let migrationError: unknown;
     for (const key of credentialKeys) {
       try {
         const data = await AsyncStorage.getItem(key);
         if (data) {
           const credentials = JSON.parse(data);
-          const serverUrl = key.substring(KEYCHAIN_PREFIX.length);
+          const storageKey = key.substring(KEYCHAIN_PREFIX.length);
 
           // Save to keychain
-          await saveCredentials(serverUrl, credentials);
+          await saveCredentials(storageKey, credentials);
 
           // Remove from AsyncStorage after successful migration
           await AsyncStorage.removeItem(key);
           migratedCount++;
-          console.log(`Migrated credentials for ${serverUrl} to Keychain`);
+          SecureLogger.logAuth('credentials-migrated');
         }
       } catch (error) {
-        console.error(`Failed to migrate credentials for ${key}:`, error);
+        SecureLogger.logError(error as Error, 'secure-storage.migrate-item');
+        migrationError ||= error;
       }
     }
 
+    if (migrationError) {
+      throw migrationError;
+    }
+
     if (migratedCount > 0) {
-      console.log(
-        `Successfully migrated ${migratedCount} credential(s) to secure storage`,
-      );
+      SecureLogger.logAuth('credentials-migration-complete');
     }
   } catch (error) {
-    console.error('Error during credential migration:', error);
-  }
-};
-
-/**
- * Initialize secure storage on app startup
- * Performs necessary migrations and setup
- */
-export const initializeSecureStorage = async (): Promise<void> => {
-  try {
-    // Run migration if needed
-    await migrateAsyncStorageCredentials();
-
-    // Initialize storage provider
-    getStorageProviderInstance();
-
-    console.log(`Secure storage initialized (Platform: ${getPlatform()})`);
-  } catch (error) {
-    console.error('Failed to initialize secure storage:', error);
+    SecureLogger.logError(error as Error, 'secure-storage.migrate');
+    throw error;
   }
 };

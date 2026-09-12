@@ -2,6 +2,14 @@ import {MessageDescriptor} from 'react-intl';
 import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('menu', {
+  title: 'More',
+  'button.label': 'More',
+  'items.label': 'Secondary navigation',
+  'close.label': 'Close menu',
+  'close.hint': 'Dismisses the secondary navigation',
+  'section.saved': 'Saved',
+  'section.diagnostics': 'Diagnostics',
+  'section.support': 'Support',
   'item.camerasList.label': 'List of cameras',
   'item.cameraEvents.label': 'All events',
   'item.retained.label': 'Retained',
@@ -9,7 +17,7 @@ export const messages = makeMessages('menu', {
   'item.system.label': 'System',
   'item.logs.label': 'Logs',
   'item.settings.label': 'Settings',
-  'item.author.label': 'Author',
+  'item.author.label': 'About',
   'item.report.label': 'Report problem',
 });
 

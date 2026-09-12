@@ -1,30 +1,12 @@
-import {format, formatDistance, formatRelative} from 'date-fns';
+import {format, formatRelative} from 'date-fns';
 import React, {FC, useMemo} from 'react';
-import {StyleProp, StyleSheet, Text, View, ViewStyle} from 'react-native';
+import {StyleProp, Text, View, ViewStyle} from 'react-native';
+import {useIntl} from 'react-intl';
 import {formatVideoTime, useDateLocale} from '../../helpers/locale';
 import {selectLocaleDatesDisplay} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
-
-const stylesFn = (numColumns: number) =>
-  StyleSheet.create({
-    wrapper: {
-      position: 'absolute',
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      left: 2,
-      top: 1,
-      width: '100%',
-      padding: 5 / numColumns,
-      backgroundColor: '#00000040',
-    },
-    timeText: {
-      fontSize: 12 / (numColumns / 1.5),
-      fontWeight: '600',
-      color: 'white',
-    },
-  });
+import {useDesignTokens} from '../../helpers/designTokens';
+import {messages} from './messages';
 
 interface IEventTitleProps {
   startTime: number;
@@ -39,42 +21,73 @@ export const EventTitle: FC<IEventTitleProps> = ({
   endTime,
   retained,
   style,
-  numColumns,
 }) => {
+  const intl = useIntl();
   const dateLocale = useDateLocale();
   const datesDisplay = useAppSelector(selectLocaleDatesDisplay);
 
-  const isInProgress = useMemo(() => !endTime, [endTime]);
+  const hasValidStartTime = Number.isFinite(startTime) && startTime >= 0;
+  const hasValidEndTime = Number.isFinite(endTime) && endTime > 0;
+  const hasDuration =
+    hasValidStartTime && hasValidEndTime && endTime > startTime;
+  const safeStartTime = hasValidStartTime ? startTime : 0;
+  const isInProgress = !hasDuration;
 
   const startDate = useMemo(
     () =>
       datesDisplay === 'descriptive'
-        ? formatRelative(new Date(startTime * 1000), new Date(), {
+        ? formatRelative(new Date(safeStartTime * 1000), new Date(), {
             locale: dateLocale,
           })
-        : format(new Date(startTime * 1000), 'Pp', {locale: dateLocale}),
-    [startTime, dateLocale, datesDisplay],
+        : format(new Date(safeStartTime * 1000), 'Pp', {locale: dateLocale}),
+    [dateLocale, datesDisplay, safeStartTime],
   );
 
   const duration = useMemo(
-    () =>
-      datesDisplay === 'descriptive'
-        ? formatDistance(new Date(endTime * 1000), new Date(startTime * 1000), {
-            includeSeconds: true,
-            locale: dateLocale,
-          })
-        : formatVideoTime(Math.round(endTime * 1000 - startTime * 1000)),
-    [startTime, endTime, dateLocale, datesDisplay],
+    () => formatVideoTime(hasDuration ? endTime - startTime : 0),
+    [endTime, hasDuration, startTime],
   );
 
-  const styles = useMemo(() => stylesFn(numColumns || 1), [numColumns]);
+  const tokens = useDesignTokens();
 
   return (
-    <View style={[styles.wrapper, style]}>
-      <Text style={styles.timeText}>
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: tokens.spacing.sm,
+        },
+        style,
+      ]}
+    >
+      <Text
+        style={{
+          ...tokens.typography.timestamp,
+          color: tokens.colors.textSecondary,
+          flexShrink: 1,
+        }}
+        accessibilityLabel={`${startDate}${
+          !isInProgress
+            ? `, ${intl.formatMessage(messages['labels.duration'], {
+                duration,
+              })}`
+            : ''
+        }`}
+      >
         {startDate} {!isInProgress && <Text>({duration})</Text>}
       </Text>
-      {retained && <Text>⭐</Text>}
+      {retained && (
+        <Text
+          accessible
+          accessibilityLabel="Retained event"
+          style={{fontSize: 18}}
+        >
+          ★
+        </Text>
+      )}
     </View>
   );
 };

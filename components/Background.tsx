@@ -6,7 +6,7 @@ export const Background: FC<ViewProps> = ({children}) => {
   const styles = useStyles(({theme}) => ({
     wrapper: {
       width: '100%',
-      height: '100%',
+      flex: 1,
       backgroundColor: theme.background,
     },
   }));

@@ -10,7 +10,7 @@ import {
 } from 'react-native-ui-lib';
 import {ScrollView} from 'react-native-gesture-handler';
 import {Background} from '../../components/Background';
-import {useStyles} from '../../helpers/colors';
+import {useStyles, useTheme} from '../../helpers/colors';
 import {Stats} from '../../helpers/interfaces';
 import {useRest} from '../../helpers/rest';
 import {selectAvailableCameras} from '../../store/events';
@@ -26,6 +26,8 @@ import {GpuRow, GpusTable} from './GpusTable';
 import {messages} from './messages';
 import {SectionTitle} from './SectionTitle';
 import {SystemInfo} from './SystemInfo';
+import {RetryState} from '../../components/RetryState';
+import {handleError} from '../../helpers/errorHandler';
 
 const refreshFrequency = 30;
 
@@ -48,24 +50,72 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
       width: '100%',
     },
   }));
+  const theme = useTheme();
 
   useMenu(componentId, 'system');
   const [stats, setStats] = useState<Stats>();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [screenVisible, setScreenVisible] = useState(true);
   const [page, setPage] = useState(0);
   const server = useAppSelector(selectServer);
   const cameras = useAppSelector(selectAvailableCameras);
   const intl = useIntl();
   const interval = useRef<ReturnType<typeof setInterval>>();
   const {get} = useRest();
+  const getRef = useRef(get);
+  const mounted = useRef(true);
+  const requestInFlight = useRef(false);
+
+  useEffect(() => {
+    getRef.current = get;
+  }, [get]);
+
+  useEffect(() => () => {
+    mounted.current = false;
+  }, []);
+
+  useEffect(() => {
+    const listener = Navigation.events().registerComponentListener(
+      {
+        componentDidAppear() {
+          setScreenVisible(true);
+        },
+        componentDidDisappear() {
+          setScreenVisible(false);
+        },
+      },
+      componentId,
+    );
+    return () => listener.remove();
+  }, [componentId]);
 
   const refresh = useCallback(() => {
+    if (requestInFlight.current) {
+      return Promise.resolve();
+    }
+    requestInFlight.current = true;
     setLoading(true);
-    return get<Stats>(server, 'stats').then(nextStats => {
-      setStats(nextStats);
-      setLoading(false);
-    });
-  }, [get, server]);
+    setError(false);
+    return getRef.current<Stats>(server, 'stats')
+      .then(nextStats => {
+        if (mounted.current) {
+          setStats(nextStats);
+        }
+      })
+      .catch(async requestError => {
+        await handleError(requestError, 'System.refresh');
+        if (mounted.current) {
+          setError(true);
+        }
+      })
+      .finally(() => {
+        requestInFlight.current = false;
+        if (mounted.current) {
+          setLoading(false);
+        }
+      });
+  }, [server]);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
@@ -80,6 +130,9 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
   }, [componentId, intl, refresh]);
 
   useEffect(() => {
+    if (!screenVisible) {
+      return undefined;
+    }
     const removeRefreshing = () => {
       if (interval.current) {
         clearInterval(interval.current);
@@ -96,7 +149,7 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
       clearTimeout(timeoutId);
       removeRefreshing();
     };
-  }, [refresh]);
+  }, [refresh, screenVisible]);
 
   const detectors: DetectorRow[] = useMemo(
     () =>
@@ -219,11 +272,27 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
     </View>
   );
 
-  return stats === undefined ? (
-    <LoaderScreen />
+  return stats === undefined && error ? (
+    <RetryState
+      message={intl.formatMessage(messages.error)}
+      retryLabel={intl.formatMessage(messages.retry)}
+      testID="system-retry"
+      onRetry={refresh}
+    />
+  ) : stats === undefined ? (
+    <LoaderScreen
+      backgroundColor={theme.background}
+      loaderColor={theme.link}
+    />
   ) : (
     <Background>
-      {loading && <LoaderScreen containerStyle={styles.loader} />}
+      {loading && (
+        <LoaderScreen
+          containerStyle={styles.loader}
+          backgroundColor={theme.background}
+          loaderColor={theme.link}
+        />
+      )}
       <ScrollView style={styles.wrapper}>
         {isCarousel ? (
           <>

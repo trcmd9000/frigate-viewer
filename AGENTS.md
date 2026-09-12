@@ -15,7 +15,8 @@ decisions that future maintainers and coding agents must preserve.
 - Android is the actively maintained and validated target. Inherited iOS source
   is present, but iOS mTLS and release builds are not currently supported or
   validated.
-- Current release version: `14.3.1` with Android `versionCode 21`.
+- Current public release: `14.3.1` with Android `versionCode 21`. The next
+  release candidate is `18.0.1` with Android `versionCode 24`.
 
 ## Public repository rules
 
@@ -57,9 +58,12 @@ Do not:
 - Silently retry an mTLS-configured request without its client identity.
 - Add a global trust-all manager or hostname verifier.
 
-Normal server certificate and hostname validation must remain enabled by
+Native mTLS server certificate and hostname validation must remain enabled by
 default. The self-signed server option is an explicit per-server override and
-must stay clearly labeled as a security reduction.
+must stay clearly labeled as a security reduction. The Android manifest
+currently permits cleartext traffic for explicitly configured legacy HTTP
+servers, so do not describe the app as having a strict global cleartext
+default; tightening that compatibility exception requires product approval.
 
 The primary implementation surfaces are:
 
@@ -88,7 +92,12 @@ The primary implementation surfaces are:
 - Android namespace and application ID:
   `com.trcmd9000.frigateviewer`.
 - App name: `Frigate Viewer`.
-- Compile and target SDK: API 35.
+- Compile and target SDK: API 36.
+- Android builds use AGP 9.3.2, Gradle 9.5, Build Tools 36.0.0, and JDK 17.
+- React Native 0.75 dependencies require the temporary AGP 9 compatibility
+  modes `android.newDsl=false` and `android.builtInKotlin=false`. Do not remove
+  them until the affected React Native dependencies have been upgraded and
+  validated; AGP 10 will remove these compatibility modes.
 - Release signing comes from ignored `android/signing.properties` or CI
   `MYAPP_UPLOAD_*` Gradle properties.
 - A release build must fail when signing is not configured; never produce a
@@ -113,6 +122,9 @@ and internal-testing checklist.
 - `react-native-navigation` requires the checked-in
   `patches/react-native-navigation+7.51.2.patch` for React Native 0.75
   compatibility.
+- AGP 9 support also requires the checked-in patches for
+  `@react-native/gradle-plugin`, `@lunarr/vlc-player`, and
+  `react-native-blob-util`.
 - `npm ci` must successfully apply the patch through `patch-package`.
 - Do not edit `node_modules` without updating the reproducible patch.
 - Do not run `npm audit fix --force`. It currently proposes breaking React
@@ -133,12 +145,32 @@ npm ci
 npm test -- --runInBand --silent --forceExit
 npx tsc --noEmit
 Set-Location android
-.\gradlew.bat assembleDebug
-.\gradlew.bat bundleRelease -PreactNativeArchitectures=arm64-v8a
+.\gradlew.bat :app:assembleDebug -PreactNativeArchitectures=arm64-v8a
+.\gradlew.bat :app:testDebugUnitTest :app:analyzeReleaseR8Config :app:lintVitalRelease -PreactNativeArchitectures=arm64-v8a
+.\gradlew.bat :app:bundleRelease -PreactNativeArchitectures=arm64-v8a
 ```
 
 Also run targeted ESLint on changed JavaScript and TypeScript files and
 `git diff --check`.
+
+## Build worker
+
+- Prefer the dedicated remote Windows build worker (`ssh frigate-builder`) for
+  dependency installation, Android/Gradle builds, native compilation, full
+  test suites, APK/AAB inspection, and other CPU- or memory-intensive local
+  development work.
+- The worker's activity root is `D:\Development`. Use isolated worktrees and
+  the reproducible source-bundle pipeline for builds; do not put signing
+  material, private server data, certificates, or Android device state on it.
+- Keep local work limited to source inspection and editing, focused
+  low-cost checks, ADB/device validation, and local-only signing. Do not start
+  a full local Android build if `frigate-builder` is reachable.
+- Confirm SSH connectivity before a worker task. If the worker's network
+  adapter is unavailable, report the blocked build and wait for recovery
+  rather than silently falling back to a full local build.
+- The worker may lose network connectivity after sleep. Inspect the exact
+  build-specific worktree and artifact paths after an interrupted connection;
+  clean only verified per-build leftovers before retrying.
 
 For Android release artifacts:
 
@@ -150,9 +182,7 @@ For Android release artifacts:
   non-mTLS servers on a physical Android device.
 
 On Windows, use a short checkout path for native release builds. React Native
-native build paths can exceed Windows or Ninja limits. Avoid setting
-`JAVA_TOOL_OPTIONS` while AGP 8.6.1 invokes Prefab: its banner on stderr can be
-misreported as `[CXX1210] No compatible library found`.
+native build paths can exceed Windows or Ninja limits.
 
 ## Change discipline
 

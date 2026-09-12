@@ -3,27 +3,46 @@ export default {
     'Autorisierungsfehler, überprüfen Sie Ihre Anmeldedaten.',
   'api.error.unauthorized':
     'Falsche Anmeldedaten beim Versuch, {url} zu erreichen.',
-  'author.topBar.title': 'Autor',
-  'author.info.authorLabel': 'Autor',
-  'author.info.contactLabel': 'Kontakt',
-  'author.info.privacyPolicyLabel': 'Datenschutzrichtlinie',
-  'author.info.opensourceLabel': 'Diese App ist ein Open Source Projekt',
-  'author.info.githubLabel': 'Auf GitHub sehen',
-  'author.buyMeCoffee.nonProfitLabel':
-    'Das Projekt wurde zu Lernzwecken erstellt und ich habe nicht die Absicht, von der Erteilung von Lizenzen zu profitieren.',
-  'author.buyMeCoffee.doYouLikeLabel': 'Mögen Sie diese Anwendung',
-  'author.buyMeCoffee.sayThankYouLabel': 'und wollen "Danke" sagen?',
-  'author.buyMeCoffee.buttonText': 'Kauf mir einen Kaffee',
-  'author.usedLibs.header': 'Liste der verwendeten Bibliotheken:',
+  'author.topBar.title': 'Über die App',
+  'author.identity': 'Frigate Viewer',
+  'author.maintainer': 'Betreut von trcmd9000',
+  'author.contact': 'Maintainer kontaktieren',
+  'author.privacy': 'Datenschutzrichtlinie',
+  'author.source': 'Quellcode und Lizenz',
+  'author.disclaimer':
+    'Frigate Viewer ist ein unabhängiger, mit Frigate kompatibler Client. Es besteht keine Verbindung zum Frigate-Projekt und keine Billigung durch dieses Projekt.',
+  'author.upstream': 'Ursprüngliche Upstream-Zuordnung',
+  'author.upstreamDescription':
+    'Ursprünglich basierend auf sp-engineering/frigate-viewer. Diese Zuordnung bedeutet keine Billigung.',
   'author.error.cantOpenLink':
     'Ich kann keine App finden, um diesen Link zu öffnen.',
-  'camerasList.topBar.title': 'Liste der Kameras',
+  'camerasList.topBar.title': 'Kameraübersicht',
   'camerasList.noCameras': 'Keine Kameras',
+  'camerasList.emptyDescription':
+    'Fügen Sie einen Server hinzu oder konfigurieren Sie ihn, um Kameras zu finden.',
+  'camerasList.configure': 'Server konfigurieren',
+  'camerasList.refresh': 'Aktualisieren',
+  'camerasList.lastUpdate': 'Letzte Aktualisierung {time}',
+  'camerasList.waiting': 'Warten auf das erste Standbild',
+  'camerasList.loadingSnapshot': 'Kamera-Standbild wird geladen',
+  'camerasList.snapshotUnavailable': 'Standbild nicht verfügbar',
+  'camerasList.snapshot': 'Standbild',
+  'camerasList.open': 'Kamera öffnen',
+  'camerasList.snapshotAccessibility': 'Standbild der Kamera {camera}',
+  'camerasList.stateAccessibility': 'Status der Kamera {camera}: {state}',
+  'camerasList.cardAccessibility': '{camera}, {state}. {action}',
+  'camerasList.tab.cameras': 'Kamera',
+  'camerasList.tab.events': 'Ereignisse',
+  'camerasList.tab.settings': 'Einstellungen',
+  'camerasList.error':
+    'Kameras konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'camerasList.retry': 'Kameras erneut laden',
   'cameraEvents.topBar.general.title': 'Ereignisse',
   'cameraEvents.topBar.retained.title': 'Beibehalten',
   'cameraEvents.topBar.specificCamera.title': 'Ereignisse der {cameraName}',
   'cameraEvents.noEvents': 'Keine ereignisse',
   'cameraEvents.labels.inProgressLabel': 'In Arbeit',
+  'cameraEvents.labels.duration': 'Dauer {duration}',
   'cameraEvents.action.delete': 'Löschen',
   'cameraEvents.action.retain': 'Behalten',
   'cameraEvents.action.unretain': 'Zurückhalten',
@@ -31,21 +50,117 @@ export default {
   'cameraEvents.share.snapshot.label': 'Schnappschuss',
   'cameraEvents.share.clip.label': 'Video',
   'cameraEvents.toast.noClip': 'Es gibt kein Video.',
+  'cameraEvents.error':
+    'Ereignisse konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'cameraEvents.retry': 'Ereignisse erneut laden',
+  'cameraEvents.loadMoreError':
+    'Weitere Ereignisse konnten nicht geladen werden.',
+  'cameraEventClip.loading': 'Geschützte Medien werden vorbereitet',
+  'cameraEventClip.error':
+    'Geschützte Medien konnten nicht abgespielt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'cameraEventClip.retry': 'Geschützte Medien erneut versuchen',
+  'cameraEventClip.share': 'Clip teilen',
+  'cameraEventClip.shareHint': 'Teilt den Clip mit einer anderen App',
+  'cameraEventClip.playbackSpeed': 'Wiedergabegeschwindigkeit',
+  'cameraEventClip.playbackSpeedHint': 'Wiedergabegeschwindigkeit auswählen',
+  'cameraEventClip.playbackSpeedMenu': 'Optionen für Wiedergabegeschwindigkeit',
+  'cameraEventClip.more': 'Weitere Ereignisaktionen',
+  'cameraEventClip.moreHint': 'Öffnet weitere Ereignisaktionen',
+  'cameraEventClip.moreMenu': 'Ereignisaktionen',
+  'cameraEventClip.download': 'Auf Gerät speichern',
+  'cameraEventClip.downloadHint': 'Speichert eine Kopie des Clips auf diesem Gerät',
+  'cameraEventClip.toggleControls':
+    'Player-Steuerelemente ein- oder ausblenden',
+  'cameraEventClip.toggleControlsHint':
+    'Blendet die Player-Steuerelemente ein oder aus',
+  'cameraEventClip.play': 'Video abspielen',
+  'cameraEventClip.playHint': 'Startet die Videowiedergabe',
+  'cameraEventClip.pause': 'Video pausieren',
+  'cameraEventClip.pauseHint': 'Pausiert die Videowiedergabe',
+  'cameraEventClip.replay': 'Video erneut abspielen',
+  'cameraEventClip.replayHint': 'Startet das Video erneut',
+  'cameraEventClip.seekBackward': '10 Sekunden zurück',
+  'cameraEventClip.seekBackwardHint': 'Springt 10 Sekunden zurück',
+  'cameraEventClip.seekForward': '10 Sekunden vor',
+  'cameraEventClip.seekForwardHint': 'Springt 10 Sekunden vor',
+  'cameraEventClip.progress': 'Videofortschritt',
+  'cameraEventClip.progressHint': 'Passt die Position im Video an',
+  'cameraPreview.audio.enable': 'Audio einschalten',
+  'cameraPreview.audio.mute': 'Audio ausschalten',
+  'cameraPreview.audio.unavailable': 'Audio nicht verfügbar',
+  'cameraPreview.audio.cancel': 'Audioaktivierung abbrechen',
+  'cameraPreview.audio.retry': 'Audio erneut versuchen',
+  'cameraPreview.audio.pending': 'Audio wird aktiviert… Zum Abbrechen tippen.',
+  'cameraPreview.audio.unavailableHint': 'In diesem Livestream ist kein Audio verfügbar.',
+  'cameraPreview.audio.failure.focus-denied': 'Audiofokus wurde nicht gewährt. Zum Wiederholen tippen.',
+  'cameraPreview.audio.failure.native': 'Audio konnte nicht aktiviert werden. Zum Wiederholen tippen.',
+  'cameraPreview.audio.failure.timeout': 'Audioaktivierung hat zu lange gedauert. Zum Wiederholen tippen.',
+  'cameraPreview.stream.select': 'Live-Stream auswählen',
+  'cameraPreview.stream.auto': 'Automatisch (HEVC bevorzugen)',
+  'cameraPreview.fallback.message':
+    'Live-Stream nicht verfügbar. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.landscape':
+    'Live-Stream nicht verfügbar – Standbilder',
+  'cameraPreview.fallback.codec':
+    'Der Live-Stream verwendet keinen kompatiblen Videocodec. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.ice':
+    'Die Live-Verbindung konnte keine Medien empfangen. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.track':
+    'Der Live-Stream enthält keine Videospur. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.muted':
+    'Die Live-Videospur blieb stummgeschaltet. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.packets':
+    'Das Live-Video empfing keine Pakete. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.decode':
+    'Live-Videopakete wurden empfangen, konnten aber nicht dekodiert werden. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.renderer':
+    'Das Live-Video wurde dekodiert, erzeugte aber kein Anzeigebild. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.fallback.timeout':
+    'Der Live-Stream überschritt vor dem ersten Bild das Zeitlimit. Stattdessen werden geschützte Standbilder angezeigt.',
+  'cameraPreview.retry': 'Live-Stream erneut versuchen',
+  'cameraPreview.status.snapshot': 'Standbilder',
+  'cameraPreview.status.preparing':
+    'Live-Stream wird vorbereitet',
+  'cameraPreview.status.connecting':
+    'Verbindung zum Live-Stream wird hergestellt',
+  'cameraPreview.status.rtsp': 'RTSP-Live-Stream',
+  'cameraPreview.status.webrtc': 'WebRTC-Live-Stream',
+  'cameraPreview.status.mse': 'HEVC-Live-Stream',
+  'cameraPreview.status.live': 'Live-Stream',
+  'cameraPreview.status.reconnecting':
+    'Verbindung zum Live-Stream wird erneut hergestellt',
+  'cameraPreview.status.degraded':
+    'Live eingeschränkt; Standbilder werden angezeigt',
+  'cameraPreview.status.fallback': 'Standbild-Fallback',
   'eventsFilters.cameras.title': 'Kameras',
   'eventsFilters.labels.title': 'Etiketten',
   'eventsFilters.zones.title': 'Zonen',
   'eventsFilters.miscellaneous.title': 'Sonstiges',
   'eventsFilters.miscellaneous.retained.label': 'Beibehalten',
+  'eventsFilters.active.none': 'Alle Ereignisse',
+  'eventsFilters.active.count':
+    '{count, plural, one {# aktiver Filter} other {# aktive Filter}}',
+  'eventsFilters.active.remove': 'Filter {value} entfernen',
+  'eventsFilters.active.removeHint': 'Entfernt diesen Filter',
+  'eventsFilters.active.clear': 'Filter löschen',
   'logs.topBar.title': 'Protokolle',
   'logs.noLogs': 'Keine Protokolle',
+  'logs.error':
+    'Protokolle konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'logs.retry': 'Protokolle erneut laden',
+  'menu.title': 'Mehr',
+  'menu.button.label': 'Mehr',
+  'menu.section.saved': 'Gespeichert',
+  'menu.section.diagnostics': 'Diagnose',
+  'menu.section.support': 'Support',
   'menu.item.camerasList.label': 'Liste der Kameras',
   'menu.item.cameraEvents.label': 'Alle Ereignisse',
-  'menu.item.retained.label': 'Beibehalten',
+  'menu.item.retained.label': 'Gespeicherte Ereignisse',
   'menu.item.storage.label': 'Speicher',
   'menu.item.system.label': 'System',
   'menu.item.logs.label': 'Protokolle',
   'menu.item.settings.label': 'Einstellungen',
-  'menu.item.author.label': 'Autor',
+  'menu.item.author.label': 'Über die App',
   'menu.item.report.label': 'Problem melden',
   'report.topBar.title': 'Problem melden',
   'report.introduction.info':
@@ -61,12 +176,43 @@ export default {
   'settings.error.min': 'Der Mindestwert ist {min}.',
   'settings.error.max': 'Der Höchstwert ist {max}',
   'settings.action.save': 'Speichern',
+  'settings.action.saveChanges': 'Änderungen speichern',
   'settings.action.cancel': 'Abbrechen',
   'settings.action.add': 'Hinzufügen',
   'settings.action.edit': 'Bearbeiten',
   'settings.server.header': 'Server',
   'settings.server.address.header': 'Adresse',
+  'settings.server.external.header': 'Externe Verbindung',
+  'settings.server.external.httpWarning':
+    'Diese Verbindung verwendet unverschlüsseltes HTTP. Ein Man-in-the-Middle kann Frigate-Anmeldedaten, Cookies, Bilder und Videos mitlesen oder verändern.',
+  'settings.server.external.httpConsent':
+    'Ich verstehe das Risiko und stimme zu, Anmeldedaten, Cookies, Bilder und Videos über unverschlüsseltes Remote-HTTP zu übertragen',
+  'settings.server.external.httpConsentRequired':
+    'Vor der Verwendung eines Remote-HTTP-Endpunkts ist eine ausdrückliche Zustimmung erforderlich.',
   'settings.server.auth.header': 'Autorisierung',
+  'settings.server.auth.progressiveHeader': 'Frigate-Authentifizierung',
+  'settings.server.mtls.progressiveHeader':
+    'Client-Zertifikat und Vertrauensstellung',
+  'settings.server.local.progressiveHeader': 'Lokale Verbindung',
+  'settings.server.rtsp.progressiveHeader':
+    'Direktes RTSP und Zustimmung für Anmeldedaten',
+  'settings.server.summary.configured': 'Konfiguriert',
+  'settings.server.summary.disabled': 'Deaktiviert',
+  'settings.server.summary.needsSetup': 'Einrichtung erforderlich',
+  'settings.server.summary.needsAttention': 'Aufmerksamkeit erforderlich',
+  'settings.server.summary.needsConsent': 'Zustimmung erforderlich',
+  'settings.server.summary.needsValidLocalRoute':
+    'Gültige private lokale Route vervollständigen',
+  'settings.server.summary.local.endpointIncomplete':
+    'Lokalen Endpunkt vervollständigen',
+  'settings.server.summary.local.privateTarget':
+    'Privaten lokalen Host oder lokale IP-Adresse verwenden',
+  'settings.server.summary.local.http':
+    'HTTP wird nur für lokales RTSP verwendet',
+  'settings.server.summary.local.tlsHttps':
+    'HTTPS für lokale Client-Zertifikate verwenden',
+  'settings.server.summary.local.tlsCertificate':
+    'Lokales Client-Zertifikat auswählen',
   'settings.servers.error.noServer': 'Kein Server hinzugefügt',
   'settings.server.protocol.label': 'Protokoll',
   'settings.server.host.label': 'Host-Adresse',
@@ -74,10 +220,108 @@ export default {
   'settings.server.path.label': 'Pfad',
   'settings.server.auth.label': 'Art der Autorisierung',
   'settings.server.auth.option.none': 'Keine',
+  'settings.server.auth.option.basic': 'Standardauthentifizierung',
+  'settings.server.auth.option.frigate': 'Frigate-Authentifizierung',
+  'settings.server.profile.configured': 'Konfiguriert',
+  'settings.server.profile.needsSetup': 'Einrichtung erforderlich',
+  'settings.server.profile.active': 'Aktiv',
+  'settings.server.profile.select': 'Server auswählen',
+  'settings.server.profile.edit': 'Server bearbeiten',
+  'settings.server.profile.editAction': 'Bearbeiten',
+  'settings.server.profile.delete': 'Server löschen',
+  'settings.server.profile.deleteAction': 'Löschen',
+  'settings.server.profile.delete.title': 'Serverprofil löschen?',
+  'settings.server.profile.delete.message':
+    'Das Profil und seine gespeicherten Einstellungen werden von diesem Gerät entfernt.',
+  'settings.server.profile.delete.confirm': 'Löschen',
+  'settings.server.profile.delete.cancel': 'Abbrechen',
+  'settings.server.profile.unnamed': 'Unbenannter Server',
+  'settings.server.profile.add': 'Server hinzufügen',
+  'settings.server.profile.tryDemo': 'Demo ausprobieren',
+  'settings.server.profile.empty': 'Fügen Sie einen Server hinzu, um zu beginnen.',
+  'settings.server.profile.mtlsRequired': 'Client-Zertifikat erforderlich',
+  'settings.server.remove': 'Server entfernen',
   'settings.server.username.label': 'Benutzername',
   'settings.server.password.label': 'Passwort',
-  'settings.server.useDemoServerButton': 'Nutzen den Demo Server',
+  'settings.server.password.show': 'Passwort anzeigen',
+  'settings.server.password.hide': 'Passwort ausblenden',
+  'settings.server.mtls.header': 'Client-Zertifikat (mTLS)',
+  'settings.server.mtls.enabled':
+    'Gegenseitige TLS-Authentifizierung verwenden',
+  'settings.server.mtls.httpsRequired': 'mTLS erfordert HTTPS.',
+  'settings.server.mtls.certificate.label': 'Zertifikat',
+  'settings.server.mtls.certificate.none': 'Kein Zertifikat ausgewählt',
+  'settings.server.mtls.certificate.choose': 'Zertifikat auswählen',
+  'settings.server.mtls.certificate.chooseShort': 'Auswählen',
+  'settings.server.mtls.certificate.change': 'Zertifikat ändern',
+  'settings.server.mtls.certificate.remove': 'Zertifikat entfernen',
+  'settings.server.mtls.certificate.remove.title':
+    'Ausgewähltes Zertifikat entfernen?',
+  'settings.server.mtls.certificate.remove.message':
+    'Das Client-Zertifikat wird aus diesem Serverprofil entfernt.',
+  'settings.server.mtls.certificate.remove.cancel': 'Abbrechen',
+  'settings.server.mtls.certificate.remove.confirm': 'Entfernen',
+  'settings.server.mtls.selfSigned.label':
+    'Selbstsigniertes Serverzertifikat zulassen',
+  'settings.server.mtls.selfSigned.warning':
+    'Zertifikatskette, Aussteller und Gültigkeit des Serverzertifikats werden nicht geprüft; die Hostnamenprüfung bleibt aktiv.',
+  'settings.server.mtls.help':
+    'Verwenden Sie dies, wenn Ihr Frigate-Server eine gegenseitige TLS-Authentifizierung (mTLS) erfordert. Das Zertifikat muss auf Ihrem Gerät installiert sein.',
+  'settings.server.local.header': 'Lokale Route',
+  'settings.server.local.enabled':
+    'Lokale Route für RTSP-Erreichbarkeit verwenden',
+  'settings.server.local.help':
+    'Konfigurieren Sie einen Endpunkt im lokalen Netzwerk für RTSP. Authentifizierte API-Anfragen bleiben immer extern.',
+  'settings.server.local.protocol.label': 'Lokales Protokoll',
+  'settings.server.local.host.label': 'Lokaler Host oder lokale IP-Adresse',
+  'settings.server.local.port.label': 'Lokaler Port',
+  'settings.server.local.path.label': 'Lokaler Basispfad (optional)',
+  'settings.server.local.publicTarget':
+    'Öffentliche Ziele sind für eine lokale Route nicht zulässig.',
+  'settings.server.local.httpWarning':
+    'HTTP wird nur für die RTSP-Erreichbarkeit verwendet. Die authentifizierte API bleibt extern.',
+  'settings.server.local.mtls.header':
+    'Lokales HTTPS: Vertrauensstellung und Client-Zertifikat',
+  'settings.server.local.mtls.enabled': 'mTLS für die lokale Route verwenden',
+  'settings.server.local.mtls.httpsRequired': 'Lokales mTLS erfordert HTTPS.',
+  'settings.server.local.mtls.certificate.label': 'Lokale KeyChain-Identität',
+  'settings.server.local.mtls.certificate.none':
+    'Keine lokale Identität ausgewählt',
+  'settings.server.local.mtls.certificate.choose': 'Lokale Identität auswählen',
+  'settings.server.local.mtls.certificate.chooseShort': 'Auswählen',
+  'settings.server.local.mtls.certificate.change': 'Lokale Identität ändern',
+  'settings.server.local.mtls.certificate.remove': 'Lokale Identität entfernen',
+  'settings.server.local.mtls.certificate.remove.title':
+    'Ausgewählte lokale Identität entfernen?',
+  'settings.server.local.mtls.certificate.remove.message':
+    'Die lokale Client-Identität wird aus diesem Serverprofil entfernt.',
+  'settings.server.local.mtls.certificate.remove.cancel': 'Abbrechen',
+  'settings.server.local.mtls.certificate.remove.confirm': 'Entfernen',
+  'settings.server.local.mtls.selfSigned.label':
+    'Selbstsigniertes lokales Serverzertifikat zulassen',
+  'settings.server.local.mtls.selfSigned.warning':
+    'Zertifikatskette, Aussteller und Gültigkeit des Serverzertifikats werden nicht geprüft; die Hostnamenprüfung bleibt aktiv.',
+  'settings.server.local.mtls.help':
+    'Die Identität des externen Servers wird, falls vorhanden, vorausgewählt. Nur der KeyChain-Alias wird gespeichert; Zertifikat und privater Schlüssel bleiben im KeyChain.',
+  'settings.server.rtsp.header': 'RTSP-Erreichbarkeit',
+  'settings.server.rtsp.enabled': 'Lokales RTSP aktivieren',
+  'settings.server.rtsp.port.label': 'RTSP-Port',
+  'settings.server.rtsp.credentialsWarning':
+    'RTSP ist unverschlüsselt. Gemeinsame Frigate-Anmeldedaten können ohne Verschlüsselung im lokalen Netzwerk übertragen werden.',
+  'settings.server.rtsp.credentialsConsent':
+    'Ich verstehe und stimme zu, gemeinsame Frigate-Anmeldedaten über unverschlüsseltes RTSP zu übertragen',
+  'settings.server.rtsp.credentialsConsentRequired':
+    'Eine ausdrückliche Zustimmung ist erforderlich, bevor gemeinsame Anmeldedaten über unverschlüsseltes RTSP übertragen werden.',
+  'settings.server.rtsp.localRouteRequired':
+    'Aktivieren und vervollständigen Sie zuerst eine lokale Route, bevor Sie RTSP aktivieren.',
+  'settings.server.local.port.invalid':
+    'Geben Sie einen Port zwischen 1 und 65535 ein.',
+  'settings.server.local.endpointRequired':
+    'Vervollständigen Sie den lokalen Endpunkt.',
+  'settings.server.useCredentials.label': 'Anmeldedaten verwenden',
   'settings.locale.header': 'Gebietsschema',
+  'settings.appearance.header': 'Darstellung',
+  'settings.cameraOverview.header': 'Kameraübersicht',
   'settings.locale.region.label': 'Region',
   'settings.locale.region.option.en_AU': 'Australien (Englisch)',
   'settings.locale.region.option.en_CA': 'Kanada (Englisch)',
@@ -117,10 +361,10 @@ export default {
   'settings.locale.region.option.it_CH': 'Schweiz (Italienisch)',
   'settings.locale.region.option.it_IT': 'Italien (Italienisch)',
   'settings.locale.region.option.sv_SE': 'Schweden (Schwedisch)',
-  'settings.locale.datesDisplay.label': 'Datumsanzeige',
-  'settings.locale.datesDisplay.option.descriptive': 'Beschreibenden',
-  'settings.locale.datesDisplay.option.numeric': 'Numerisch',
-  'settings.app.header': 'Anwendung',
+  'settings.locale.datesDisplay.label': 'Datumsformat',
+  'settings.locale.datesDisplay.option.descriptive':
+    'Relative Zeit (z. B. vor 5 Minuten)',
+  'settings.locale.datesDisplay.option.numeric': 'Datum und Uhrzeit',
   'settings.app.colorScheme.label': 'Farbschema',
   'settings.app.colorScheme.option.auto': 'Auto',
   'settings.app.colorScheme.option.light': 'Hell',
@@ -128,14 +372,10 @@ export default {
   'settings.app.sendCrashReports.label': 'Absturzberichte senden',
   'settings.cameras.header': 'Kameras',
   'settings.cameras.imageRefreshFrequency.label':
-    'Grafik ausgetauscht (sekunden)',
-  'settings.cameras.liveView.label': 'Live-Ansicht',
-  'settings.cameras.liveView.disclaimer':
-    'Beachten Sie, dass die Aktualisierungsfrequenz von Ihrer Netzwerklatenz abhängt',
+    'Bildaktualisierungsintervall',
+  'settings.cameras.imageRefreshFrequency.unit.second': 'Sekunde',
+  'settings.cameras.imageRefreshFrequency.unit.seconds': 'Sekunden',
   'settings.cameras.numberOfColumns.label': 'Anzahl der Spalten',
-  'settings.cameras.actionWhenPressed.label': 'Aktion beim Drücken',
-  'settings.cameras.actionWhenPressed.option.events': 'Ereignisliste',
-  'settings.cameras.actionWhenPressed.option.preview': 'Kameravorschau',
   'settings.events.header': 'Ereignisse',
   'settings.events.numberOfColumns.label': 'Anzahl der Spalten',
   'settings.events.photoPreference.label': 'Fotopräferenz',
@@ -146,6 +386,9 @@ export default {
   'settings.toast.noServerData':
     'Sie müssen Frigate NVR-Serverdaten bereitstellen.',
   'storage.topBar.title': 'Speicher',
+  'storage.error':
+    'Speicherinformationen konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'storage.retry': 'Speicher erneut laden',
   'storage.location.header': 'Speicherort',
   'storage.location.recordings': 'Clips & Aufzeichnungen',
   'storage.location.cache': 'Cache',
@@ -155,6 +398,9 @@ export default {
   'storage.camera.header': 'Kamera',
   'storage.bandwidth.header': 'Bandbreite',
   'system.topBar.title': 'System',
+  'system.error':
+    'Systeminformationen konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'system.retry': 'Systeminformationen erneut laden',
   'system.info.data_updated': 'Daten aktualisiert',
   'system.info.current_version': 'Die aktuelle Version ist {version}',
   'system.info.latest_version': 'Es gibt ein Update auf {version}',

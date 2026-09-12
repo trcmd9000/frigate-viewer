@@ -8,6 +8,8 @@ and currently focuses on a secure Android release.
 ## Features
 
 - Browse camera events, snapshots, clips, and live feeds.
+- Choose a configured live stream per camera, or use Auto to prefer an
+  eligible H.265 stream with a compatible fallback.
 - Configure multiple Frigate servers.
 - Use Basic Auth, Frigate authentication, or Android client-certificate
   authentication (mTLS).
@@ -22,17 +24,24 @@ Android mTLS uses `KeyChain.choosePrivateKeyAlias`. The app stores only the
 selected alias and asks Android to use the protected private key during TLS
 authentication. The private key is not exported to JavaScript or app storage.
 
-Server certificate validation remains strict by default. Trusting a self-signed
-server certificate is an explicit, per-server opt-in.
+Native mTLS server certificate and hostname validation remain strict by default.
+Trusting a self-signed server certificate is an explicit, per-server opt-in.
+The Android manifest still permits cleartext traffic to preserve explicitly
+configured legacy HTTP servers; this is not a strict global cleartext default
+and requires a separate product decision before a production release.
 
 See [Client Certificate Setup](./docs/CLIENT_CERT_SETUP.md) for installation,
 configuration, and troubleshooting.
+See [Protected Media Playback](./docs/MEDIA_PLAYBACK.md) for the Media3 HLS
+transport and camera preview fallback.
 
 ## Releases
 
-Version `14.3.1` is available as an Android pre-release for internal testing.
-See the [GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases)
-for signed artifacts. Validate mTLS on a physical device before production use.
+Version `18.0.0` is the next Android release candidate. It requires the
+documented worker build, physical-device, and Play Internal Testing checks
+before public production promotion. See the
+[GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases) for
+signed artifacts.
 
 ## Privacy and security
 
