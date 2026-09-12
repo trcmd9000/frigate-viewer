@@ -67,7 +67,7 @@ jobs:
           fi
 
   android:
-    name: Android debug build
+    name: Android builds
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -108,3 +108,18 @@ jobs:
             --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m' \
             --stacktrace
+
+      - name: Verify minified arm64 release APK
+        working-directory: android
+        run: |
+          ./gradlew app:assembleRelease \
+            -PreactNativeArchitectures=arm64-v8a \
+            -PMYAPP_UPLOAD_STORE_FILE="$HOME/.android/debug.keystore" \
+            -PMYAPP_UPLOAD_STORE_PASSWORD=android \
+            -PMYAPP_UPLOAD_KEY_ALIAS=androiddebugkey \
+            -PMYAPP_UPLOAD_KEY_PASSWORD=android \
+            --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m' \
+            --stacktrace
+          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" dex packages --defined-only app/build/outputs/apk/release/app-release.apk |
+            grep -Eq 'com\.facebook\.react\.devsupport\.CxxInspectorPackagerConnection$'
