@@ -1,12 +1,10 @@
 name: Publish internal Play build
 
 on:
-  workflow_dispatch:
-    inputs:
-      release_name:
-        description: Optional release name shown in Play Console
-        required: false
-        type: string
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read
@@ -18,13 +16,15 @@ concurrency:
 jobs:
   publish:
     name: Build and publish to internal testing
-    if: github.ref == 'refs/heads/main'
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: play-internal
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -83,4 +83,3 @@ jobs:
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           track: internal
           status: completed
-          releaseName: ${{ inputs.release_name }}
