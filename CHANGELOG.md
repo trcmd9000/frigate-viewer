@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.1] - 2026-09-12
+
+- Fixed an Android release startup crash where R8 removed React Native inspector
+  JNI classes required by the native runtime.
+
 ## [18.0.0] - 2026-09-12
 
 - Added per-camera, per-server-profile live stream selection with an `Auto`

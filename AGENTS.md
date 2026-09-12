@@ -16,7 +16,7 @@ decisions that future maintainers and coding agents must preserve.
   is present, but iOS mTLS and release builds are not currently supported or
   validated.
 - Current public release: `14.3.1` with Android `versionCode 21`. The next
-  release candidate is `18.0.0` with Android `versionCode 23`.
+  release candidate is `18.0.1` with Android `versionCode 24`.
 
 ## Public repository rules
 
