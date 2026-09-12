@@ -9,6 +9,9 @@
 
 # Add any project specific keep options here:
 
+-keep class com.facebook.react.devsupport.CxxInspectorPackagerConnection { *; }
+-keep class com.facebook.react.devsupport.CxxInspectorPackagerConnection$* { *; }
+
 # VLC 3.2.6 calls these callback entry points from libvlcjni by name rather
 # than through a Java call. Keep only the JNI dispatch class and methods; do
 # not keep the whole org.videolan.libvlc package.
