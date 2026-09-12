@@ -33,6 +33,7 @@ final class ProtectedMseLiveDataSource extends BaseDataSource {
   private final MediaProfileRegistry registry;
   private final Object stateLock = new Object();
   private final ArrayDeque<byte[]> messages = new ArrayDeque<>();
+  private final ProtectedMseMp4Probe mp4 = new ProtectedMseMp4Probe();
 
   private WebSocket webSocket;
   private Uri openedUri;
@@ -41,6 +42,7 @@ final class ProtectedMseLiveDataSource extends BaseDataSource {
   private int bufferedBytes;
   private int connectionGeneration;
   private boolean mimeReady;
+  private boolean contractReady;
   private final AtomicBoolean retriedAuthentication = new AtomicBoolean();
   private boolean closed;
   private boolean transferStarted;
@@ -66,7 +68,7 @@ final class ProtectedMseLiveDataSource extends BaseDataSource {
     transferInitializing(listenerDataSpec);
     try {
       connect(openedUri);
-      awaitMime();
+      awaitMseContract();
     } catch (IOException | RuntimeException error) {
       close();
       throw error;
@@ -211,9 +213,17 @@ final class ProtectedMseLiveDataSource extends BaseDataSource {
                 new IOException("Protected MSE live media buffer exceeded its limit")
               );
             } else {
-              messages.addLast(message);
-              bufferedBytes += message.length;
-              stateLock.notifyAll();
+              try {
+                mp4.accept(message);
+                messages.addLast(message);
+                bufferedBytes += message.length;
+                if (mp4.isComplete()) {
+                  contractReady = true;
+                }
+                stateLock.notifyAll();
+              } catch (IOException error) {
+                socketToCancel = failLocked(error);
+              }
             }
           }
           if (socketToCancel != null) {
@@ -276,12 +286,12 @@ final class ProtectedMseLiveDataSource extends BaseDataSource {
     }
   }
 
-  private void awaitMime() throws IOException {
+  private void awaitMseContract() throws IOException {
     synchronized (stateLock) {
       long deadline = System.nanoTime() + START_TIMEOUT_NANOS;
-      while (!mimeReady) {
+      while (!contractReady) {
         throwIfUnavailable();
-        awaitState(deadline, "Protected MSE live media startup timed out");
+        awaitState(deadline, "Protected MSE live media contract timed out");
       }
     }
   }

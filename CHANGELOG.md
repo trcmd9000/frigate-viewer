@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [18.0.0] - 2026-09-12
 
 - Added per-camera, per-server-profile live stream selection with an `Auto`
   default that prefers a verified H.265 MSE stream and otherwise selects a
@@ -12,6 +12,12 @@ All notable changes to this project will be documented in this file.
   must all succeed; a failure falls back to a compatible stream or snapshots.
 - Consolidated camera title, transport status, and audio controls into one
   bounded live-preview overlay and removed the duplicate native `LIVE` badge.
+- Added a compact, theme-aware stream selector behind a player gear control and
+  replaced the ambiguous audio glyph with conventional speaker icons.
+- Hid Android system bars for live and event playback modals while preserving
+  Android predictive-back behavior.
+- Reduced repeated live-start preparation by reusing validated stream metadata
+  briefly within the active server profile.
 - Switched event clip playback to protected Frigate VOD HLS through the
   Media3/react-native-video transport extension.
 - Added Android Frigate/go2rtc WebRTC live preview with native protected

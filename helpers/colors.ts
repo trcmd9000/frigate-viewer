@@ -147,7 +147,7 @@ export const navigationThemeOptions = (
   statusBar: {
     backgroundColor: theme.background,
     style: scheme === 'dark' ? ('light' as const) : ('dark' as const),
-    visible: Platform.OS !== 'android' || surface !== 'event',
+    visible: Platform.OS !== 'android' || surface === 'app',
     animate: true,
   },
   navigationBar: {

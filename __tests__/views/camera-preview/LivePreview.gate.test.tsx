@@ -9,7 +9,6 @@ const appStateListeners: Array<(state: 'active' | 'background') => void> = [];
 const mockGet = jest.fn();
 const mockFetchStreamMetadata = jest.fn();
 const mockPrepareLocalRtspMedia = jest.fn();
-const mockProbeProtectedMseContract = jest.fn();
 const mockProbeDeviceCodecCapability = jest.fn();
 const mockPlanProtectedLiveStreams = jest.fn();
 const mockProtectedMseMediaUri = jest.fn();
@@ -97,7 +96,6 @@ jest.mock('../../../helpers/hevcTransport', () => ({
   probeDeviceCodecCapability: () => mockProbeDeviceCodecCapability(),
   protectedMseProbeEnabled: () => mockMseProbeEnabled,
   protectedMseProbeFailure: () => 'unknown',
-  probeProtectedMseContract: mockProbeProtectedMseContract,
 }));
 
 jest.mock('../../../components/media/ProtectedWebRTCPlayer', () => {
@@ -131,6 +129,7 @@ jest.mock('../../../components/media/LocalRtspPlayer', () => ({
 
 jest.mock('../../../helpers/protectedMedia', () => ({
   protectedMseMediaUri: mockProtectedMseMediaUri,
+  protectedMediaProfileId: jest.fn().mockResolvedValue('profile-id'),
   releaseProtectedMediaUri: jest.fn(),
 }));
 
@@ -304,7 +303,6 @@ describe('LivePreview audio render gate', () => {
     });
     mockPrepareLocalRtspMedia.mockReset();
     mockPrepareLocalRtspMedia.mockRejectedValue(new Error('no local route'));
-    mockProbeProtectedMseContract.mockReset();
     mockProtectedMseMediaUri.mockReset();
     mockProtectedMseMediaUri.mockResolvedValue('frigate-media://profile/mse/front');
     mockLogInfo.mockReset();
@@ -336,27 +334,13 @@ describe('LivePreview audio render gate', () => {
     view.unmount();
   });
 
-  it('keeps fallback transports idle until an HEVC probe reaches stable MSE playback', async () => {
-    let resolveProbe: (result: {
-      mimeH265: boolean;
-      ftyp: boolean;
-      moov: boolean;
-      moof: boolean;
-      mdat: boolean;
-      bytesObserved: number;
-    }) => void = () => undefined;
+  it('starts Media3 directly so one MSE connection owns validation and playback', async () => {
     mockMseProbeEnabled = true;
-    mockPlayerShouldReportPlaying = false;
     mockFetchStreamMetadata.mockResolvedValue({
       video: [{kind: 'video', codec: 'h265'}],
       audio: [],
       malformed: false,
     });
-    mockProbeProtectedMseContract.mockReturnValue(
-      new Promise(resolve => {
-        resolveProbe = resolve;
-      }),
-    );
 
     const view = render(
       <IntlProvider locale="en" messages={en}>
@@ -364,22 +348,11 @@ describe('LivePreview audio render gate', () => {
       </IntlProvider>,
     );
 
-    await waitFor(() => expect(mockProbeProtectedMseContract).toHaveBeenCalled());
+    await waitFor(() => expect(mockProtectedMseMediaUri).toHaveBeenCalledWith(
+      mockServer,
+      'front',
+    ));
     expect(mockPrepareLocalRtspMedia).not.toHaveBeenCalled();
-    expect(view.queryByTestId('protected-player')).toBeNull();
-    expect(view.getByTestId('mock-live-status').props.state).toBe('preparing');
-
-    await act(async () => {
-      resolveProbe({
-        mimeH265: true,
-        ftyp: true,
-        moov: true,
-        moof: true,
-        mdat: true,
-        bytesObserved: 1024,
-      });
-    });
-
     await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
     await waitFor(() => {
       const status = view.getByTestId('mock-live-status');
@@ -391,7 +364,102 @@ describe('LivePreview audio render gate', () => {
     view.unmount();
   });
 
-  it('probes a non-primary HEVC candidate before starting the compatible stream', async () => {
+  it('prewarms the opaque MSE URI while stream metadata is loading', async () => {
+    mockMseProbeEnabled = true;
+    let resolveMetadata!: (value: unknown) => void;
+    mockFetchStreamMetadata.mockReturnValue(new Promise(resolve => {
+      resolveMetadata = resolve;
+    }));
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() => expect(mockProtectedMseMediaUri).toHaveBeenCalledWith(
+      mockServer,
+      'front',
+    ));
+    expect(view.queryByTestId('mse-player')).toBeNull();
+
+    resolveMetadata({
+      video: [{kind: 'video', codec: 'h265'}],
+      audio: [],
+      malformed: false,
+    });
+    await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
+    view.unmount();
+  });
+
+  it('starts MSE without waiting for the optional camera stats request', async () => {
+    mockMseProbeEnabled = true;
+    mockGet.mockImplementation((_: unknown, endpoint: string) =>
+      endpoint === 'stats'
+        ? new Promise(() => undefined)
+        : Promise.resolve({
+            go2rtc: {streams: {front: {}}},
+            cameras: {front: {live: {streams: {main: 'front'}}}},
+          }),
+    );
+    mockFetchStreamMetadata.mockResolvedValue({
+      video: [{kind: 'video', codec: 'h265'}],
+      audio: [],
+      malformed: false,
+    });
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
+    view.unmount();
+  });
+
+  it('starts an eligible MSE stream before slower fallback metadata resolves', async () => {
+    mockMseProbeEnabled = true;
+    mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
+    let resolveCompatible!: (value: unknown) => void;
+    mockFetchStreamMetadata.mockImplementation((_: unknown, streamName: string) =>
+      streamName === 'compatible'
+        ? new Promise(resolve => {
+            resolveCompatible = resolve;
+          })
+        : Promise.resolve({
+            video: [{kind: 'video', codec: 'h265'}],
+            audio: [],
+            malformed: false,
+          }),
+    );
+    mockPlanProtectedLiveStreams.mockImplementation(({streams}) => streams
+      .map((stream: {name: string; metadata?: {video?: Array<{codec: string}>}}) => ({
+        name: stream.name,
+        codec: stream.metadata?.video?.some(
+          descriptor => descriptor.codec === 'h265',
+        ) ? 'h265' : 'h264',
+        transport: stream.metadata?.video?.some(
+          descriptor => descriptor.codec === 'h265',
+        ) ? 'mse' : 'webrtc',
+      })));
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
+    resolveCompatible({
+      video: [{kind: 'video', codec: 'h264'}],
+      audio: [],
+      malformed: false,
+    });
+    view.unmount();
+  });
+
+  it('starts a non-primary HEVC candidate before the compatible stream', async () => {
     mockMseProbeEnabled = true;
     mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
     mockFetchStreamMetadata.mockImplementation((_: unknown, streamName: string) =>
@@ -410,15 +478,6 @@ describe('LivePreview audio render gate', () => {
       {name: streams[1].name, codec: 'h265', transport: 'mse'},
       {name: streams[0].name, codec: 'h264', transport: 'webrtc'},
     ]);
-    mockProbeProtectedMseContract.mockResolvedValue({
-      mimeH265: true,
-      ftyp: true,
-      moov: true,
-      moof: true,
-      mdat: true,
-      bytesObserved: 1024,
-    });
-
     const view = render(
       <IntlProvider locale="en" messages={en}>
         <LivePreview cameraName="front" />
@@ -426,7 +485,7 @@ describe('LivePreview audio render gate', () => {
     );
 
     await waitFor(() =>
-      expect(mockProbeProtectedMseContract).toHaveBeenCalledWith(
+      expect(mockProtectedMseMediaUri).toHaveBeenCalledWith(
         mockServer,
         'original',
       ),
@@ -473,6 +532,12 @@ describe('LivePreview audio render gate', () => {
     expect(view.getByTestId('mock-live-status').props.frameRate).toBe(12);
     fireEvent.press(view.getByTestId('camera-preview-media-tap'));
     expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy();
+    expect(view.queryByRole('radio')).toBeNull();
+    fireEvent.press(view.getByTestId('camera-preview-stream-dropdown'));
+    expect(view.getByTestId('camera-preview-stream-menu-dismiss')).toBeTruthy();
+    fireEvent.press(view.getByTestId('camera-preview-stream-menu-dismiss'));
+    expect(view.queryByRole('radio')).toBeNull();
+    fireEvent.press(view.getByTestId('camera-preview-stream-dropdown'));
     fireEvent.press(
       view.getByRole('radio', {
         name: 'Original H.264 - 1920 x 1080',
@@ -529,6 +594,8 @@ describe('LivePreview audio render gate', () => {
       left: 32,
     });
     fireEvent.press(mediaTap);
+    expect(view.queryByRole('radio')).toBeNull();
+    fireEvent.press(view.getByTestId('camera-preview-stream-dropdown'));
 
     expect(
       view.getByRole('radio', {name: 'Compatible - H.264'}).props

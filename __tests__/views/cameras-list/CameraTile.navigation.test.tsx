@@ -131,6 +131,12 @@ describe('CameraTile native navigation', () => {
         component: expect.objectContaining({
           name: 'CameraPreview',
           passProps: {cameraName: 'lumus_pro', ownerScopeGeneration: 0},
+          options: expect.objectContaining({
+            layout: expect.objectContaining({backgroundColor: '#000000'}),
+            topBar: {visible: false},
+            statusBar: {visible: false},
+            navigationBar: {visible: false, backgroundColor: '#000000'},
+          }),
         }),
       }),
     );

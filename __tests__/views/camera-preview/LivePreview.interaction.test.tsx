@@ -112,9 +112,7 @@ describe('LivePreview interaction layering', () => {
     const media = await view.findByTestId('camera-preview-media');
     await waitFor(() => expect(view.getByTestId('zoomable-image')).toBeTruthy());
     await waitFor(() => expect(mockGet).toHaveBeenCalled());
-    const retry = await waitFor(() =>
-      view.getByRole('button', {name: 'Retry live stream'}),
-    );
+    const retry = await view.findByTestId('camera-preview-retry');
 
     expect(view.queryByTestId('camera-preview-media-tap')).toBeNull();
     expect(view.getByTestId('zoomable-image').props.source).toEqual({
@@ -123,7 +121,7 @@ describe('LivePreview interaction layering', () => {
 
     fireEvent(media, 'touchEnd');
     fireEvent.press(retry);
-    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(4));
 
     expect(retry).toBeTruthy();
     view.unmount();

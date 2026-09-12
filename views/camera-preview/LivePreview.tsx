@@ -42,6 +42,7 @@ import {ProtectedWebRTCPlayer} from '../../components/media/ProtectedWebRTCPlaye
 import {LocalRtspPlayer} from '../../components/media/LocalRtspPlayer';
 import {
   protectedMseMediaUri,
+  protectedMediaProfileId,
   releaseProtectedMediaUri,
 } from '../../helpers/protectedMedia';
 import {Media3MediaPlayer} from '../../components/media/Media3MediaPlayer';
@@ -61,18 +62,20 @@ import type {PlayableMedia} from '../../components/media/PlayableMedia';
 import {LiveStatusBadge} from '../../components/media/LiveStatusBadge';
 import type {ProtectedLiveFailureReason} from '../../helpers/protectedLiveDiagnostics';
 import {LiveAudioControl} from './LiveAudioControl';
-import {Dropdown} from '../../components/forms/Dropdown';
+import {LiveStreamControl} from './LiveStreamControl';
 import type {ProtectedAudioStatus} from '../../helpers/protectedAudio';
 import type {Stats} from '../../helpers/interfaces';
 import {
   fetchStreamMetadata,
   planProtectedLiveStreams,
   probeDeviceCodecCapability,
-  probeProtectedMseContract,
   protectedMseProbeEnabled,
-  protectedMseProbeFailure,
 } from '../../helpers/hevcTransport';
-import type {CodecFamily, MediaDescriptor} from '../../helpers/hevcTransport';
+import type {
+  CodecFamily,
+  MediaDescriptor,
+  StreamMetadata,
+} from '../../helpers/hevcTransport';
 
 type LivePreviewProps = PropsWithChildren<{
   cameraName: string;
@@ -145,6 +148,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       left: 32,
       zIndex: 2,
     },
+    streamMenuDismissSurface: {
+      position: 'absolute',
+      top: 48,
+      right: 32,
+      bottom: 72,
+      left: 32,
+      zIndex: 3,
+    },
     topOverlay: {
       position: 'absolute',
       top: 12,
@@ -167,12 +178,6 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       flexShrink: 0,
       marginLeft: 'auto',
       alignItems: 'flex-end',
-    },
-    streamSelector: {
-      position: 'absolute',
-      right: 16,
-      bottom: 24,
-      zIndex: 4,
     },
     image: {
       width: '100%',
@@ -254,6 +259,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [streamFrameRates, setStreamFrameRates] = useState<
     Array<number | undefined>
   >([]);
+  const cameraFrameRateRef = useRef<number>();
   const [firstCompatibleStreamIndex, setFirstCompatibleStreamIndex] =
     useState(0);
   const streamName = streamNames[streamIndex];
@@ -269,8 +275,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [fallbackReason, setFallbackReason] =
     useState<ProtectedLiveFailureReason>();
   const [transientOverlayVisible, setTransientOverlayVisible] = useState(true);
-  const [overlayOpacity] = useState(() => new Animated.Value(1));
   const [streamSelectorOpen, setStreamSelectorOpen] = useState(false);
+  const [overlayOpacity] = useState(() => new Animated.Value(1));
   const overlayTimer = useRef<ReturnType<typeof setTimeout>>();
   const overlayGeneration = useRef(0);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
@@ -345,14 +351,24 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   }, [fallbackReason, intl, livePhase, overlayOpacity]);
   const scheduleOverlayHide = useCallback(() => {
     clearOverlayTimer();
-    if (!playbackActive || (livePhase !== 'live' && livePhase !== 'fallback' && livePhase !== 'degraded')) {
+    if (
+      streamSelectorOpen ||
+      !playbackActive ||
+      (livePhase !== 'live' && livePhase !== 'fallback' && livePhase !== 'degraded')
+    ) {
       return;
     }
     overlayTimer.current = setTimeout(
       hideTransientOverlay,
       livePhase === 'live' ? 3000 : 6000,
     );
-  }, [clearOverlayTimer, hideTransientOverlay, livePhase, playbackActive]);
+  }, [
+    clearOverlayTimer,
+    hideTransientOverlay,
+    livePhase,
+    playbackActive,
+    streamSelectorOpen,
+  ]);
   const revealTransientOverlays = useCallback(() => {
     overlayGeneration.current += 1;
     clearOverlayTimer();
@@ -363,10 +379,16 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   }, [clearOverlayTimer, overlayOpacity, scheduleOverlayHide]);
   const handleDecodedMediaPress = useCallback(() => {
     revealTransientOverlays();
-    if (streamOptions.length > 1 && server.profileId) {
-      setStreamSelectorOpen(true);
+  }, [revealTransientOverlays]);
+  const handleStreamSelectorOpenChange = useCallback((open: boolean) => {
+    setStreamSelectorOpen(open);
+    if (open) {
+      revealTransientOverlays();
+      clearOverlayTimer();
+      return;
     }
-  }, [revealTransientOverlays, server.profileId, streamOptions.length]);
+    scheduleOverlayHide();
+  }, [clearOverlayTimer, revealTransientOverlays, scheduleOverlayHide]);
   const cancelTransientOverlay = useCallback(() => {
     overlayGeneration.current += 1;
     clearOverlayTimer();
@@ -681,6 +703,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setStreamNames([]);
     setStreamCodecs([]);
     setStreamFrameRates([]);
+    cameraFrameRateRef.current = undefined;
     setStreamOptions([]);
     setStreamOptionLabels({});
     setFallbackReason(undefined);
@@ -704,6 +727,29 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         active = false;
       };
     }
+
+    const deviceCapabilityRequest = probeDeviceCodecCapability();
+    const cameraFrameRateRequest = getRef.current<Stats>(server, 'stats')
+      .then(stats => {
+        const frameRate = stats.cameras?.[cameraName]?.camera_fps;
+        return typeof frameRate === 'number' &&
+          Number.isFinite(frameRate) && frameRate > 0
+          ? frameRate
+          : undefined;
+      })
+      .catch(() => undefined);
+    void cameraFrameRateRequest.then(cameraFrameRate => {
+      if (!active || cameraFrameRate === undefined) {
+        return;
+      }
+      cameraFrameRateRef.current = cameraFrameRate;
+      setStreamFrameRates(current => current.map(
+        frameRate => frameRate ?? cameraFrameRate,
+      ));
+    });
+    const profileRegistrationRequest = protectedMseProbeEnabled()
+      ? protectedMediaProfileId(server).then(() => true).catch(() => false)
+      : Promise.resolve(false);
 
     getRef
       .current<Parameters<typeof selectProtectedLiveStreams>[0]>(
@@ -745,17 +791,61 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         }
         setLivePhase('preparing');
         armFirstFrameTimeout();
-        const deviceCapabilityRequest = probeDeviceCodecCapability();
-        const cameraFrameRateRequest = getRef.current<Stats>(server, 'stats')
-          .then(stats => {
-            const frameRate = stats.cameras?.[cameraName]?.camera_fps;
-            return typeof frameRate === 'number' &&
-              Number.isFinite(frameRate) && frameRate > 0
-              ? frameRate
-              : undefined;
-          })
-          .catch(() => undefined);
 
+        const mseUriRequests = new Map<string, Promise<string>>();
+        if (protectedMseProbeEnabled()) {
+          selectedStreams.forEach(selectedStream => {
+            const request = protectedMseMediaUri(server, selectedStream);
+            // The selected request is awaited below. Observe unused requests so
+            // an unavailable optional stream cannot become an unhandled rejection.
+            request.catch(() => undefined);
+            mseUriRequests.set(selectedStream, request);
+          });
+        }
+        let mseStartRequest: Promise<boolean> | undefined;
+        const startMse = (
+          selectedStream: string,
+          metadata?: StreamMetadata,
+        ): Promise<boolean> => {
+          if (mseStartRequest) {
+            return mseStartRequest;
+          }
+          mseStartRequest = (async () => {
+            try {
+              if (!(await profileRegistrationRequest)) {
+                throw new Error('The protected MSE profile is unavailable');
+              }
+              const uri = await (
+                mseUriRequests.get(selectedStream) ||
+                protectedMseMediaUri(server, selectedStream)
+              );
+              if (!active || firstFrameExpired.current) {
+                releaseProtectedMediaUri(uri);
+                return false;
+              }
+              armFirstFrameTimeout();
+              setMseAudioAvailable((metadata?.audio.length || 0) > 0);
+              setMseMedia({
+                uri,
+                mimeType: 'video/mp4',
+                mode: 'direct',
+              });
+              setRtspMedia(undefined);
+              setActiveTransport('mse');
+              setLivePhase('connecting');
+              return true;
+            } catch {
+              if (active) {
+                SecureLogger.logInfo(
+                  'streamIndex=0, success=false',
+                  'protected-mse-prepare',
+                );
+              }
+              return false;
+            }
+          })();
+          return mseStartRequest;
+        };
         const metadataRequests = selectedStreams.map((selectedStream, index) =>
           fetchStreamMetadata(server, selectedStream)
             .then(metadata => {
@@ -769,6 +859,22 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 `streamIndex=${index}, metadataAvailable=true, malformed=${metadata.malformed}, aac=${audioCodecs.has('aac')}, opus=${audioCodecs.has('opus')}, pcma=${audioCodecs.has('pcma')}, pcmu=${audioCodecs.has('pcmu')}`,
                 'protected-live-codecs',
               );
+              if (protectedMseProbeEnabled()) {
+                void deviceCapabilityRequest.then(device => {
+                  if (!active || firstFrameExpired.current) {
+                    return;
+                  }
+                  const earlyPlan = planProtectedLiveStreams({
+                    streams: [{name: selectedStream, metadata}],
+                    device,
+                    selection: effectiveStreamPreference,
+                    mseEnabled: true,
+                  });
+                  if (earlyPlan[0]?.transport === 'mse') {
+                    void startMse(selectedStream, metadata);
+                  }
+                }).catch(() => undefined);
+              }
               return metadata;
             })
             .catch(() => {
@@ -783,10 +889,9 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           );
 
           (async () => {
-            const [metadata, device, cameraFrameRate] = await Promise.all([
+            const [metadata, device] = await Promise.all([
               Promise.all(metadataRequests),
               deviceCapabilityRequest,
-              cameraFrameRateRequest,
             ]);
             if (!active || firstFrameExpired.current) {
               return;
@@ -838,55 +943,15 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               ];
               return streamMetadata?.video?.find(
                 descriptor => descriptor.codec === candidate.codec,
-              )?.frameRate ?? cameraFrameRate;
+              )?.frameRate ?? cameraFrameRateRef.current;
             }));
             setStreamIndex(0);
             setFirstCompatibleStreamIndex(
               compatibleStreamIndex >= 0 ? compatibleStreamIndex : plan.length,
             );
             if (initialCandidate.transport === 'mse') {
-              try {
-                const result = await probeProtectedMseContract(
-                  server,
-                  initialCandidate.name,
-                );
-                if (active) {
-                  SecureLogger.logInfo(
-                    `streamIndex=0, success=true, mimeH265=${result.mimeH265}, ftyp=${result.ftyp}, moov=${result.moov}, moof=${result.moof}, mdat=${result.mdat}, bytesObserved=${result.bytesObserved}`,
-                    'protected-mse-probe',
-                  );
-                }
-                if (
-                  result.mimeH265 && result.ftyp && result.moov &&
-                  result.moof && result.mdat
-                ) {
-                  const uri = await protectedMseMediaUri(
-                    server,
-                    initialCandidate.name,
-                  );
-                  if (!active || firstFrameExpired.current) {
-                    releaseProtectedMediaUri(uri);
-                    return;
-                  }
-                  armFirstFrameTimeout();
-                  setMseAudioAvailable((initialMetadata?.audio.length || 0) > 0);
-                  setMseMedia({
-                    uri,
-                    mimeType: 'video/mp4',
-                    mode: 'direct',
-                  });
-                  setRtspMedia(undefined);
-                  setActiveTransport('mse');
-                  setLivePhase('connecting');
-                  return;
-                }
-              } catch (error) {
-                if (active) {
-                  SecureLogger.logInfo(
-                    `streamIndex=0, success=false, reason=${protectedMseProbeFailure(error)}`,
-                    'protected-mse-probe',
-                  );
-                }
+              if (await startMse(initialCandidate.name, initialMetadata)) {
+                return;
               }
               if (compatibleStreamIndex >= 0) {
                 armFirstFrameTimeout();
@@ -1128,6 +1193,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           onPress={handleDecodedMediaPress}
         />
       )}
+      {streamSelectorOpen && (
+        <Pressable
+          testID="camera-preview-stream-menu-dismiss"
+          accessible={false}
+          style={styles.streamMenuDismissSurface}
+          onPress={() => handleStreamSelectorOpenChange(false)}
+        />
+      )}
       {playbackActive &&
         (livePhase === 'degraded' || livePhase === 'fallback') && (
           <Animated.View
@@ -1154,6 +1227,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               {fallbackVisibleText}
             </Text>
             <Pressable
+              testID="camera-preview-retry"
               style={styles.retryButton}
               accessibilityRole="button"
               accessibilityLabel={intl.formatMessage({
@@ -1202,64 +1276,6 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           playbackActive &&
           decoded &&
           livePhase === 'live' &&
-          streamOptions.length > 1 &&
-          server.profileId && (
-          <Animated.View
-            testID="camera-preview-stream-selector"
-            accessibilityElementsHidden={!transientOverlayVisible}
-            importantForAccessibility={
-              transientOverlayVisible ? 'yes' : 'no-hide-descendants'
-            }
-            pointerEvents={transientOverlayVisible ? 'auto' : 'none'}
-            style={[styles.streamSelector, {opacity: overlayOpacity}]}
-          >
-            <Dropdown
-              testID="camera-preview-stream-dropdown"
-              compact
-              icon="switcher"
-              open={streamSelectorOpen}
-              onOpenChange={setStreamSelectorOpen}
-              accessibilityLabel={intl.formatMessage({
-                id: 'cameraPreview.stream.select',
-                defaultMessage: 'Select live stream',
-              })}
-              value={
-                streamName || (streamPreference?.mode === 'manual'
-                  ? streamPreference.streamName
-                  : 'auto')
-              }
-              options={[
-                {
-                  value: 'auto',
-                  label: intl.formatMessage({
-                    id: 'cameraPreview.stream.auto',
-                    defaultMessage: 'Auto (prefer HEVC)',
-                  }),
-                },
-                ...streamOptions.map(stream => ({
-                  value: stream.name,
-                  label: streamOptionLabels[stream.name] || stream.label,
-                })),
-              ]}
-              onValueChange={value => {
-                dispatch(
-                  setLiveStreamPreference({
-                    profileId: server.profileId as string,
-                    cameraName,
-                    preference:
-                      value === 'auto'
-                        ? {mode: 'auto'}
-                        : {mode: 'manual', streamName: value as string},
-                  }),
-                );
-              }}
-            />
-          </Animated.View>
-        )}
-        {appActive &&
-          playbackActive &&
-          decoded &&
-          livePhase === 'live' &&
           (transport === 'rtsp' || transport === 'webrtc' || transport === 'mse') && (
           <LiveAudioControl
             muted={transport === 'webrtc' ? webrtcAudioStatus.state !== 'active' : muted}
@@ -1277,6 +1293,44 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               }
               revealTransientOverlays();
             }}
+            streamControl={
+              streamOptions.length > 1 && server.profileId ? (
+                <LiveStreamControl
+                  open={streamSelectorOpen}
+                  onOpenChange={handleStreamSelectorOpenChange}
+                  value={
+                    streamName || (streamPreference?.mode === 'manual'
+                      ? streamPreference.streamName
+                      : 'auto')
+                  }
+                  options={[
+                    {
+                      value: 'auto',
+                      label: intl.formatMessage({
+                        id: 'cameraPreview.stream.auto',
+                        defaultMessage: 'Auto (prefer HEVC)',
+                      }),
+                    },
+                    ...streamOptions.map(stream => ({
+                      value: stream.name,
+                      label: streamOptionLabels[stream.name] || stream.label,
+                    })),
+                  ]}
+                  onValueChange={value => {
+                    dispatch(
+                      setLiveStreamPreference({
+                        profileId: server.profileId as string,
+                        cameraName,
+                        preference:
+                          value === 'auto'
+                            ? {mode: 'auto'}
+                            : {mode: 'manual', streamName: value},
+                      }),
+                    );
+                  }}
+                />
+              ) : undefined
+            }
           />
         )}
       </View>

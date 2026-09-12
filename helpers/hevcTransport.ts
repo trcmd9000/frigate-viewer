@@ -2,6 +2,7 @@ import {Buffer} from 'buffer';
 import {NativeModules, Platform} from 'react-native';
 import type {Server} from '../store/settings';
 import {protectedMediaProfileId} from './protectedMedia';
+import {serverProfileIdentity} from './serverIdentity';
 import {
   authorizationHeader,
   buildServerApiUrl,
@@ -11,6 +12,7 @@ import {
 export const MAX_STREAM_METADATA_BYTES = 64 * 1024;
 const MAX_METADATA_DEPTH = 16;
 const MAX_METADATA_DESCRIPTORS = 128;
+const STREAM_METADATA_CACHE_TTL_MS = 30_000;
 
 export type CodecFamily =
   | 'h264'
@@ -975,6 +977,44 @@ export const fetchStreamMetadata = async (
   if (!baseUrl) {
     throw new Error('The configured server endpoint is invalid');
   }
+  const cacheScope = serverProfileIdentity(server);
+  const cacheKey = `${baseUrl}\u0000${streamName}`;
+  const cached = streamMetadataCache.get(cacheScope)?.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.request;
+  }
+  const entries = streamMetadataCache.get(cacheScope) || new Map();
+  streamMetadataCache.set(cacheScope, entries);
+  const request = fetchStreamMetadataUncached(server, encodedStreamName, baseUrl)
+    .then(metadata => {
+      if (metadata.malformed) {
+        entries.delete(cacheKey);
+      }
+      return metadata;
+    })
+    .catch(error => {
+      entries.delete(cacheKey);
+      throw error;
+    });
+  entries.set(cacheKey, {
+    expiresAt: Date.now() + STREAM_METADATA_CACHE_TTL_MS,
+    request,
+  });
+  return request;
+};
+
+interface StreamMetadataCacheEntry {
+  readonly expiresAt: number;
+  readonly request: Promise<StreamMetadata>;
+}
+
+const streamMetadataCache = new Map<string, Map<string, StreamMetadataCacheEntry>>();
+
+const fetchStreamMetadataUncached = async (
+  server: Server,
+  encodedStreamName: string,
+  baseUrl: string,
+): Promise<StreamMetadata> => {
   const response = await executeServerRequest(
     server,
     `${baseUrl}/go2rtc/streams/${encodedStreamName}`,

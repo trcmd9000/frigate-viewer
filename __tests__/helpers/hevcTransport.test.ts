@@ -405,6 +405,29 @@ describe('HEVC transport observation model', () => {
     expect(JSON.stringify(metadata)).not.toContain('public.invalid');
   });
 
+  it('briefly reuses validated metadata for the same server and stream', async () => {
+    request.mockResolvedValue({
+      status: 200,
+      text: async () => '{"producers":[{"medias":"video, H265"}]}',
+    });
+    const server = {
+      profileId: 'metadata-cache-test',
+      protocol: 'https' as const,
+      host: 'server.invalid',
+      port: 443,
+      path: '',
+      auth: 'none' as const,
+      credentials: {username: '', password: ''},
+    };
+
+    const first = await fetchStreamMetadata(server, 'camera');
+    const second = await fetchStreamMetadata({...server}, 'camera');
+
+    expect(first.video[0].codec).toBe('h265');
+    expect(second).toBe(first);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it('treats an unexpected response content type as unknown without retaining it', async () => {
     request.mockResolvedValue({
       status: 200,

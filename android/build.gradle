@@ -4,14 +4,14 @@ def enableProguardInReleaseBuilds = true
 
 buildscript {
     ext {
-        RNNKotlinVersion = "1.9.22"
-        buildToolsVersion = "35.0.0"
+        RNNKotlinVersion = "2.2.10"
+        buildToolsVersion = "36.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 35
-        targetSdkVersion = 35
+        compileSdkVersion = 36
+        targetSdkVersion = 36
 
         ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.9.22"
+        kotlinVersion = "2.2.10"
         media3Version = "1.8.0"
         // Enable the Media3 RTSP module used by the local, opt-in camera path.
         useExoplayerRtsp = true
@@ -21,10 +21,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$RNNKotlinVersion"
-        classpath("com.android.tools.build:gradle:8.6.1")
+        classpath("com.android.tools.build:gradle:9.3.2")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$RNNKotlinVersion")
     }
 }
  

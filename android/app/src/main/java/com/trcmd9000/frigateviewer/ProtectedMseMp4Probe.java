@@ -22,6 +22,9 @@ final class ProtectedMseMp4Probe {
     if (data == null || data.length == 0) {
       return;
     }
+    if (isComplete()) {
+      return;
+    }
     if (data.length > MAX_MESSAGE_BYTES || totalBytes + data.length > MAX_TOTAL_BYTES) {
       throw new IOException("The protected MSE probe exceeded its byte budget");
     }

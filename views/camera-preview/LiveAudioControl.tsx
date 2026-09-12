@@ -1,4 +1,4 @@
-import React, {FC} from 'react';
+import React, {FC, ReactNode} from 'react';
 import {Text, View} from 'react-native';
 import {useIntl} from 'react-intl';
 import {AudioToggle} from '../../components/media/AudioToggle';
@@ -10,6 +10,7 @@ interface LiveAudioControlProps {
   onToggle: () => void;
   disabled?: boolean;
   status?: ProtectedAudioStatus;
+  streamControl?: ReactNode;
 }
 
 export const LiveAudioControl: FC<LiveAudioControlProps> = ({
@@ -17,6 +18,7 @@ export const LiveAudioControl: FC<LiveAudioControlProps> = ({
   onToggle,
   disabled = false,
   status,
+  streamControl,
 }) => {
   const intl = useIntl();
   const hint = status?.state === 'pending'
@@ -42,6 +44,11 @@ export const LiveAudioControl: FC<LiveAudioControlProps> = ({
       zIndex: 4,
       alignItems: 'center',
     },
+    controls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     hint: {
       color: theme.mediaText,
       backgroundColor: theme.mediaOverlay,
@@ -55,15 +62,17 @@ export const LiveAudioControl: FC<LiveAudioControlProps> = ({
 
   return (
     <View testID="camera-preview-audio-container" pointerEvents="box-none" style={styles.audioControls}>
-      <AudioToggle
-        testID="camera-preview-audio"
-        slashTestID="camera-preview-audio-slash"
-        muted={muted}
-        onToggle={onToggle}
-        disabled={disabled}
-        status={status}
-        hint={hint}
-      />
+      <View style={styles.controls}>
+        <AudioToggle
+          testID="camera-preview-audio"
+          muted={muted}
+          onToggle={onToggle}
+          disabled={disabled}
+          status={status}
+          hint={hint}
+        />
+        {streamControl}
+      </View>
       {hint && (
         <View pointerEvents="none">
           <Text testID="camera-preview-audio-hint" accessibilityLiveRegion="polite" style={styles.hint}>{hint}</Text>

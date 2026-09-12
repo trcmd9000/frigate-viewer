@@ -100,7 +100,7 @@ describe('adaptive color scheme', () => {
     ).toBe(false);
   });
 
-  it('hides only the event status bar on Android', () => {
+  it('hides status and navigation bars for playback surfaces on Android', () => {
     const originalPlatform = Platform.OS;
     (Platform as {OS: string}).OS = 'android';
 
@@ -112,7 +112,7 @@ describe('adaptive color scheme', () => {
     ).toBe(false);
     expect(
       navigationThemeOptions(lightTheme, 'light', 'media').statusBar.visible,
-    ).toBe(true);
+    ).toBe(false);
 
     (Platform as {OS: string}).OS = originalPlatform;
   });

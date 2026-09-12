@@ -6,15 +6,16 @@ This fork continues the upstream Android version sequence. Every published build
 must increment both values in `android/app/build.gradle`:
 
 - `versionName`: user-visible semantic version, next release candidate
-  `14.4.0`
+  `18.0.0`
 - `versionCode`: monotonically increasing Play Store build number, next
-  release candidate `22`
+  release candidate `23`
 
 ## Local prerequisites
 
 - JDK 17
-- Android SDK Platform 35
-- Android Build Tools 35.0.0
+- Android SDK Platform 36
+- Android Build Tools 36.0.0
+- Android Gradle Plugin 9.3.2 through the Gradle 9.5 wrapper
 - Node.js 18 or newer
 - An `arm64-v8a` Android device. Published Android artifacts currently target
   only this ABI.
@@ -52,9 +53,22 @@ npm test -- --runInBand
 npx tsc --noEmit
 Set-Location android
 .\gradlew.bat assembleDebug
+.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:analyzeReleaseR8Config
+.\gradlew.bat :app:lintVitalRelease
 .\gradlew.bat assembleRelease
 .\gradlew.bat bundleRelease
 ```
+
+The Android source compile, debug APK packaging, debug unit tests, release R8
+configuration analysis, and release-critical lint were validated with this
+toolchain. A signed release APK/AAB and physical-device checks remain required
+before any Play upload.
+
+React Native 0.75 currently requires `android.newDsl=false` and
+`android.builtInKotlin=false` in `android/gradle.properties` for AGP 9
+compatibility. These are temporary modes and must be removed only after the
+affected dependencies are upgraded and revalidated.
 
 Generated artifacts:
 

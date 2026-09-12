@@ -52,6 +52,8 @@ public class ProtectedMseLiveDataSourceTest {
   public void streamsOrderedMseBytesAfterTheHevcMimeGate() throws Exception {
     byte[] first = new byte[] {0, 0, 0, 8, 'f', 't', 'y', 'p'};
     byte[] second = new byte[] {0, 0, 0, 8, 'm', 'o', 'o', 'v'};
+    byte[] third = new byte[] {0, 0, 0, 8, 'm', 'o', 'o', 'f'};
+    byte[] fourth = new byte[] {0, 0, 0, 8, 'm', 'd', 'a', 't'};
     AtomicReference<String> control = new AtomicReference<>();
     CountDownLatch requestReceived = new CountDownLatch(1);
     server.enqueue(new MockResponse().withWebSocketUpgrade(new WebSocketListener() {
@@ -62,6 +64,8 @@ public class ProtectedMseLiveDataSourceTest {
         webSocket.send("{\"type\":\"mse\",\"value\":\"video/mp4; codecs=\\\"hvc1.1.6.L153.B0\\\"\"}");
         webSocket.send(ByteString.of(first));
         webSocket.send(ByteString.of(second));
+        webSocket.send(ByteString.of(third));
+        webSocket.send(ByteString.of(fourth));
       }
     }));
     String profileId = registerProfile();
@@ -71,7 +75,7 @@ public class ProtectedMseLiveDataSourceTest {
     assertEquals(C.LENGTH_UNSET, source.open(new DataSpec(Uri.parse(handle))));
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     byte[] buffer = new byte[5];
-    while (output.size() < first.length + second.length) {
+    while (output.size() < first.length + second.length + third.length + fourth.length) {
       int read = source.read(buffer, 0, buffer.length);
       assertTrue(read > 0);
       output.write(buffer, 0, read);
@@ -82,7 +86,7 @@ public class ProtectedMseLiveDataSourceTest {
       "{\"type\":\"mse\",\"value\":\"hvc1.1.6.L153.B0\"}",
       control.get()
     );
-    assertArrayEquals(concat(first, second), output.toByteArray());
+    assertArrayEquals(concat(first, second, third, fourth), output.toByteArray());
     source.close();
     try {
       source.read(buffer, 0, buffer.length);
@@ -91,6 +95,32 @@ public class ProtectedMseLiveDataSourceTest {
       return;
     }
     throw new AssertionError("Expected reads after close to fail");
+  }
+
+  @Test
+  public void rejectsIncompleteMseStartupBeforeExposingMediaBytes() throws Exception {
+    byte[] ftyp = new byte[] {0, 0, 0, 8, 'f', 't', 'y', 'p'};
+    server.enqueue(new MockResponse().withWebSocketUpgrade(new WebSocketListener() {
+      @Override
+      public void onMessage(WebSocket webSocket, String text) {
+        webSocket.send("{\"type\":\"mse\",\"value\":\"video/mp4; codecs=\\\"hvc1.1.6.L153.B0\\\"\"}");
+        webSocket.send(ByteString.of(ftyp));
+        webSocket.close(1000, null);
+      }
+    }));
+    String profileId = registerProfile();
+    ProtectedMseLiveDataSource source = new ProtectedMseLiveDataSource(registry);
+
+    try {
+      source.open(new DataSpec(Uri.parse(
+        registry.createMseMediaUri(profileId, "front:main")
+      )));
+    } catch (IOException expected) {
+      return;
+    } finally {
+      source.close();
+    }
+    throw new AssertionError("Expected incomplete MSE startup to fail");
   }
 
   private String registerProfile() throws Exception {
@@ -109,10 +139,11 @@ public class ProtectedMseLiveDataSourceTest {
     ));
   }
 
-  private static byte[] concat(byte[] first, byte[] second) throws IOException {
+  private static byte[] concat(byte[]... messages) throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
-    output.write(first);
-    output.write(second);
+    for (byte[] message : messages) {
+      output.write(message);
+    }
     return output.toByteArray();
   }
 

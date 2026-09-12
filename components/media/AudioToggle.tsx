@@ -1,4 +1,4 @@
-import {IconOutline} from '@ant-design/icons-react-native';
+import {LucideProvider, Volume, VolumeX} from 'lucide-react-native';
 import React, {FC} from 'react';
 import {ActivityIndicator, Pressable, View} from 'react-native';
 import {useIntl} from 'react-intl';
@@ -10,7 +10,6 @@ interface AudioToggleProps {
   onToggle: () => void;
   disabled?: boolean;
   testID?: string;
-  slashTestID?: string;
   status?: ProtectedAudioStatus;
   hint?: string;
 }
@@ -20,7 +19,6 @@ export const AudioToggle: FC<AudioToggleProps> = ({
   onToggle,
   disabled = false,
   testID,
-  slashTestID,
   status,
   hint,
 }) => {
@@ -46,15 +44,8 @@ export const AudioToggle: FC<AudioToggleProps> = ({
       alignItems: 'center',
       justifyContent: 'center',
     },
-    slash: {
-      position: 'absolute',
-      width: 27,
-      height: 2,
-      borderRadius: 1,
-      backgroundColor: palette.mediaText,
-      transform: [{rotate: '-45deg'}],
-    },
   }));
+  const AudioIcon = muted ? VolumeX : Volume;
 
   return (
     <Pressable
@@ -90,19 +81,10 @@ export const AudioToggle: FC<AudioToggleProps> = ({
       disabled={unavailable ? true : undefined}
     >
       <View style={styles.iconContainer}>
-        {pending ? <ActivityIndicator color={theme.mediaText} /> : <IconOutline
-          accessible={false}
-          name="sound"
-          color={theme.mediaText}
-          size={22}
-        />}
-        {muted && !pending && (
-          <View
-            testID={slashTestID}
-            accessible={false}
-            pointerEvents="none"
-            style={styles.slash}
-          />
+        {pending ? <ActivityIndicator color={theme.mediaText} /> : (
+          <LucideProvider color={theme.mediaText} size={22}>
+            <AudioIcon />
+          </LucideProvider>
         )}
       </View>
     </Pressable>

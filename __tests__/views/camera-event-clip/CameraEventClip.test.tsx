@@ -16,6 +16,10 @@ const mockMediaPlayerProps = jest.fn();
 const mockEmitProgress = {current: false};
 let mockGeneration = 0;
 const mockPlayerCleanup = jest.fn();
+const lucideIconWithName = (view: ReturnType<typeof render>, name: string) =>
+  view.getAllByTestId('lucide-icon').find(
+    icon => icon.props.accessibilityLabel === name,
+  );
 let mockTheme = {
   background: '#ffffff',
   text: '#1f2933',
@@ -347,7 +351,7 @@ describe('CameraEventClip protected playback state', () => {
     const audio = view.getByTestId('event-player-audio');
     expect(audio.props.accessibilityLabel).toBe('Audio einschalten');
     expect(audio.props.accessibilityState).toEqual({checked: false});
-    expect(view.getByTestId('event-player-audio-slash')).toBeTruthy();
+    expect(lucideIconWithName(view, 'volume-x')).toBeTruthy();
     expect(shareButton.props.accessibilityLabel).toBe('Clip teilen');
     expect(shareButton.props.accessibilityHint).toBe(
       'Teilt den Clip mit einer anderen App',
@@ -402,12 +406,12 @@ describe('CameraEventClip protected playback state', () => {
     await view.findByTestId('event-player-audio');
 
     expect(view.getByTestId('media-player').props.muted).toBe(true);
-    expect(view.getByTestId('event-player-audio-slash')).toBeTruthy();
+    expect(lucideIconWithName(view, 'volume-x')).toBeTruthy();
 
     fireEvent.press(view.getByTestId('event-player-audio'));
 
     expect(view.getByTestId('media-player').props.muted).toBe(false);
-    expect(view.queryByTestId('event-player-audio-slash')).toBeNull();
+    expect(lucideIconWithName(view, 'volume')).toBeTruthy();
   });
 
   it('re-mutes audio when playback is retried after an error', async () => {

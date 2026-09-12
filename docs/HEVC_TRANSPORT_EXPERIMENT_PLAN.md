@@ -1,7 +1,7 @@
 # HEVC transport experiment plan
 
 Status: The native MSE/Media3 path and stream-selection policy are implemented
-for the Android 14.4.0 release candidate. The public production release remains
+for the Android 18.0.0 release candidate. The public production release remains
 blocked on the documented worker build, device matrix, and Play Internal
 Testing of the exact final AAB.
 
@@ -250,7 +250,7 @@ Camera-only frame hashes at 1, 6 and 12 seconds were distinct. Media3 selected
 profile-level capability, but decoded frames remained stable during the test.
 
 This satisfies the single-device decoded-frame gate, not production release.
-The bridge is default-enabled in the 14.4.0 release candidate but remains
+The bridge is default-enabled in the 18.0.0 release candidate but remains
 strictly gated at runtime. Lifecycle transitions, authentication failures,
 H.264 regression behavior, a longer soak test, and Play Internal Testing are
 still required before public promotion.

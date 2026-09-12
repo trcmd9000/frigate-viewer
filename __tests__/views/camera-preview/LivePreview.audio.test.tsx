@@ -5,12 +5,23 @@ import en from '../../../i18n/en';
 import de from '../../../i18n/de';
 import {LiveAudioControl} from '../../../views/camera-preview/LiveAudioControl';
 
-jest.mock('@ant-design/icons-react-native', () => ({
-  ['IconOutline']: (props: Record<string, unknown>) => {
+jest.mock('lucide-react-native', () => ({
+  LucideProvider: ({children}: {children: React.ReactNode}) => children,
+  Volume: (props: Record<string, unknown>) => {
     const ReactModule = require('react');
     const NativeView = require('react-native').View;
     return ReactModule.createElement(NativeView, {
       testID: 'camera-preview-audio-icon',
+      name: 'volume',
+      ...props,
+    });
+  },
+  VolumeX: (props: Record<string, unknown>) => {
+    const ReactModule = require('react');
+    const NativeView = require('react-native').View;
+    return ReactModule.createElement(NativeView, {
+      testID: 'camera-preview-audio-icon',
+      name: 'volume-x',
       ...props,
     });
   },
@@ -66,7 +77,7 @@ describe('LiveAudioControl', () => {
     expect(button.props.accessibilityHint).toBe(en[`cameraPreview.audio.failure.${reason}`]);
   });
 
-  it('uses the speaker icon with a slash only while muted', () => {
+  it('uses a plain muted speaker icon while muted', () => {
     const {getByRole, getByTestId, queryByText} = render(
       <IntlProvider locale="de" messages={de}>
         <LiveAudioControl muted onToggle={jest.fn()} />
@@ -75,14 +86,13 @@ describe('LiveAudioControl', () => {
     const button = getByRole('button', {name: 'Audio einschalten'});
 
     expect(button.props.accessibilityState).toEqual({checked: false});
-    expect(getByTestId('camera-preview-audio-icon').props.name).toBe('sound');
-    expect(getByTestId('camera-preview-audio-slash')).toBeTruthy();
+    expect(getByTestId('camera-preview-audio-icon').props.name).toBe('volume-x');
     expect(queryByText('Ton an')).toBeNull();
     expect(queryByText('Ton aus')).toBeNull();
     expect(queryByText('Audio einschalten')).toBeNull();
   });
 
-  it('uses the unslashed speaker icon when audible and toggles through its callback', () => {
+  it('uses the plain speaker icon when audible and toggles through its callback', () => {
     const onToggle = jest.fn();
     const view = render(
       <IntlProvider locale="en" messages={en}>
@@ -93,9 +103,8 @@ describe('LiveAudioControl', () => {
 
     expect(button.props.accessibilityState).toEqual({checked: true});
     expect(view.getByTestId('camera-preview-audio-icon').props.name).toBe(
-      'sound',
+      'volume',
     );
-    expect(view.queryByTestId('camera-preview-audio-slash')).toBeNull();
     expect(view.queryByText('Sound on')).toBeNull();
     expect(view.queryByText('Sound off')).toBeNull();
 
@@ -116,7 +125,9 @@ describe('LiveAudioControl', () => {
 
     const audibleButton = view.getByRole('button', {name: 'Disable audio'});
     expect(audibleButton.props.accessibilityState).toEqual({checked: true});
-    expect(view.queryByTestId('camera-preview-audio-slash')).toBeNull();
+    expect(view.getByTestId('camera-preview-audio-icon').props.name).toBe(
+      'volume',
+    );
   });
 
   it('uses English accessibility fallbacks for unsupported locales', () => {

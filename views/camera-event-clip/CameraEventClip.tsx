@@ -597,7 +597,6 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         <View style={styles.tools}>
           <AudioToggle
             testID="event-player-audio"
-            slashTestID="event-player-audio-slash"
             muted={muted}
             onToggle={() => setMuted(current => !current)}
           />

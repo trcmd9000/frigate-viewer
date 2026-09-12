@@ -465,7 +465,11 @@ const CameraEventsContent: NavigationFunctionComponent<
                     ? 'sensorLandscape'
                     : 'sensor',
                 ],
+                backgroundColor: '#000000',
               },
+              topBar: {visible: false},
+              statusBar: {visible: false},
+              navigationBar: {visible: false, backgroundColor: '#000000'},
             },
           },
         })

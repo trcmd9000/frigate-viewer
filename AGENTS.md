@@ -16,7 +16,7 @@ decisions that future maintainers and coding agents must preserve.
   is present, but iOS mTLS and release builds are not currently supported or
   validated.
 - Current public release: `14.3.1` with Android `versionCode 21`. The next
-  release candidate is `14.4.0` with Android `versionCode 22`.
+  release candidate is `18.0.0` with Android `versionCode 23`.
 
 ## Public repository rules
 
@@ -92,7 +92,12 @@ The primary implementation surfaces are:
 - Android namespace and application ID:
   `com.trcmd9000.frigateviewer`.
 - App name: `Frigate Viewer`.
-- Compile and target SDK: API 35.
+- Compile and target SDK: API 36.
+- Android builds use AGP 9.3.2, Gradle 9.5, Build Tools 36.0.0, and JDK 17.
+- React Native 0.75 dependencies require the temporary AGP 9 compatibility
+  modes `android.newDsl=false` and `android.builtInKotlin=false`. Do not remove
+  them until the affected React Native dependencies have been upgraded and
+  validated; AGP 10 will remove these compatibility modes.
 - Release signing comes from ignored `android/signing.properties` or CI
   `MYAPP_UPLOAD_*` Gradle properties.
 - A release build must fail when signing is not configured; never produce a
@@ -117,6 +122,9 @@ and internal-testing checklist.
 - `react-native-navigation` requires the checked-in
   `patches/react-native-navigation+7.51.2.patch` for React Native 0.75
   compatibility.
+- AGP 9 support also requires the checked-in patches for
+  `@react-native/gradle-plugin`, `@lunarr/vlc-player`, and
+  `react-native-blob-util`.
 - `npm ci` must successfully apply the patch through `patch-package`.
 - Do not edit `node_modules` without updating the reproducible patch.
 - Do not run `npm audit fix --force`. It currently proposes breaking React
@@ -137,8 +145,9 @@ npm ci
 npm test -- --runInBand --silent --forceExit
 npx tsc --noEmit
 Set-Location android
-.\gradlew.bat assembleDebug
-.\gradlew.bat bundleRelease -PreactNativeArchitectures=arm64-v8a
+.\gradlew.bat :app:assembleDebug -PreactNativeArchitectures=arm64-v8a
+.\gradlew.bat :app:testDebugUnitTest :app:analyzeReleaseR8Config :app:lintVitalRelease -PreactNativeArchitectures=arm64-v8a
+.\gradlew.bat :app:bundleRelease -PreactNativeArchitectures=arm64-v8a
 ```
 
 Also run targeted ESLint on changed JavaScript and TypeScript files and
@@ -173,9 +182,7 @@ For Android release artifacts:
   non-mTLS servers on a physical Android device.
 
 On Windows, use a short checkout path for native release builds. React Native
-native build paths can exceed Windows or Ninja limits. Avoid setting
-`JAVA_TOOL_OPTIONS` while AGP 8.6.1 invokes Prefab: its banner on stderr can be
-misreported as `[CXX1210] No compatible library found`.
+native build paths can exceed Windows or Ninja limits.
 
 ## Change discipline
 

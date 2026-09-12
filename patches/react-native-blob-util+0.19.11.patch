@@ -1,3 +1,16 @@
+diff --git a/node_modules/react-native-blob-util/android/build.gradle b/node_modules/react-native-blob-util/android/build.gradle
+index 7b332f0..473533f 100644
+--- a/node_modules/react-native-blob-util/android/build.gradle
++++ b/node_modules/react-native-blob-util/android/build.gradle
+@@ -63,7 +63,7 @@ android {
+     buildTypes {
+         release {
+             minifyEnabled false
+-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
++            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
+     }
+     compileOptions {
 diff --git a/node_modules/react-native-blob-util/fetch.js b/node_modules/react-native-blob-util/fetch.js
 index 4f52ad3..de5a3e7 100644
 --- a/node_modules/react-native-blob-util/fetch.js

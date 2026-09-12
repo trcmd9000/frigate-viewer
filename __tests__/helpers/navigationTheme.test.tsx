@@ -42,7 +42,7 @@ jest.mock('../../helpers/colors', () => ({
     surface: 'app' | 'media' | 'event' = 'app',
   ) => ({
     statusBar: {
-      visible: surface !== 'event',
+      visible: surface === 'app',
     },
     navigationBar: {
       backgroundColor:
@@ -67,7 +67,7 @@ describe('withNavigationTheme', () => {
     mockCurrentScheme = 'light';
   });
 
-  it('uses an immersive event surface without changing live preview status chrome', () => {
+  it('uses immersive chrome for both playback surfaces', () => {
     expect(navigationSurfaceForComponent('CameraEventClip')).toBe('event');
     expect(navigationSurfaceForComponent('CameraPreview')).toBe('media');
     expect(navigationSurfaceForComponent('Settings')).toBe('app');
@@ -145,7 +145,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'repeated-player',
       expect.objectContaining({
-        statusBar: {visible: true},
+        statusBar: {visible: false},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
