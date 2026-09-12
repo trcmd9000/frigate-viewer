@@ -112,11 +112,20 @@ jobs:
       - name: Verify minified arm64 release APK
         working-directory: android
         run: |
+          keytool -genkeypair \
+            -keystore "$RUNNER_TEMP/ci-release.keystore" \
+            -storepass android \
+            -keypass android \
+            -alias ci-release \
+            -dname "CN=CI" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1
           ./gradlew app:assembleRelease \
             -PreactNativeArchitectures=arm64-v8a \
-            -PMYAPP_UPLOAD_STORE_FILE="$HOME/.android/debug.keystore" \
+            -PMYAPP_UPLOAD_STORE_FILE="$RUNNER_TEMP/ci-release.keystore" \
             -PMYAPP_UPLOAD_STORE_PASSWORD=android \
-            -PMYAPP_UPLOAD_KEY_ALIAS=androiddebugkey \
+            -PMYAPP_UPLOAD_KEY_ALIAS=ci-release \
             -PMYAPP_UPLOAD_KEY_PASSWORD=android \
             --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m' \
