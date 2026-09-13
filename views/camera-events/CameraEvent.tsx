@@ -1,5 +1,12 @@
 import React, {FC, ComponentType, useCallback, useMemo, useState} from 'react';
-import {Image, Pressable, Text, View, ViewStyle} from 'react-native';
+import {
+  Image,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+  ViewStyle,
+} from 'react-native';
 import {useIntl} from 'react-intl';
 import {useRest} from '../../helpers/rest';
 import {
@@ -16,6 +23,10 @@ import {useStyles, useTheme} from '../../helpers/colors';
 import {SecureLogger} from '../../helpers/secureLogger';
 import {handleError} from '../../helpers/errorHandler';
 import {MediaSurface, SurfaceCard} from '../../components/primitives';
+import {
+  gridCellGutters,
+  gridCellWidth,
+} from '../../helpers/gridLayout';
 
 interface DrawerItemProps {
   text: string;
@@ -56,6 +67,7 @@ export interface ICameraEvent {
 
 interface ICameraEventProps extends ICameraEvent {
   componentId: string;
+  index?: number;
   onDelete: (id: string[]) => void;
   onSnapshotDimensions: (width: number, height: number) => void;
   onEventPress: (event: ICameraEvent) => void;
@@ -87,6 +99,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     onEventPress,
     onShare,
     mediaEnabled,
+    index = 0,
     ...event
   } = props;
   const {
@@ -103,8 +116,11 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
   const server = useAppSelector(selectServer);
   const snapshotHeight = useAppSelector(selectEventsSnapshotHeight);
   const numColumns = useAppSelector(selectEventsNumColumns);
+  const {width: listWidth} = useWindowDimensions();
   const intl = useIntl();
   const {del, post} = useRest();
+  const gutters = gridCellGutters(index, numColumns, 12);
+  const cellWidth = gridCellWidth(listWidth, numColumns, 12);
 
   const onSnapshotLoad = useCallback(
     async (snapshot: string) => {
@@ -183,8 +199,10 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
       leftItem={deleteDrawerItem}
       rightItems={[shareDrawerItem, retainDrawerItem]}
       style={{
-        width: `${100 / numColumns}%`,
-        padding: 6,
+        width: cellWidth + gutters.left + gutters.right,
+        paddingVertical: 6,
+        paddingLeft: gutters.left,
+        paddingRight: gutters.right,
       }}
     >
       <SurfaceCard style={{padding: 0, overflow: 'hidden'}}>

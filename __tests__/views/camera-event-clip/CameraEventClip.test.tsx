@@ -52,8 +52,12 @@ jest.mock('../../../helpers/playbackLifecycle', () => ({
 }));
 
 jest.mock('../../../helpers/protectedMedia', () => ({
-  eventClipPath: jest.fn((eventId: string) => `/api/events/${eventId}/clip.mp4`),
-  eventVodPath: jest.fn(() => '/vod/front-door/master.m3u8'),
+  eventVodPath: jest.fn(
+    (eventId: string) => `/vod/event/${encodeURIComponent(eventId)}/master.m3u8`,
+  ),
+  eventClipPath: jest.fn(
+    (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/clip.mp4`,
+  ),
   protectedMediaUri: (...args: unknown[]) => mockProtectedMediaUri(...args),
 }));
 
@@ -190,23 +194,43 @@ describe('CameraEventClip protected playback state', () => {
     expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');
   });
 
-  it('uses the protected event MP4 path when Frigate has generated a clip', async () => {
-    mockProtectedMediaUri.mockResolvedValue(
-      'frigate-media://0123456789abcdef0123456789abcdef/api/events/event-1/clip.mp4',
-    );
+  it('uses the documented event VOD path for Android playback', async () => {
     const view = renderClip(en, 'en', {...event, has_clip: true});
-
-    await view.findByTestId('media-player');
+    await waitFor(() => expect(view.getByTestId('media-player')).toBeTruthy());
 
     expect(mockProtectedMediaUri).toHaveBeenCalledWith(
       server,
-      '/api/events/event-1/clip.mp4',
+      '/vod/event/event-1/master.m3u8',
     );
+    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
+    expect(downloadMedia).not.toHaveBeenCalled();
     expect(mockMediaPlayerProps).toHaveBeenCalledWith(
       expect.objectContaining({
-        media: expect.objectContaining({mimeType: 'video/mp4'}),
+        media: expect.objectContaining({
+          mimeType: 'application/x-mpegURL',
+          mode: 'direct',
+        }),
       }),
     );
+  });
+
+  it('downloads the documented event clip on non-Android playback', async () => {
+    (Platform as {OS: string}).OS = 'ios';
+    (downloadMedia as jest.Mock).mockResolvedValue('/cache/event-1.mp4');
+    const view = renderClip(en, 'en', {...event, has_clip: true});
+
+    await waitFor(() => expect(view.getByTestId('media-player')).toBeTruthy());
+
+    expect(downloadMedia).toHaveBeenCalledWith(
+      server,
+      'https://frigate.example.test:443/api/events/event-1/clip.mp4',
+    );
+    expect(retainDownloadedMedia).toHaveBeenCalledWith(
+      '/cache/event-1.mp4',
+      'display',
+    );
+    expect(mockProtectedMediaUri).not.toHaveBeenCalled();
+    expect(downloadMedia).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a delayed old navigation mount before any content hooks run', () => {
@@ -297,10 +321,21 @@ describe('CameraEventClip protected playback state', () => {
       view.getByLabelText('Medien erneut versuchen'),
     ).toBeTruthy();
     expect(view.queryByText('Unable to play media.')).toBeNull();
+    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
 
     fireEvent.press(view.getByTestId('protected-media-retry'));
     await waitFor(() => expect(view.getByTestId('media-player')).toBeTruthy());
     expect(mockProtectedMediaUri).toHaveBeenCalledTimes(2);
+    expect(mockProtectedMediaUri).toHaveBeenNthCalledWith(
+      1,
+      server,
+      '/vod/event/event-1/master.m3u8',
+    );
+    expect(mockProtectedMediaUri).toHaveBeenNthCalledWith(
+      2,
+      server,
+      '/vod/event/event-1/master.m3u8',
+    );
   });
 
   it('keeps the English fallback when no translation is supplied', async () => {
@@ -482,7 +517,7 @@ describe('CameraEventClip protected playback state', () => {
     );
   });
 
-  it('queues a changed preparation instead of running two concurrently', async () => {
+  it('serializes a changed preparation instead of running two concurrently', async () => {
     let resolveInitial!: (uri: string) => void;
     mockProtectedMediaUri
       .mockImplementationOnce(
@@ -506,6 +541,11 @@ describe('CameraEventClip protected playback state', () => {
         />
       </IntlProvider>,
     );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
 
     resolveInitial(

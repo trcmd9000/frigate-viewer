@@ -7,13 +7,19 @@ import React, {
   useState,
 } from 'react';
 import type {PropsWithChildren} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {useIntl} from 'react-intl';
 import {IconOutline} from '@ant-design/icons-react-native';
 import {Navigation} from 'react-native-navigation';
 import {useAppSelector} from '../../store/store';
 import {
   selectCamerasRefreshFrequency,
+  selectCamerasNumColumns,
   selectEventsLockLandscapePlaybackOrientation,
   selectServer,
 } from '../../store/settings';
@@ -32,12 +38,17 @@ import {useDesignTokens} from '../../helpers/designTokens';
 import {Card} from '../../components/primitives';
 import {ImagePreview} from './ImagePreview';
 import {messages} from './messages';
+import {
+  gridCellGutters,
+  gridCellWidth,
+} from '../../helpers/gridLayout';
 
 type CameraTileProps = PropsWithChildren<{
   /** Retained for callers while card navigation is modal-only. */
   componentId?: string;
   cameraName: string;
   active?: boolean;
+  index?: number;
 }>;
 
 interface SnapshotState {
@@ -51,8 +62,7 @@ const toError = (value: unknown): Error =>
 
 const styles = StyleSheet.create({
   tile: {
-    flex: 1,
-    margin: 8,
+    marginVertical: 8,
     minWidth: 0,
   },
   compactCard: {
@@ -111,16 +121,19 @@ const styles = StyleSheet.create({
 export const CameraTile: FC<CameraTileProps> = ({
   cameraName,
   active = true,
+  index = 0,
 }) => {
   const [snapshot, setSnapshot] = useState<SnapshotState>({
     status: 'loading',
   });
   const server = useAppSelector(selectServer);
   const refreshFrequency = useAppSelector(selectCamerasRefreshFrequency);
+  const numColumns = useAppSelector(selectCamerasNumColumns) ?? 1;
   const lockLandscapePlaybackOrientation = useAppSelector(
     selectEventsLockLandscapePlaybackOrientation,
   );
   const tokens = useDesignTokens();
+  const {width: listWidth} = useWindowDimensions();
   const intl = useIntl();
   const interval = useRef<NodeJS.Timeout>();
   const currentPath = useRef<string>();
@@ -131,6 +144,8 @@ export const CameraTile: FC<CameraTileProps> = ({
   const {generation, isCurrentScope} = useServerScopeOwner();
   const imageRequestId = useRef(0);
   const profileIdentity = serverProfileIdentity(server);
+  const gutters = gridCellGutters(index, numColumns, 16);
+  const cellWidth = gridCellWidth(listWidth, numColumns, 16);
 
   const getLastImageUrl = useCallback(
     () => {
@@ -339,6 +354,11 @@ export const CameraTile: FC<CameraTileProps> = ({
       style={[
         styles.tile,
         styles.compactCard,
+        {
+          width: cellWidth,
+          marginLeft: gutters.left,
+          marginRight: gutters.right,
+        },
       ]}
     >
       <View style={styles.media}>

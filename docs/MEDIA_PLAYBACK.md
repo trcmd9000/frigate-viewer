@@ -1,30 +1,40 @@
 # Protected media playback
 
-Android event playback uses Media3 through the `react-native-video` 6.19.2
-ExoPlayer extension. JavaScript receives an opaque `frigate-media://` URI. The
-native profile registry resolves it with the configured KeyChain identity,
-profile CookieJar, and OkHttp client; credentials and resolved server URLs never
-enter the player props.
+Android protected event VOD playback uses Media3 through the
+`react-native-video` 6.19.2 ExoPlayer extension. JavaScript receives an opaque
+`frigate-media://` URI. The native profile registry resolves it with the
+configured KeyChain identity, profile CookieJar, and OkHttp client; credentials
+and resolved server URLs never enter the player props.
 
 The checked-in `patch-package` change only teaches the upstream source parser to
 accept the opaque scheme; transport and policy remain project-owned native code.
 
-## Event VOD
+## Event VOD and generated event clips
 
-For events with a generated clip, Android plays the Frigate event MP4 endpoint
-through the opaque native handle:
-
-```text
-/api/events/{eventId}/clip.mp4
-```
-
-This matches the established download/share endpoint and supports Frigate
-servers that do not expose timestamp-based VOD. Events without a generated
-clip use timestamp-based camera VOD:
+Android event playback uses the documented event-scoped VOD route. The
+[Frigate OpenAPI definition](https://github.com/blakeblackshear/frigate/blob/dev/docs/static/frigate-api.yaml)
+defines `GET /vod/event/{event_id}` as returning an HLS playlist and says to
+append `/master.m3u8` or `/index.m3u8` for HLS playback. The app uses the
+protected relative master-playlist path:
 
 ```text
-/vod/{camera}/start/{startTimestamp}/end/{endTimestamp}/master.m3u8
+/vod/event/{eventId}/master.m3u8
 ```
+
+The route accepts the documented optional integer `padding` parameter, whose
+default is `0`. The app does not infer media availability from an HTTP status.
+
+For share/download and non-Android display, the app uses the documented
+`GET /events/{event_id}/clip.mp4` endpoint (under the server's API base) and
+the managed local-download path:
+
+```text
+/events/{eventId}/clip.mp4
+```
+
+The documented optional integer `padding` parameter also defaults to `0`; no
+client-side status semantics are attached to this endpoint. The app's
+server-relative URL includes its API base as `/api/events/{eventId}/clip.mp4`.
 
 The same native data source handles the master/media playlist, relative or
 absolute segments, initialization ranges, and AES-128 key requests.

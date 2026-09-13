@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useIntl} from 'react-intl';
@@ -37,6 +38,7 @@ import {
   presentSettingsModal,
   updatePrimaryDestinationLabels,
 } from '../../helpers/navigationShell';
+import {gridCellGutters, gridCellWidth} from '../../helpers/gridLayout';
 
 interface IConfigResponse {
   cameras: Record<string, {zones: Record<string, unknown>}>;
@@ -59,8 +61,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   skeletonCard: {
-    flex: 1,
-    margin: 8,
     minWidth: 0,
   },
   skeletonMedia: {
@@ -78,6 +78,7 @@ const CameraListSkeleton = ({
   loadingLabel: string;
 }) => {
   const tokens = useDesignTokens();
+  const {width: listWidth} = useWindowDimensions();
   return (
     <View testID="cameras-list-loading" style={{flexDirection: 'row', flexWrap: 'wrap'}}>
       {Array.from({length: Math.max(numColumns * 2, 4)}, (_, index) => (
@@ -85,7 +86,12 @@ const CameraListSkeleton = ({
           key={index}
           style={[
             styles.skeletonCard,
-            {width: `${100 / numColumns}%`},
+            {
+              width: gridCellWidth(listWidth, numColumns, 16),
+              marginLeft: gridCellGutters(index, numColumns, 16).left,
+              marginRight: gridCellGutters(index, numColumns, 16).right,
+              marginVertical: 8,
+            },
           ]}
         >
           <View
