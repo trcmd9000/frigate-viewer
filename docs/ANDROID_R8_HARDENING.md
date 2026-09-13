@@ -65,6 +65,13 @@ third-party packages, or the full Media3, OkHttp, VLC, KeyChain, or navigation
 surfaces. Such rules would hide shrinker regressions and are not justified by
 the current static registration paths.
 
+React Native packages JavaScript image imports as generated Android drawable
+resources. React Native Navigation resolves the three bottom-tab icons by
+their generated resource names, so Android's static resource analysis cannot
+observe the runtime references. `res/raw/keep.xml` narrowly retains those
+three drawables while resource shrinking remains enabled. The release APK
+check verifies that each retained icon is present in the packaged artifact.
+
 ## Validation status
 
 The first release R8 attempt was:

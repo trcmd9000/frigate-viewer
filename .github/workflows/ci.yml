@@ -130,5 +130,10 @@ jobs:
             --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m' \
             --stacktrace
-          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" dex packages --defined-only app/build/outputs/apk/release/app-release.apk |
-            grep -Eq 'com\.facebook\.react\.devsupport\.CxxInspectorPackagerConnection$'
+          unzip -p app/build/outputs/apk/release/app-release.apk classes.dex |
+            grep -aFq 'com/facebook/react/devsupport/CxxInspectorPackagerConnection'
+          unzip -p app/build/outputs/apk/release/app-release.apk resources.arsc |
+            tr -d '\000' > "$RUNNER_TEMP/release-resource-names.txt"
+          for icon in cameras events settings; do
+            grep -Fq "assets_navigation_${icon}" "$RUNNER_TEMP/release-resource-names.txt"
+          done
