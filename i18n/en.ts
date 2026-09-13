@@ -53,10 +53,10 @@ export default {
     'Unable to load events. Check your connection and try again.',
   'cameraEvents.retry': 'Retry loading events',
   'cameraEvents.loadMoreError': 'More events could not be loaded.',
-  'cameraEventClip.loading': 'Preparing protected media',
+  'cameraEventClip.loading': 'Preparing media',
   'cameraEventClip.error':
-    'Unable to play protected media. Check your connection and try again.',
-  'cameraEventClip.retry': 'Retry protected media',
+    'Unable to play media. Check your connection and try again.',
+  'cameraEventClip.retry': 'Retry media',
   'cameraEventClip.share': 'Share clip',
   'cameraEventClip.shareHint': 'Shares the clip using another app',
   'cameraEventClip.playbackSpeed': 'Playback speed',

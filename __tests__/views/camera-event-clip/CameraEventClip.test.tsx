@@ -52,6 +52,7 @@ jest.mock('../../../helpers/playbackLifecycle', () => ({
 }));
 
 jest.mock('../../../helpers/protectedMedia', () => ({
+  eventClipPath: jest.fn((eventId: string) => `/api/events/${eventId}/clip.mp4`),
   eventVodPath: jest.fn(() => '/vod/front-door/master.m3u8'),
   protectedMediaUri: (...args: unknown[]) => mockProtectedMediaUri(...args),
 }));
@@ -135,6 +136,7 @@ const event = {
   camera: 'front-door',
   start_time: 10,
   end_time: 20,
+  has_clip: false,
 };
 
 const renderClip = (
@@ -186,6 +188,25 @@ describe('CameraEventClip protected playback state', () => {
     expect(mockPlayerCleanup).toHaveBeenCalledTimes(1);
     expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
     expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');
+  });
+
+  it('uses the protected event MP4 path when Frigate has generated a clip', async () => {
+    mockProtectedMediaUri.mockResolvedValue(
+      'frigate-media://0123456789abcdef0123456789abcdef/api/events/event-1/clip.mp4',
+    );
+    const view = renderClip(en, 'en', {...event, has_clip: true});
+
+    await view.findByTestId('media-player');
+
+    expect(mockProtectedMediaUri).toHaveBeenCalledWith(
+      server,
+      '/api/events/event-1/clip.mp4',
+    );
+    expect(mockMediaPlayerProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media: expect.objectContaining({mimeType: 'video/mp4'}),
+      }),
+    );
   });
 
   it('rejects a delayed old navigation mount before any content hooks run', () => {
@@ -262,20 +283,20 @@ describe('CameraEventClip protected playback state', () => {
     const view = renderClip(de, 'de');
 
     expect(
-      view.getByLabelText('Geschützte Medien werden vorbereitet'),
+      view.getByLabelText('Medien werden vorbereitet'),
     ).toBeTruthy();
 
     await waitFor(() => {
       expect(
         view.getByText(
-          'Geschützte Medien konnten nicht abgespielt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+          'Medien konnten nicht abgespielt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
         ),
       ).toBeTruthy();
     });
     expect(
-      view.getByLabelText('Geschützte Medien erneut versuchen'),
+      view.getByLabelText('Medien erneut versuchen'),
     ).toBeTruthy();
-    expect(view.queryByText('Unable to play the protected media.')).toBeNull();
+    expect(view.queryByText('Unable to play media.')).toBeNull();
 
     fireEvent.press(view.getByTestId('protected-media-retry'));
     await waitFor(() => expect(view.getByTestId('media-player')).toBeTruthy());
@@ -291,11 +312,11 @@ describe('CameraEventClip protected playback state', () => {
     await waitFor(() =>
       expect(
         view.getByText(
-          'Unable to play protected media. Check your connection and try again.',
+          'Unable to play media. Check your connection and try again.',
         ),
       ).toBeTruthy(),
     );
-    expect(view.getByLabelText('Retry protected media')).toBeTruthy();
+    expect(view.getByLabelText('Retry media')).toBeTruthy();
   });
 
   it.each([
@@ -325,7 +346,7 @@ describe('CameraEventClip protected playback state', () => {
     await waitFor(() => expect(view.getByTestId('protected-media-retry')).toBeTruthy());
     expect(
       view.getByText(
-        'Unable to play protected media. Check your connection and try again.',
+        'Unable to play media. Check your connection and try again.',
       ).props.style,
     ).toEqual(expect.objectContaining({color: '#ffffff'}));
   });

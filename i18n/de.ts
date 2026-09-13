@@ -55,10 +55,10 @@ export default {
   'cameraEvents.retry': 'Ereignisse erneut laden',
   'cameraEvents.loadMoreError':
     'Weitere Ereignisse konnten nicht geladen werden.',
-  'cameraEventClip.loading': 'Geschützte Medien werden vorbereitet',
+  'cameraEventClip.loading': 'Medien werden vorbereitet',
   'cameraEventClip.error':
-    'Geschützte Medien konnten nicht abgespielt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
-  'cameraEventClip.retry': 'Geschützte Medien erneut versuchen',
+    'Medien konnten nicht abgespielt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'cameraEventClip.retry': 'Medien erneut versuchen',
   'cameraEventClip.share': 'Clip teilen',
   'cameraEventClip.shareHint': 'Teilt den Clip mit einer anderen App',
   'cameraEventClip.playbackSpeed': 'Wiedergabegeschwindigkeit',

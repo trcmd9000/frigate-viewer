@@ -11,7 +11,16 @@ accept the opaque scheme; transport and policy remain project-owned native code.
 
 ## Event VOD
 
-Frigate exposes timestamp-based camera VOD at:
+For events with a generated clip, Android plays the Frigate event MP4 endpoint
+through the opaque native handle:
+
+```text
+/api/events/{eventId}/clip.mp4
+```
+
+This matches the established download/share endpoint and supports Frigate
+servers that do not expose timestamp-based VOD. Events without a generated
+clip use timestamp-based camera VOD:
 
 ```text
 /vod/{camera}/start/{startTimestamp}/end/{endTimestamp}/master.m3u8

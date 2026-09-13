@@ -20,6 +20,7 @@ jest.mock('react-native', () => ({
 
 import type {Server} from '../../store/settings';
 import {
+  eventClipPath,
   eventVodPath,
   invalidateProtectedMediaProfile,
   isProtectedMediaUri,
@@ -266,5 +267,13 @@ describe('protected media URI registration', () => {
     );
     expect(() => eventVodPath('', 1, 2)).toThrow();
     expect(() => eventVodPath('camera', 2, 1)).toThrow();
+  });
+
+  it('constructs a relative encoded MP4 resource path from an event identifier', () => {
+    expect(eventClipPath('event/with-space')).toBe(
+      '/api/events/event%2Fwith-space/clip.mp4',
+    );
+    expect(() => eventClipPath('')).toThrow('event identifier');
+    expect(() => eventClipPath(' '.repeat(257))).toThrow('event identifier');
   });
 });

@@ -108,6 +108,17 @@ export const eventVodPath = (
   )}/start/${startTime}/end/${endTime}/master.m3u8`;
 };
 
+export const eventClipPath = (eventId: string): string => {
+  if (
+    typeof eventId !== 'string' ||
+    eventId.trim().length === 0 ||
+    eventId.length > 256
+  ) {
+    throw new Error('The event identifier is invalid');
+  }
+  return `/api/events/${encodeURIComponent(eventId)}/clip.mp4`;
+};
+
 const registerProfile = (server: Server): Promise<string> => {
   const native = nativeModule();
   const endpoint = canonicalServerEndpoint(server);

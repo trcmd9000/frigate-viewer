@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.3] - 2026-09-13
+
+- Fixed Android event playback on Frigate servers where timestamp-based VOD is
+  unavailable by using the existing protected event clip endpoint when a clip
+  has been generated.
+- Simplified event playback messages to refer to media rather than protected
+  media.
+
 ## [18.0.2] - 2026-09-13
 
 - Fixed an Android release startup crash where resource shrinking removed the
