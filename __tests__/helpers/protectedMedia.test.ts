@@ -71,16 +71,16 @@ describe('protected media URI registration', () => {
     const configured = server();
     const uri = await protectedMediaUri(
       configured,
-      eventVodPath('front_door', 100.5, 120.25),
+      eventVodPath('event-with-space'),
     );
 
     expect(uri).toBe(
-      'frigate-media://0123456789abcdef0123456789abcdef/vod/front_door/start/100.5/end/120.25/master.m3u8',
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/event/event-with-space/master.m3u8',
     );
     expect(mockRegisterMediaProfile).toHaveBeenCalledTimes(1);
     expect(mockCreateMediaUri).toHaveBeenCalledWith(
       '0123456789abcdef0123456789abcdef',
-      '/vod/front_door/start/100.5/end/120.25/master.m3u8',
+      '/vod/event/event-with-space/master.m3u8',
     );
     expect(uri).not.toContain(configured.host);
     expect(uri).not.toContain(configured.credentials.password);
@@ -261,12 +261,12 @@ describe('protected media URI registration', () => {
     expect(mockCreateRtspMediaUri).not.toHaveBeenCalled();
   });
 
-  it('constructs the verified Frigate VOD resource path from an event range', () => {
-    expect(eventVodPath('camera/with-space', 123.45, 234.56)).toBe(
-      '/vod/camera%2Fwith-space/start/123.45/end/234.56/master.m3u8',
+  it('constructs a relative encoded HLS path from an event identifier', () => {
+    expect(eventVodPath('event/with-space')).toBe(
+      '/vod/event/event%2Fwith-space/master.m3u8',
     );
-    expect(() => eventVodPath('', 1, 2)).toThrow();
-    expect(() => eventVodPath('camera', 2, 1)).toThrow();
+    expect(() => eventVodPath('')).toThrow('event identifier');
+    expect(() => eventVodPath(' '.repeat(257))).toThrow('event identifier');
   });
 
   it('constructs a relative encoded MP4 resource path from an event identifier', () => {

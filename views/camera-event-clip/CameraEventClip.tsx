@@ -2,6 +2,7 @@ import React, {
   FC,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,7 +23,7 @@ import {useIntl} from 'react-intl';
 import {NavigationFunctionComponent} from 'react-native-navigation';
 import {selectServer} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
-import {buildServerApiUrl} from '../../helpers/rest';
+import {buildServerUrl} from '../../helpers/rest';
 import Share from 'react-native-share';
 import {clipFilename} from '../camera-events/eventHelpers';
 import {ICameraEvent} from '../camera-events/CameraEvent';
@@ -43,8 +44,8 @@ import {
 import {Media3MediaPlayer} from '../../components/media/Media3MediaPlayer';
 import {AudioToggle} from '../../components/media/AudioToggle';
 import {
-  eventClipPath,
   eventVodPath,
+  eventClipPath,
   protectedMediaUri,
 } from '../../helpers/protectedMedia';
 import {useScreenPlaybackLifecycle} from '../../helpers/playbackLifecycle';
@@ -79,6 +80,7 @@ interface IVideoPlayerProps {
   shareUrl: string;
   fileName?: string;
   initiallyPaused?: boolean;
+  activationId?: number;
 }
 
 const VideoPlayer: FC<IVideoPlayerProps> = ({
@@ -91,8 +93,40 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   shareUrl,
   fileName = 'clip.mp4',
   initiallyPaused = false,
+  activationId = 0,
 }) => {
   const {isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
+  const actionIdentity = useRef({
+    active,
+    activationId,
+    server,
+    shareUrl,
+    fileName,
+  });
+  useLayoutEffect(() => {
+    actionIdentity.current = {
+      active,
+      activationId,
+      server,
+      shareUrl,
+      fileName,
+    };
+  }, [activationId, active, fileName, server, shareUrl]);
+  const isCurrentAction = useCallback(
+    (identity: typeof actionIdentity.current): boolean => {
+      const current = actionIdentity.current;
+      return (
+        isCurrentScope() &&
+        current.active &&
+        current.active === identity.active &&
+        current.activationId === identity.activationId &&
+        current.server === identity.server &&
+        current.shareUrl === identity.shareUrl &&
+        current.fileName === identity.fileName
+      );
+    },
+    [isCurrentScope],
+  );
   const {width: windowWidth} = useWindowDimensions();
   const overflowMenuAnchorLeft = 48;
   const overflowMenuMargin = 8;
@@ -380,7 +414,8 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const share = async () => {
-    if (!isCurrentScope() || sharing || sharingRef.current) {
+    const identity = actionIdentity.current;
+    if (!isCurrentAction(identity) || sharing || sharingRef.current) {
       return;
     }
     sharingRef.current = true;
@@ -390,7 +425,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     try {
       path = await downloadMedia(server, shareUrl);
       retainDownloadedMedia(path, 'share');
-      if (!isCurrentScope()) {
+      if (!isCurrentAction(identity)) {
         return;
       }
       await Share.open({
@@ -399,11 +434,11 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         type: 'video/mp4',
       });
     } catch (error) {
-      if (!isCurrentScope()) {
+      if (!isCurrentAction(identity)) {
         return;
       }
       const appError = await handleError(error, 'CameraEventClip.share');
-      if (!isCurrentScope()) {
+      if (!isCurrentAction(identity)) {
         return;
       }
       const message = getUserFriendlyMessage(appError);
@@ -444,7 +479,8 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const download = useCallback(async () => {
-    if (!isCurrentScope() || sharing || sharingRef.current) {
+    const identity = actionIdentity.current;
+    if (!isCurrentAction(identity) || sharing || sharingRef.current) {
       return;
     }
     sharingRef.current = true;
@@ -454,7 +490,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     try {
       path = await downloadMedia(server, shareUrl);
       retainDownloadedMedia(path, 'share');
-      if (!isCurrentScope()) {
+      if (!isCurrentAction(identity)) {
         return;
       }
       await Share.open({
@@ -464,11 +500,11 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         saveToFiles: true,
       });
     } catch (error) {
-      if (!isCurrentScope()) {
+      if (!isCurrentAction(identity)) {
         return;
       }
       const appError = await handleError(error, 'CameraEventClip.download');
-      if (!isCurrentScope()) {
+      if (!isCurrentAction(identity)) {
         return;
       }
       const message = getUserFriendlyMessage(appError);
@@ -489,7 +525,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         }
       }
     }
-  }, [fileName, isCurrentScope, server, shareUrl, sharing]);
+  }, [fileName, isCurrentAction, isCurrentScope, server, shareUrl, sharing]);
 
   if (mediaError || playerError) {
     const errorMessage = intl.formatMessage({
@@ -766,13 +802,18 @@ const CameraEventClipContent: NavigationFunctionComponent<
       : undefined;
 
   const clipUrl = useMemo(
-    () => `${buildServerApiUrl(server)}/events/${event.id}/clip.mp4`,
+    () =>
+      `${buildServerUrl(server)?.replace(/\/+$/, '')}${eventClipPath(event.id)}`,
     [event.id, server],
   );
 
   const fileName = useMemo(() => clipFilename(event), [event]);
   const retryPreparation = useCallback(() => {
-    if (!isCurrentScope() || preparationInFlight.current) {
+    if (!isCurrentScope()) {
+      return;
+    }
+    if (preparationInFlight.current) {
+      preparationQueued.current = true;
       return;
     }
     setPreparedMedia(undefined);
@@ -784,6 +825,8 @@ const CameraEventClipContent: NavigationFunctionComponent<
     if (!playbackActive || !isCurrentScope()) {
       return;
     }
+    setPreparedMedia(undefined);
+    setMediaError(false);
     if (preparationInFlight.current) {
       preparationQueued.current = true;
       return;
@@ -792,8 +835,6 @@ const CameraEventClipContent: NavigationFunctionComponent<
     let downloadedPath: string | undefined;
     let downloadedPathReleased = false;
     preparationInFlight.current = true;
-    setPreparedMedia(undefined);
-    setMediaError(false);
     const releaseDownloadedPath = () => {
       if (downloadedPath && !downloadedPathReleased) {
         downloadedPathReleased = true;
@@ -808,16 +849,13 @@ const CameraEventClipContent: NavigationFunctionComponent<
           return undefined;
         }
         if (Platform.OS === 'android') {
-          const resourcePath = event.has_clip
-            ? eventClipPath(event.id)
-            : eventVodPath(event.camera, event.start_time, event.end_time);
           const uri = await protectedMediaUri(
             server,
-            resourcePath,
+            eventVodPath(event.id),
           );
           return {
             uri,
-            mimeType: event.has_clip ? 'video/mp4' : 'application/x-mpegURL',
+            mimeType: 'application/x-mpegURL',
             mode: 'direct',
           };
         }
@@ -851,9 +889,15 @@ const CameraEventClipContent: NavigationFunctionComponent<
       })
       .finally(() => {
         preparationInFlight.current = false;
-        if (preparationQueued.current && mounted.current && isCurrentScope()) {
+        if (
+          preparationQueued.current &&
+          mounted.current &&
+          isCurrentScope()
+        ) {
           preparationQueued.current = false;
           setRetryAttempt(current => current + 1);
+        } else if (!mounted.current || !isCurrentScope()) {
+          preparationQueued.current = false;
         }
       });
     return () => {
@@ -862,11 +906,7 @@ const CameraEventClipContent: NavigationFunctionComponent<
     };
   }, [
     clipUrl,
-    event.camera,
-    event.end_time,
-    event.has_clip,
     event.id,
-    event.start_time,
     activationId,
     playbackActive,
     retryAttempt,
@@ -877,6 +917,7 @@ const CameraEventClipContent: NavigationFunctionComponent<
   useEffect(
     () => () => {
       mounted.current = false;
+      preparationQueued.current = false;
     },
     [],
   );
@@ -892,6 +933,7 @@ const CameraEventClipContent: NavigationFunctionComponent<
       shareUrl={clipUrl}
       fileName={fileName}
       initiallyPaused={activationId > 0}
+      activationId={activationId}
     />
   );
 };

@@ -35,7 +35,12 @@ jest.mock('../../../helpers/playbackLifecycle', () => ({
   useScreenPlaybackLifecycle: () => ({active: true, activationId: 0}),
 }));
 jest.mock('../../../helpers/protectedMedia', () => ({
-  eventVodPath: jest.fn(() => '/vod/front-door/master.m3u8'),
+  eventVodPath: jest.fn(
+    (eventId: string) => `/vod/event/${encodeURIComponent(eventId)}/master.m3u8`,
+  ),
+  eventClipPath: jest.fn(
+    (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/clip.mp4`,
+  ),
   protectedMediaUri: (...args: unknown[]) => mockProtectedMediaUri(...args),
 }));
 jest.mock('../../../helpers/colors', () => ({

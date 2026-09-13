@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.4] - 2026-09-13
+
+- Switched Android event playback to Frigate's documented event HLS VOD route.
+- Made the Android status bar transparent while preserving theme-aware icon
+  contrast.
+- Removed only the outer horizontal gutters from camera and event previews
+  while preserving card spacing, vertical spacing, and internal content.
+
 ## [18.0.3] - 2026-09-13
 
 - Fixed Android event playback on Frigate servers where timestamp-based VOD is

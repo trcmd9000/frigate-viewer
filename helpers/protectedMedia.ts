@@ -87,25 +87,15 @@ export const isProtectedMediaUri = (uri: string): boolean => {
   );
 };
 
-export const eventVodPath = (
-  camera: string,
-  startTime: number,
-  endTime: number,
-): string => {
-  if (typeof camera !== 'string' || camera.trim().length === 0) {
-    throw new Error('The event camera is invalid');
-  }
+export const eventVodPath = (eventId: string): string => {
   if (
-    !Number.isFinite(startTime) ||
-    !Number.isFinite(endTime) ||
-    startTime < 0 ||
-    endTime < startTime
+    typeof eventId !== 'string' ||
+    eventId.trim().length === 0 ||
+    eventId.length > 256
   ) {
-    throw new Error('The event time range is invalid');
+    throw new Error('The event identifier is invalid');
   }
-  return `/vod/${encodeURIComponent(
-    camera,
-  )}/start/${startTime}/end/${endTime}/master.m3u8`;
+  return `/vod/event/${encodeURIComponent(eventId)}/master.m3u8`;
 };
 
 export const eventClipPath = (eventId: string): string => {

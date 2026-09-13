@@ -1,7 +1,13 @@
 import React, {FC, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
 import {useStore} from 'react-redux';
-import {Dimensions, FlatList, ToastAndroid, Text, View} from 'react-native';
+import {
+  FlatList,
+  ToastAndroid,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {useRest} from '../../helpers/rest';
 import {
@@ -36,50 +42,71 @@ import {RetryState} from '../../components/RetryState';
 import {SecureLogger} from '../../helpers/secureLogger';
 import {ActiveFilters} from '../events-filters/ActiveFilters';
 import {useDesignTokens} from '../../helpers/designTokens';
+import {gridCellGutters, gridCellWidth} from '../../helpers/gridLayout';
 
-const EventListSkeleton: FC<{label: string}> = ({label}) => {
+const EventListSkeleton: FC<{
+  label: string;
+  numColumns: number;
+}> = ({label, numColumns}) => {
   const tokens = useDesignTokens();
+  const {width: listWidth} = useWindowDimensions();
   return (
     <View
       testID="camera-events-skeleton"
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       accessibilityState={{busy: true}}
-      style={{padding: tokens.spacing.lg}}
+      style={{flexDirection: 'row', flexWrap: 'wrap'}}
     >
-      {[0, 1, 2].map(item => (
-        <View
-          key={item}
-          style={{
-            marginBottom: tokens.spacing.lg,
-            borderRadius: tokens.geometry.cardRadius,
-            backgroundColor: tokens.colors.surfaceElevated,
-            overflow: 'hidden',
-          }}
-        >
+      {Array.from({length: Math.max(numColumns * 2, 4)}, (_, index) => {
+        const gutters = gridCellGutters(index, numColumns, 12);
+        const cellWidth = gridCellWidth(listWidth, numColumns, 12);
+        return (
           <View
+            key={index}
             style={{
-              width: '100%',
-              aspectRatio: tokens.geometry.mediaAspectRatio,
-              backgroundColor: tokens.colors.mediaBackground,
-              opacity: 0.35,
+              width: cellWidth + gutters.left + gutters.right,
+              paddingLeft: gutters.left,
+              paddingRight: gutters.right,
+              marginVertical: 6,
             }}
-          />
-          <View style={{padding: tokens.spacing.lg}}>
+          >
             <View
               style={{
-                width: '52%',
-                height: tokens.spacing.md,
-                backgroundColor: tokens.colors.outline,
-                marginBottom: tokens.spacing.sm,
+                borderRadius: tokens.geometry.cardRadius,
+                backgroundColor: tokens.colors.surfaceElevated,
+                overflow: 'hidden',
               }}
-            />
-            <View
-              style={{width: '76%', height: tokens.spacing.sm, backgroundColor: tokens.colors.outline}}
-            />
+            >
+              <View
+                style={{
+                  width: '100%',
+                  aspectRatio: tokens.geometry.mediaAspectRatio,
+                  backgroundColor: tokens.colors.mediaBackground,
+                  opacity: 0.35,
+                }}
+              />
+              <View style={{padding: tokens.spacing.lg}}>
+                <View
+                  style={{
+                    width: '52%',
+                    height: tokens.spacing.md,
+                    backgroundColor: tokens.colors.outline,
+                    marginBottom: tokens.spacing.sm,
+                  }}
+                />
+                <View
+                  style={{
+                    width: '76%',
+                    height: tokens.spacing.sm,
+                    backgroundColor: tokens.colors.outline,
+                  }}
+                />
+              </View>
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
       <Text style={{position: 'absolute', opacity: 0}}>{label}</Text>
     </View>
   );
@@ -151,6 +178,7 @@ const CameraEventsContent: NavigationFunctionComponent<
   );
   const intl = useIntl();
   const {orientation, setComponentId} = useOrientation();
+  const {width: listWidth} = useWindowDimensions();
   const {get} = useRest();
   const getRef = useRef(get);
 
@@ -426,13 +454,13 @@ const CameraEventsContent: NavigationFunctionComponent<
     if (isCurrentScope() && snapshotDimensions) {
       const [width, height] = snapshotDimensions;
       const proportion = height / width;
-      const windowWidth = Dimensions.get('window').width;
-      const newHeight = (windowWidth * proportion) / numColumns;
+      const newHeight =
+        gridCellWidth(listWidth, numColumns, 12) * proportion;
       if (newHeight !== snapshotHeight) {
         dispatch(setEventSnapshotHeight(newHeight));
       }
     }
-  }, [snapshotDimensions, numColumns, orientation]);
+  }, [listWidth, snapshotDimensions, numColumns, orientation]);
 
   const showEventClip = (event: ICameraEvent) => {
     if (!isCurrentScope()) {
@@ -506,10 +534,11 @@ const CameraEventsContent: NavigationFunctionComponent<
         ref={listRef}
         testID="camera-events-list"
         data={events}
-        renderItem={({item}) => (
+        renderItem={({item, index}) => (
           <CameraEvent
             {...item}
             componentId={componentId}
+            index={index}
             mediaEnabled={mediaEnabled}
             onDelete={onDelete}
             onSnapshotDimensions={onSnapshotDimensions}
@@ -532,7 +561,10 @@ const CameraEventsContent: NavigationFunctionComponent<
         numColumns={numColumns}
         ListEmptyComponent={
           refreshing ? (
-            <EventListSkeleton label={intl.formatMessage(messages.loading)} />
+            <EventListSkeleton
+              label={intl.formatMessage(messages.loading)}
+              numColumns={numColumns}
+            />
           ) : (
             <RetryState
               message={
