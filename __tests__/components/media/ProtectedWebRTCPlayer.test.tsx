@@ -226,6 +226,7 @@ describe('ProtectedWebRTCPlayer', () => {
   });
 
   it.each(['focus-denied', 'native'] as const)('reports %s independently of initial false and retries only on new intent', async reason => {
+    jest.useFakeTimers();
     if (reason === 'focus-denied') {
       mockAcquireProtectedAudio.mockResolvedValueOnce(null);
     } else {
