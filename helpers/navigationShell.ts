@@ -121,8 +121,14 @@ export const presentSettingsModal = (): Promise<unknown> => {
   try {
     return Promise.resolve(
       Navigation.showModal({
-        component: {
-          name: 'Settings',
+        stack: {
+          children: [
+            {
+              component: {
+                name: 'Settings',
+              },
+            },
+          ],
         },
       }),
     ).finally(() => {

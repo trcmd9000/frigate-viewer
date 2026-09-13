@@ -11,8 +11,9 @@ export const spacing = {
 } as const;
 
 export const geometry = {
-  cardRadius: 16,
-  controlRadius: 12,
+  mediaRadius: 4,
+  cardRadius: 8,
+  controlRadius: 8,
   pillRadius: 999,
   minimumTouchTarget: 48,
   phoneInset: 16,

@@ -113,7 +113,7 @@ jest.mock('../../../helpers/designTokens', () => ({
 }));
 
 jest.mock('../../../views/cameras-list/CameraTile', () => ({
-  CameraTile: () => null,
+  CameraTile: jest.fn(() => null),
 }));
 
 describe('CamerasList Settings navigation', () => {
@@ -139,6 +139,32 @@ describe('CamerasList Settings navigation', () => {
     ));
   });
 
+  it('passes each item index and resolved column count to camera tiles', () => {
+    state.cameras = ['front', 'back'];
+    const {CameraTile} = jest.requireMock(
+      '../../../views/cameras-list/CameraTile',
+    ) as {CameraTile: jest.Mock};
+
+    render(<CamerasList componentId="cameras" componentName="CamerasList" />);
+
+    expect(CameraTile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cameraName: 'front',
+        index: 0,
+        layoutColumns: 2,
+      }),
+      {},
+    );
+    expect(CameraTile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cameraName: 'back',
+        index: 1,
+        layoutColumns: 2,
+      }),
+      {},
+    );
+  });
+
   it('opens no-server Configure as a modal and suppresses duplicate taps', async () => {
     const showModal = Navigation.showModal as jest.Mock;
     showModal.mockReturnValue(new Promise<void>(() => undefined));
@@ -153,7 +179,9 @@ describe('CamerasList Settings navigation', () => {
 
     expect(showModal).toHaveBeenCalledTimes(1);
     expect(showModal).toHaveBeenCalledWith({
-      component: {name: 'Settings'},
+      stack: {
+        children: [{component: {name: 'Settings'}}],
+      },
     });
   });
 

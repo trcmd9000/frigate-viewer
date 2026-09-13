@@ -119,7 +119,9 @@ describe('media-first navigation shell', () => {
 
     expect(showModal).toHaveBeenCalledTimes(1);
     expect(showModal).toHaveBeenCalledWith({
-      component: {name: 'Settings'},
+      stack: {
+        children: [{component: {name: 'Settings'}}],
+      },
     });
 
     resolvePresentation?.();

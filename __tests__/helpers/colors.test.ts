@@ -79,7 +79,7 @@ describe('adaptive color scheme', () => {
     expect(options.bottomTab.iconColor).toBe(theme.textSecondary);
     expect(options.bottomTab.selectedTextColor).toBe(theme.link);
     expect(options.bottomTab.selectedIconColor).toBe(theme.link);
-    expect(options.bottomTab.selectedFontSize).toBeGreaterThan(
+    expect(options.bottomTab.selectedFontSize).toBe(
       options.bottomTab.fontSize,
     );
     expect(options.bottomTab.fontWeight).toBe('600');

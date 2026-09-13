@@ -42,7 +42,11 @@ import {RetryState} from '../../components/RetryState';
 import {SecureLogger} from '../../helpers/secureLogger';
 import {ActiveFilters} from '../events-filters/ActiveFilters';
 import {useDesignTokens} from '../../helpers/designTokens';
-import {gridCellGutters, gridCellWidth} from '../../helpers/gridLayout';
+import {
+  gridCellGutters,
+  gridCellWidth,
+  responsiveGridColumns,
+} from '../../helpers/gridLayout';
 
 const EventListSkeleton: FC<{
   label: string;
@@ -167,7 +171,7 @@ const CameraEventsContent: NavigationFunctionComponent<
   const mounted = useRef(true);
   const dispatch = useAppDispatch();
   const server = useAppSelector(selectServer);
-  const numColumns = useAppSelector(selectEventsNumColumns);
+  const preferredColumns = useAppSelector(selectEventsNumColumns) ?? 1;
   const snapshotHeight = useAppSelector(selectEventsSnapshotHeight);
   const filtersCameras = useAppSelector(selectFiltersCameras);
   const filtersLabels = useAppSelector(selectFiltersLabels);
@@ -178,7 +182,14 @@ const CameraEventsContent: NavigationFunctionComponent<
   );
   const intl = useIntl();
   const {orientation, setComponentId} = useOrientation();
-  const {width: listWidth} = useWindowDimensions();
+  const {width: listWidth, fontScale} = useWindowDimensions();
+  const numColumns = responsiveGridColumns(
+    listWidth,
+    preferredColumns,
+    160,
+    12,
+    fontScale,
+  );
   const {get} = useRest();
   const getRef = useRef(get);
 
@@ -539,6 +550,7 @@ const CameraEventsContent: NavigationFunctionComponent<
             {...item}
             componentId={componentId}
             index={index}
+            layoutColumns={numColumns}
             mediaEnabled={mediaEnabled}
             onDelete={onDelete}
             onSnapshotDimensions={onSnapshotDimensions}

@@ -49,6 +49,7 @@ type CameraTileProps = PropsWithChildren<{
   cameraName: string;
   active?: boolean;
   index?: number;
+  layoutColumns?: number;
 }>;
 
 interface SnapshotState {
@@ -74,7 +75,6 @@ const styles = StyleSheet.create({
   media: {
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: 16,
   },
   state: {
     position: 'absolute',
@@ -110,7 +110,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   metadata: {
-    marginTop: 10,
+    paddingTop: 8,
+    paddingHorizontal: 12,
   },
   supporting: {
     fontSize: 14,
@@ -122,13 +123,15 @@ export const CameraTile: FC<CameraTileProps> = ({
   cameraName,
   active = true,
   index = 0,
+  layoutColumns,
 }) => {
   const [snapshot, setSnapshot] = useState<SnapshotState>({
     status: 'loading',
   });
   const server = useAppSelector(selectServer);
   const refreshFrequency = useAppSelector(selectCamerasRefreshFrequency);
-  const numColumns = useAppSelector(selectCamerasNumColumns) ?? 1;
+  const preferredColumns = useAppSelector(selectCamerasNumColumns) ?? 1;
+  const numColumns = layoutColumns ?? preferredColumns;
   const lockLandscapePlaybackOrientation = useAppSelector(
     selectEventsLockLandscapePlaybackOrientation,
   );
@@ -361,7 +364,12 @@ export const CameraTile: FC<CameraTileProps> = ({
         },
       ]}
     >
-      <View style={styles.media}>
+      <View
+        style={[
+          styles.media,
+          {borderRadius: tokens.geometry?.mediaRadius ?? 4},
+        ]}
+      >
         <ImagePreview
           imageUrl={snapshot.imageUrl}
           state={snapshot.status}

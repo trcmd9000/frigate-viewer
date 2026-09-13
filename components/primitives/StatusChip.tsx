@@ -41,11 +41,11 @@ export const StatusChip: FC<StatusChipProps> = ({
       accessibilityRole="text"
       accessibilityLabel={accessibilityLabel || label}
       style={{
-        minHeight: tokens.geometry.minimumTouchTarget,
+        minHeight: 28,
         alignSelf: 'flex-start',
         justifyContent: 'center',
         paddingHorizontal: tokens.spacing.md,
-        paddingVertical: tokens.spacing.sm,
+        paddingVertical: tokens.spacing.xs,
         borderRadius: tokens.geometry.pillRadius,
         backgroundColor: colors.backgroundColor,
       }}

@@ -76,7 +76,7 @@ export const menuButton: OptionsTopBarButton = {
   component: {
     name: 'TopBarButton',
     passProps: {
-      icon: 'ellipsis',
+      icon: 'menu',
       onPress: openSecondaryMenu,
     },
   },

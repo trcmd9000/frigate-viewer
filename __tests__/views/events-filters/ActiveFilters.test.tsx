@@ -74,7 +74,7 @@ describe('active event filters', () => {
     });
   });
 
-  it('renders the German empty state without an ID or English fallback', () => {
+  it('omits the filter summary when no filters are active', () => {
     mockSelectorValues.cameras = [];
     mockSelectorValues.labels = [];
     mockSelectorValues.retained = false;
@@ -85,7 +85,7 @@ describe('active event filters', () => {
       </IntlProvider>,
     );
 
-    expect(view.getByText('Alle Ereignisse')).toBeTruthy();
+    expect(view.queryByTestId('events-filter-bar')).toBeNull();
     expect(view.queryByText('eventsFilters.active.none')).toBeNull();
     expect(view.queryByText('All events')).toBeNull();
 

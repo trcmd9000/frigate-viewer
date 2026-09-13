@@ -4,6 +4,8 @@ import {makeMessages} from '../../helpers/locale';
 export const messages = makeMessages('menu', {
   title: 'More',
   'button.label': 'More',
+  'button.refresh': 'Refresh',
+  'button.filter': 'Filter',
   'items.label': 'Secondary navigation',
   'close.label': 'Close menu',
   'close.hint': 'Dismisses the secondary navigation',

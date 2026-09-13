@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.5] - 2026-09-13
+
+- Polished camera and event grids with adaptive columns, consistent gutters,
+  compact metadata, and smaller semantic media radii.
+- Simplified settings grouping and navigation typography while preserving
+  existing server-profile actions.
+- Improved event-player controls with safe insets, an explicit close action,
+  responsive seeking, and screen-reader support.
+
 ## [18.0.4] - 2026-09-13
 
 - Switched Android event playback to Frigate's documented event HLS VOD route.

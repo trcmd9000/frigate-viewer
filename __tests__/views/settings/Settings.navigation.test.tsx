@@ -10,6 +10,7 @@ jest.mock('react-native-navigation', () => ({
   Navigation: {
     dismissModal: jest.fn(),
     showModal: jest.fn().mockResolvedValue(undefined),
+    mergeOptions: jest.fn(),
   },
 }));
 
@@ -182,12 +183,18 @@ describe('Settings modal navigation', () => {
   });
 
   it('renders German headings and TalkBack labels without IDs or English fallback', () => {
-    const {getByRole, getByText, getByLabelText, queryByText} = renderSettings(
+    const {getByText, getByLabelText, queryByText} = renderSettings(
       'de',
       de,
     );
 
-    expect(getByRole('header', {name: 'Einstellungen'})).toBeTruthy();
+    const {Navigation} = require('react-native-navigation');
+    expect(Navigation.mergeOptions).toHaveBeenCalledWith(
+      'settings',
+      expect.objectContaining({
+        topBar: {title: {text: 'Einstellungen'}},
+      }),
+    );
     expect(getByText('Darstellung')).toBeTruthy();
     expect(getByLabelText('Datumsformat')).toBeTruthy();
     expect(getByText('Relative Zeit (z. B. vor 5 Minuten)')).toBeTruthy();
@@ -205,12 +212,18 @@ describe('Settings modal navigation', () => {
   });
 
   it('falls back to English defaults without exposing message IDs', () => {
-    const {getByRole, getByText, getByLabelText, queryByText} = renderSettings(
+    const {getByText, getByLabelText, queryByText} = renderSettings(
       'fr',
       {},
     );
 
-    expect(getByRole('header', {name: 'Settings'})).toBeTruthy();
+    const {Navigation} = require('react-native-navigation');
+    expect(Navigation.mergeOptions).toHaveBeenCalledWith(
+      'settings',
+      expect.objectContaining({
+        topBar: {title: {text: 'Settings'}},
+      }),
+    );
     expect(getByText('Appearance')).toBeTruthy();
     expect(getByLabelText('Date format')).toBeTruthy();
     expect(getByText('Relative time')).toBeTruthy();

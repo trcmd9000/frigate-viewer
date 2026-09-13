@@ -38,7 +38,11 @@ import {
   presentSettingsModal,
   updatePrimaryDestinationLabels,
 } from '../../helpers/navigationShell';
-import {gridCellGutters, gridCellWidth} from '../../helpers/gridLayout';
+import {
+  gridCellGutters,
+  gridCellWidth,
+  responsiveGridColumns,
+} from '../../helpers/gridLayout';
 
 interface IConfigResponse {
   cameras: Record<string, {zones: Record<string, unknown>}>;
@@ -66,7 +70,6 @@ const styles = StyleSheet.create({
   skeletonMedia: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 16,
   },
 });
 
@@ -100,18 +103,22 @@ const CameraListSkeleton = ({
             accessibilityLabel={loadingLabel}
             style={[
               styles.skeletonMedia,
-              {backgroundColor: tokens.colors.mediaBackground},
+              {
+                backgroundColor: tokens.colors.mediaBackground,
+                borderRadius: tokens.geometry?.mediaRadius ?? 4,
+              },
             ]}
           />
-          <View
-            style={{
-              width: '65%',
-              height: 20,
-              marginTop: 10,
-              borderRadius: 6,
-              backgroundColor: tokens.colors.surfaceElevated,
-            }}
-          />
+          <View style={{paddingTop: 8, paddingHorizontal: 12}}>
+            <View
+              style={{
+                width: '65%',
+                height: 20,
+                borderRadius: tokens.geometry?.mediaRadius ?? 4,
+                backgroundColor: tokens.colors.surfaceElevated,
+              }}
+            />
+          </View>
         </View>
       ))}
     </View>
@@ -133,7 +140,15 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
   const tokens = useDesignTokens();
   const server = useAppSelector(selectServer);
   const cameras = useAppSelector(selectAvailableCameras);
-  const numColumns = useAppSelector(selectCamerasNumColumns);
+  const preferredColumns = useAppSelector(selectCamerasNumColumns) ?? 1;
+  const {width: listWidth, fontScale} = useWindowDimensions();
+  const numColumns = responsiveGridColumns(
+    listWidth,
+    preferredColumns,
+    160,
+    16,
+    fontScale,
+  );
   const localeRegion = useAppSelector(selectLocaleRegion);
   const {get} = useRest();
   const getRef = useRef(get);
@@ -340,11 +355,13 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
       <FlatList
         testID="cameras-list"
         data={cameras}
-        renderItem={({item}) => (
+        renderItem={({item, index}) => (
           <CameraTile
             cameraName={item}
             componentId={componentId}
             active={screenVisible}
+            index={index}
+            layoutColumns={numColumns}
           />
         )}
         key={numColumns}
