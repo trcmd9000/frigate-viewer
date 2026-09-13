@@ -42,7 +42,11 @@ import {
 } from '../../components/media/PlayableMedia';
 import {Media3MediaPlayer} from '../../components/media/Media3MediaPlayer';
 import {AudioToggle} from '../../components/media/AudioToggle';
-import {eventVodPath, protectedMediaUri} from '../../helpers/protectedMedia';
+import {
+  eventClipPath,
+  eventVodPath,
+  protectedMediaUri,
+} from '../../helpers/protectedMedia';
 import {useScreenPlaybackLifecycle} from '../../helpers/playbackLifecycle';
 import {
   EVENT_PLAYBACK_SPEEDS,
@@ -491,11 +495,11 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     const errorMessage = intl.formatMessage({
       id: 'cameraEventClip.error',
       defaultMessage:
-        'Unable to play protected media. Check your connection and try again.',
+        'Unable to play media. Check your connection and try again.',
     });
     const retryMessage = intl.formatMessage({
       id: 'cameraEventClip.retry',
-      defaultMessage: 'Retry protected media',
+      defaultMessage: 'Retry media',
     });
     return (
       <View accessibilityLiveRegion="assertive" style={styles.overlayWrapper}>
@@ -522,7 +526,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   if (!media) {
     const loadingMessage = intl.formatMessage({
       id: 'cameraEventClip.loading',
-      defaultMessage: 'Preparing protected media',
+      defaultMessage: 'Preparing media',
     });
     return (
       <View
@@ -804,13 +808,16 @@ const CameraEventClipContent: NavigationFunctionComponent<
           return undefined;
         }
         if (Platform.OS === 'android') {
+          const resourcePath = event.has_clip
+            ? eventClipPath(event.id)
+            : eventVodPath(event.camera, event.start_time, event.end_time);
           const uri = await protectedMediaUri(
             server,
-            eventVodPath(event.camera, event.start_time, event.end_time),
+            resourcePath,
           );
           return {
             uri,
-            mimeType: 'application/x-mpegURL',
+            mimeType: event.has_clip ? 'video/mp4' : 'application/x-mpegURL',
             mode: 'direct',
           };
         }
@@ -857,6 +864,7 @@ const CameraEventClipContent: NavigationFunctionComponent<
     clipUrl,
     event.camera,
     event.end_time,
+    event.has_clip,
     event.id,
     event.start_time,
     activationId,
