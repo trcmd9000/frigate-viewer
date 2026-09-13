@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.2] - 2026-09-13
+
+- Fixed an Android release startup crash where resource shrinking removed the
+  dynamically resolved React Native Navigation tab icons.
+
 ## [18.0.1] - 2026-09-12
 
 - Fixed an Android release startup crash where R8 removed React Native inspector
