@@ -46,8 +46,8 @@ export const EventLabels: FC<IEventLabelsProps> = ({
           color: tokens.colors.textOnAccent,
           backgroundColor: tokens.colors.accent,
           paddingHorizontal: tokens.spacing.sm,
-          paddingVertical: tokens.spacing.xs,
-          borderRadius: tokens.geometry.controlRadius,
+          paddingVertical: 2,
+          borderRadius: tokens.geometry.pillRadius,
         }}
       >
         {label}
@@ -59,8 +59,8 @@ export const EventLabels: FC<IEventLabelsProps> = ({
             color: tokens.colors.textOnMedia,
             backgroundColor: tokens.colors.mediaBackground,
             paddingHorizontal: tokens.spacing.sm,
-            paddingVertical: tokens.spacing.xs,
-            borderRadius: tokens.geometry.controlRadius,
+            paddingVertical: 2,
+            borderRadius: tokens.geometry.pillRadius,
           }}
           key={zone}
         >
@@ -73,8 +73,8 @@ export const EventLabels: FC<IEventLabelsProps> = ({
           color: tokens.colors.textSecondary,
           backgroundColor: tokens.colors.surfaceElevated,
           paddingHorizontal: tokens.spacing.sm,
-          paddingVertical: tokens.spacing.xs,
-          borderRadius: tokens.geometry.controlRadius,
+          paddingVertical: 2,
+          borderRadius: tokens.geometry.pillRadius,
         }}
       >
         {score}
@@ -86,8 +86,8 @@ export const EventLabels: FC<IEventLabelsProps> = ({
             color: tokens.colors.textOnWarning,
             backgroundColor: tokens.colors.warningContainer,
             paddingHorizontal: tokens.spacing.sm,
-            paddingVertical: tokens.spacing.xs,
-            borderRadius: tokens.geometry.controlRadius,
+            paddingVertical: 2,
+            borderRadius: tokens.geometry.pillRadius,
           }}
         >
           {intl.formatMessage(messages['labels.inProgressLabel'])}

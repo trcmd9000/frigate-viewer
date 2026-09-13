@@ -60,8 +60,70 @@ describe('event player controls', () => {
     expect(getByTestId('event-player-timeline').props.accessibilityRole).toBe(
       'adjustable',
     );
+    expect(
+      getByTestId('event-player-timeline').props.accessibilityValue,
+    ).toEqual({
+      min: 0,
+      now: 2,
+      max: 10,
+      text: '0:02 of 0:10',
+    });
     fireEvent.press(play);
     expect(onPausePress).toHaveBeenCalledWith(false);
+  });
+
+  it('adjusts the timeline by safe 10-second TalkBack actions', () => {
+    const onSeek = jest.fn();
+    const view = renderProgressBar(en, 'en', {
+      currentTime: 4,
+      duration: 12,
+      onSeek,
+    });
+    const timeline = view.getByTestId('event-player-timeline');
+
+    fireEvent(timeline, 'accessibilityAction', {
+      nativeEvent: {actionName: 'increment'},
+    });
+    fireEvent(timeline, 'accessibilityAction', {
+      nativeEvent: {actionName: 'decrement'},
+    });
+
+    expect(onSeek).toHaveBeenNthCalledWith(1, 12);
+    expect(onSeek).toHaveBeenNthCalledWith(2, 0);
+    expect(timeline.props.accessibilityActions).toEqual([
+      {name: 'increment', label: 'Forward 10 seconds'},
+      {name: 'decrement', label: 'Back 10 seconds'},
+    ]);
+  });
+
+  it('uses a separate full-width timeline row in portrait', () => {
+    const view = renderProgressBar();
+
+    expect(view.getByTestId('event-player-transport-row')).toBeTruthy();
+    expect(view.getByTestId('event-player-timeline-row').props.style).toEqual(
+      expect.objectContaining({
+        flexDirection: 'row',
+        minHeight: 48,
+      }),
+    );
+  });
+
+  it('applies bottom and horizontal system insets to the overlay', () => {
+    const view = renderProgressBar(en, 'en', {
+      bottomInset: 24,
+      leftInset: 8,
+      rightInset: 12,
+    });
+
+    expect(view.getByTestId('event-player-progress-bar').props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          paddingBottom: 32,
+          paddingLeft: 12,
+          paddingRight: 16,
+        }),
+      ]),
+    );
   });
 
   it('renders German transport labels and hints without English fallbacks', () => {

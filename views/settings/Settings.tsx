@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import {Alert, Pressable, Text} from 'react-native';
 import {useIntl} from 'react-intl';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
@@ -76,7 +76,7 @@ const withCurrentOption = <T extends string | number>(
     ? options
     : [{value, label: labelForValue?.(value)}, ...options];
 
-export const Settings: NavigationFunctionComponent = () => {
+export const Settings: NavigationFunctionComponent = ({componentId}) => {
   const theme = useTheme();
   const intl = useIntl();
   const dispatch = useAppDispatch();
@@ -93,6 +93,9 @@ export const Settings: NavigationFunctionComponent = () => {
     },
     card: {
       marginBottom: 12,
+      padding: 0,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
     },
     empty: {
       color: currentTheme.text,
@@ -116,6 +119,7 @@ export const Settings: NavigationFunctionComponent = () => {
     },
     addButton: {
       minHeight: 48,
+      borderRadius: 8,
     },
     settingText: {
       color: currentTheme.text,
@@ -140,6 +144,14 @@ export const Settings: NavigationFunctionComponent = () => {
       : currentSettings?.activeServerProfileId;
   const serverFormNavigationInFlight = useRef(false);
   const profileDeletionInFlight = useRef(new Set<string>());
+
+  useEffect(() => {
+    Navigation.mergeOptions(componentId, {
+      topBar: {
+        title: {text: intl.formatMessage(messages['topBar.title'])},
+      },
+    });
+  }, [componentId, intl]);
 
   const persist = useCallback(
     (nextSettings: ISettings, operation: string) => {
@@ -337,9 +349,6 @@ export const Settings: NavigationFunctionComponent = () => {
   return (
     <View style={styles.wrapper}>
       <ScrollView contentContainerStyle={styles.scrollArea}>
-        <SectionHeader testID="settings-page-heading">
-          {intl.formatMessage(messages['topBar.title'])}
-        </SectionHeader>
         <Card style={styles.card} testID="settings-server-profiles">
           <SectionHeader>
             {intl.formatMessage(messages['server.header'])}

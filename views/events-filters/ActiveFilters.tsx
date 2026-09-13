@@ -53,30 +53,12 @@ export const ActiveFilters: FC<ActiveFiltersProps> = ({viewedCameraNames}) => {
   };
 
   if (active.length === 0) {
-    return (
-      <View
-        testID="events-filter-bar"
-        style={{
-          minHeight: tokens.geometry.minimumTouchTarget,
-          paddingHorizontal: tokens.spacing.lg,
-          paddingVertical: tokens.spacing.sm,
-          backgroundColor: tokens.colors.canvas,
-          borderBottomWidth: 1,
-          borderBottomColor: tokens.colors.divider,
-        }}
-      >
-        <Text style={{...tokens.typography.supporting, color: tokens.colors.textSecondary}}>
-          {intl.formatMessage(messages['active.none'])}
-        </Text>
-      </View>
-    );
+    return null;
   }
 
   return (
     <View
       testID="events-filter-bar"
-      accessible
-      accessibilityLabel={intl.formatMessage(messages['active.count'], {count: active.length})}
       style={{
         minHeight: tokens.geometry.minimumTouchTarget,
         paddingHorizontal: tokens.spacing.lg,

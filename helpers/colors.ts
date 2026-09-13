@@ -167,7 +167,7 @@ export const navigationThemeOptions = (
     iconColor: theme.textSecondary,
     selectedIconColor: theme.link,
     fontSize: 12,
-    selectedFontSize: 14,
+    selectedFontSize: 12,
     fontWeight: '600' as const,
   },
   topBar: {

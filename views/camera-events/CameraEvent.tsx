@@ -73,6 +73,7 @@ interface ICameraEventProps extends ICameraEvent {
   onEventPress: (event: ICameraEvent) => void;
   onShare: (event: ICameraEvent) => void;
   mediaEnabled: boolean;
+  layoutColumns?: number;
 }
 
 export const CameraEvent: FC<ICameraEventProps> = props => {
@@ -83,13 +84,13 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
       flex: 1,
     },
     metadata: {
-      padding: 12,
+      padding: 10,
       gap: 4,
     },
     cameraName: {
       color: palette.text,
-      fontSize: 16,
-      fontWeight: '700',
+      fontSize: 14,
+      fontWeight: '600',
     },
   }));
 
@@ -99,6 +100,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     onEventPress,
     onShare,
     mediaEnabled,
+    layoutColumns,
     index = 0,
     ...event
   } = props;
@@ -115,7 +117,8 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
   const [retained, setRetained] = useState(retain_indefinitely);
   const server = useAppSelector(selectServer);
   const snapshotHeight = useAppSelector(selectEventsSnapshotHeight);
-  const numColumns = useAppSelector(selectEventsNumColumns);
+  const preferredColumns = useAppSelector(selectEventsNumColumns) ?? 1;
+  const numColumns = layoutColumns ?? preferredColumns;
   const {width: listWidth} = useWindowDimensions();
   const intl = useIntl();
   const {del, post} = useRest();
@@ -217,6 +220,8 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
             style={{
               aspectRatio: undefined,
               height: snapshotHeight,
+              borderTopLeftRadius: 4,
+              borderTopRightRadius: 4,
             }}
             accessible
             accessibilityLabel={`${event.camera} ${label} event thumbnail`}

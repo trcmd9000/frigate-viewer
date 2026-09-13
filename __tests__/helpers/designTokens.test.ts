@@ -18,7 +18,9 @@ describe('semantic media-first design tokens', () => {
   it('uses the shared spacing and accessible geometry scale', () => {
     expect(spacing).toEqual({xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32});
     expect(geometry.minimumTouchTarget).toBeGreaterThanOrEqual(48);
-    expect(geometry.cardRadius).toBe(16);
+    expect(geometry.mediaRadius).toBe(4);
+    expect(geometry.cardRadius).toBe(8);
+    expect(geometry.controlRadius).toBe(8);
     expect(geometry.mediaAspectRatio).toBeCloseTo(16 / 9);
   });
 

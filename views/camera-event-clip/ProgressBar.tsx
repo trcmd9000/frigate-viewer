@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
+  AccessibilityActionEvent,
+  useWindowDimensions,
 } from 'react-native';
 import {useIntl} from 'react-intl';
 import {formatVideoTime} from '../../helpers/locale';
@@ -21,6 +23,9 @@ interface IProgressBarProps {
   onPausePress?: (paused: boolean) => void;
   onSeek?: (pos: number) => void;
   onSkip?: (seconds: number) => void;
+  bottomInset?: number;
+  leftInset?: number;
+  rightInset?: number;
 }
 
 export const ProgressBar: FC<IProgressBarProps> = ({
@@ -31,6 +36,9 @@ export const ProgressBar: FC<IProgressBarProps> = ({
   onPausePress,
   onSeek,
   onSkip,
+  bottomInset = 0,
+  leftInset = 0,
+  rightInset = 0,
 }) => {
   const styles = useStyles(({theme}) => ({
     playerBar: {
@@ -47,6 +55,21 @@ export const ProgressBar: FC<IProgressBarProps> = ({
       flexDirection: 'row',
       alignItems: 'center',
     },
+    playerBarPortrait: {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    },
+    transportRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    timelineRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     controlButton: {
       width: 48,
       height: 48,
@@ -58,6 +81,8 @@ export const ProgressBar: FC<IProgressBarProps> = ({
       fontWeight: '600',
       color: theme.mediaText,
       fontVariant: ['tabular-nums'],
+      minWidth: 44,
+      textAlign: 'center',
     },
     playerProgressBar: {
       flex: 1,
@@ -96,18 +121,28 @@ export const ProgressBar: FC<IProgressBarProps> = ({
   }));
   const theme = useTheme();
   const intl = useIntl();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const portrait = windowHeight >= windowWidth;
 
   const [ballPos, setBallPos] = useState<number | undefined>();
   const [trackWidth, setTrackWidth] = useState(0);
 
+  const safeDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+  const safeCurrentTime = Number.isFinite(currentTime)
+    ? Math.max(0, Math.min(safeDuration, currentTime))
+    : 0;
   const currentTimeStr = useMemo(
-    () => formatVideoTime(currentTime),
-    [currentTime],
+    () => formatVideoTime(safeCurrentTime),
+    [safeCurrentTime],
   );
-  const durationStr = useMemo(() => formatVideoTime(duration), [duration]);
+  const durationStr = useMemo(
+    () => formatVideoTime(safeDuration),
+    [safeDuration],
+  );
   const percentage = useMemo(
-    () => `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
-    [currentTime, duration],
+    () =>
+      `${safeDuration > 0 ? (safeCurrentTime / safeDuration) * 100 : 0}%`,
+    [safeCurrentTime, safeDuration],
   );
 
   const play = useCallback(() => {
@@ -130,13 +165,42 @@ export const ProgressBar: FC<IProgressBarProps> = ({
     onSkip?.(10);
   }, [onSkip]);
 
+  const adjustTimeline = useCallback(
+    (seconds: number) => {
+      if (safeDuration <= 0) {
+        return;
+      }
+      const nextPosition = Math.max(
+        0,
+        Math.min(safeDuration, safeCurrentTime + seconds),
+      );
+      if (onSeek) {
+        onSeek(nextPosition);
+      } else {
+        onSkip?.(nextPosition - safeCurrentTime);
+      }
+    },
+    [onSeek, onSkip, safeCurrentTime, safeDuration],
+  );
+
+  const handleAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      if (event.nativeEvent.actionName === 'increment') {
+        adjustTimeline(10);
+      } else if (event.nativeEvent.actionName === 'decrement') {
+        adjustTimeline(-10);
+      }
+    },
+    [adjustTimeline],
+  );
+
   const seek = useCallback(
     (seekPos: number) => {
       if (onSeek) {
-        onSeek(seekPos * duration);
+        onSeek(seekPos * safeDuration);
       }
     },
-    [duration, onSeek],
+    [onSeek, safeDuration],
   );
 
   const clampPosition = useCallback(
@@ -229,109 +293,163 @@ export const ProgressBar: FC<IProgressBarProps> = ({
     id: 'cameraEventClip.progressHint',
     defaultMessage: 'Adjust video position',
   });
+  const progressValue = intl.formatMessage(
+    {
+      id: 'cameraEventClip.progressValue',
+      defaultMessage: '{currentTime} of {duration}',
+    },
+    {currentTime: currentTimeStr, duration: durationStr},
+  );
 
-  return (
-    <View style={[styles.playerBar]}>
-      <Pressable
-        testID="event-player-play-toggle"
-        accessibilityLabel={playLabel}
-        accessibilityHint={playHint}
-        accessibilityRole="button"
-        onPress={togglePause}
-        style={styles.controlButton}
-      >
-        {paused ? (
-          <IconOutline
-            accessible={false}
-            name="caret-right"
-            color={theme.mediaText}
-            size={24}
-          />
-        ) : (
-          <IconOutline
-            accessible={false}
-            name="pause"
-            color={theme.mediaText}
-            size={24}
-          />
-        )}
-      </Pressable>
-      <Pressable
-        testID="event-player-skip-backward"
-        accessibilityLabel={backwardLabel}
-        accessibilityHint={backwardHint}
-        accessibilityRole="button"
-        onPress={skipBackward}
-        style={styles.controlButton}
-      >
+  const playButton = (
+    <Pressable
+      testID="event-player-play-toggle"
+      accessibilityLabel={playLabel}
+      accessibilityHint={playHint}
+      accessibilityRole="button"
+      onPress={togglePause}
+      style={styles.controlButton}
+    >
+      {paused ? (
         <IconOutline
           accessible={false}
-          name="backward"
+          name="caret-right"
           color={theme.mediaText}
-          size={22}
+          size={24}
         />
-      </Pressable>
-      <Text style={[styles.playerBarText]}>{currentTimeStr}</Text>
-      <View
-        testID="event-player-timeline"
-        accessibilityLabel={progressLabel}
-        accessibilityHint={progressHint}
-        accessibilityRole="adjustable"
-        accessibilityValue={{
-          min: 0,
-          now: Math.round(currentTime),
-          max: Math.round(duration),
-        }}
-        onLayout={handleTrackLayout}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        style={[styles.playerProgressBar]}
-      >
+      ) : (
+        <IconOutline
+          accessible={false}
+          name="pause"
+          color={theme.mediaText}
+          size={24}
+        />
+      )}
+    </Pressable>
+  );
+
+  const backwardButton = (
+    <Pressable
+      testID="event-player-skip-backward"
+      accessibilityLabel={backwardLabel}
+      accessibilityHint={backwardHint}
+      accessibilityRole="button"
+      onPress={skipBackward}
+      style={styles.controlButton}
+    >
+      <IconOutline
+        accessible={false}
+        name="backward"
+        color={theme.mediaText}
+        size={22}
+      />
+    </Pressable>
+  );
+
+  const forwardButton = (
+    <Pressable
+      testID="event-player-skip-forward"
+      accessibilityLabel={forwardLabel}
+      accessibilityHint={forwardHint}
+      accessibilityRole="button"
+      onPress={skipForward}
+      style={styles.controlButton}
+    >
+      <IconOutline
+        accessible={false}
+        name="forward"
+        color={theme.mediaText}
+        size={22}
+      />
+    </Pressable>
+  );
+
+  const timeline = (
+    <View
+      testID="event-player-timeline"
+      accessibilityLabel={progressLabel}
+      accessibilityHint={progressHint}
+      accessibilityRole="adjustable"
+      accessibilityActions={[
+        {name: 'increment', label: forwardLabel},
+        {name: 'decrement', label: backwardLabel},
+      ]}
+      accessibilityValue={{
+        min: 0,
+        now: Math.round(safeCurrentTime),
+        max: Math.round(safeDuration),
+        text: progressValue,
+      }}
+      onAccessibilityAction={handleAccessibilityAction}
+      onLayout={handleTrackLayout}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={[styles.playerProgressBar]}
+    >
+      <View testID="event-player-track" style={styles.playerProgressBarTrack}>
         <View
-          testID="event-player-track"
-          style={styles.playerProgressBarTrack}
-        >
+          testID="event-player-track-background"
+          style={styles.playerProgressBarTrackBackground}
+        />
+        <View
+          testID="event-player-progress"
+          style={[
+            styles.playerProgressBarProgress,
+            {width: percentage as DimensionValue},
+          ]}
+        />
+        {ballPos !== undefined && (
           <View
-            testID="event-player-track-background"
-            style={styles.playerProgressBarTrackBackground}
-          />
-          <View
-            testID="event-player-progress"
+            testID="event-player-thumb"
             style={[
-              styles.playerProgressBarProgress,
-              {width: percentage as DimensionValue},
+              styles.playerProgressBarBall,
+              {transform: [{translateX: ballPos}]},
             ]}
           />
-          {ballPos !== undefined && (
-            <View
-              testID="event-player-thumb"
-              style={[
-                styles.playerProgressBarBall,
-                {transform: [{translateX: ballPos}]},
-              ]}
-            />
-          )}
-        </View>
+        )}
       </View>
-      <Text style={[styles.playerBarText]}>{durationStr}</Text>
-      <Pressable
-        testID="event-player-skip-forward"
-        accessibilityLabel={forwardLabel}
-        accessibilityHint={forwardHint}
-        accessibilityRole="button"
-        onPress={skipForward}
-        style={styles.controlButton}
-      >
-        <IconOutline
-          accessible={false}
-          name="forward"
-          color={theme.mediaText}
-          size={22}
-        />
-      </Pressable>
+    </View>
+  );
+
+  return (
+    <View
+      testID="event-player-progress-bar"
+      style={[
+        styles.playerBar,
+        portrait && styles.playerBarPortrait,
+        {
+          paddingBottom: 8 + bottomInset,
+          paddingLeft: 4 + leftInset,
+          paddingRight: 4 + rightInset,
+        },
+      ]}
+    >
+      {portrait ? (
+        <>
+          <View testID="event-player-transport-row" style={styles.transportRow}>
+            {backwardButton}
+            {playButton}
+            {forwardButton}
+          </View>
+          <View testID="event-player-timeline-row" style={styles.timelineRow}>
+            <Text style={styles.playerBarText}>{currentTimeStr}</Text>
+            {timeline}
+            <Text style={styles.playerBarText}>{durationStr}</Text>
+          </View>
+        </>
+      ) : (
+        <>
+          {playButton}
+          {backwardButton}
+          <Text style={styles.playerBarText}>{currentTimeStr}</Text>
+          {timeline}
+          <Text style={styles.playerBarText}>{durationStr}</Text>
+          {forwardButton}
+        </>
+      )}
     </View>
   );
 };

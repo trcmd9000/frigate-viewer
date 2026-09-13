@@ -57,10 +57,10 @@ export const TopBarButton: FC<ITopBarButtonProps> = ({
       accessibilityRole="button"
       accessibilityLabel={
         icon === 'sync'
-          ? 'Refresh'
-          : icon === 'ellipsis'
+          ? intl.formatMessage(menuMessages['button.refresh'])
+          : icon === 'ellipsis' || icon === 'menu'
           ? intl.formatMessage(menuMessages['button.label'])
-          : 'Filter'
+          : intl.formatMessage(menuMessages['button.filter'])
       }
     >
       <View>

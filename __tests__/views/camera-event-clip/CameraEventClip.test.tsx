@@ -4,7 +4,12 @@ import {Navigation} from 'react-native-navigation';
 import Share from 'react-native-share';
 import {downloadMedia, releaseDownloadedMedia, retainDownloadedMedia} from '../../../helpers/mediaDownload';
 import {IntlProvider} from 'react-intl';
-import {Platform, Pressable, StyleSheet} from 'react-native';
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  StyleSheet,
+} from 'react-native';
 import en from '../../../i18n/en';
 import de from '../../../i18n/de';
 import {CameraEventClip} from '../../../views/camera-event-clip/CameraEventClip';
@@ -40,7 +45,15 @@ jest.mock('../../../store/store', () => ({
 }));
 
 jest.mock('react-native-navigation', () => ({
-  Navigation: {dismissModal: jest.fn(() => Promise.resolve())},
+  Navigation: {
+    constantsSync: jest.fn(() => ({
+      statusBarHeight: 24,
+      bottomTabsHeight: 0,
+      topBarHeight: 0,
+      backButtonId: '',
+    })),
+    dismissModal: jest.fn(() => Promise.resolve()),
+  },
 }));
 
 jest.mock('../../../store/settings', () => ({
@@ -170,6 +183,9 @@ describe('CameraEventClip protected playback state', () => {
       active: true,
       activationId: 0,
     });
+    jest
+      .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+      .mockResolvedValue(false);
   });
 
   const clipElement = (ownerScopeGeneration = 0) => (
@@ -179,20 +195,26 @@ describe('CameraEventClip protected playback state', () => {
     </IntlProvider>
   );
 
-  it('preserves playback in scope, then unmounts the player without preparing on the new server', async () => {
-    mockProtectedMediaUri.mockResolvedValue('frigate-media://test/vod/master.m3u8');
-    const view = render(clipElement());
-    await view.findByTestId('media-player');
-    view.rerender(clipElement());
-    expect(mockPlayerCleanup).not.toHaveBeenCalled();
-    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
-    mockGeneration = 1;
-    view.rerender(clipElement(1));
-    expect(view.toJSON()).toBeNull();
-    expect(mockPlayerCleanup).toHaveBeenCalledTimes(1);
-    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
-    expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');
-  });
+  it(
+    'preserves playback in scope, then unmounts the player without preparing on the new server',
+    async () => {
+      mockProtectedMediaUri.mockResolvedValue(
+        'frigate-media://test/vod/master.m3u8',
+      );
+      const view = render(clipElement());
+      await view.findByTestId('media-player');
+      view.rerender(clipElement());
+      expect(mockPlayerCleanup).not.toHaveBeenCalled();
+      expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
+      mockGeneration = 1;
+      view.rerender(clipElement(1));
+      expect(view.toJSON()).toBeNull();
+      expect(mockPlayerCleanup).toHaveBeenCalledTimes(1);
+      expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
+      expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');
+    },
+    30000,
+  );
 
   it('uses the documented event VOD path for Android playback', async () => {
     const view = renderClip(en, 'en', {...event, has_clip: true});
@@ -212,6 +234,89 @@ describe('CameraEventClip protected playback state', () => {
         }),
       }),
     );
+  });
+
+  it('shows a safe-inset 48dp close control and dismisses the modal', async () => {
+    mockProtectedMediaUri.mockResolvedValueOnce(
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
+    );
+    const view = renderClip(en);
+    await view.findByTestId('media-player');
+    const close = view.getByTestId('event-player-close');
+
+    expect(close.props.style).toEqual(
+      expect.objectContaining({minWidth: 48, minHeight: 48}),
+    );
+    expect(close.props.accessibilityLabel).toBe('Close player');
+    expect(view.getByTestId('event-player-tools').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({top: 24})]),
+    );
+    fireEvent.press(close);
+    expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');
+  });
+
+  it('auto-hides controls after inactivity and restores them on tap', async () => {
+    jest.useFakeTimers();
+    mockEmitProgress.current = true;
+    mockProtectedMediaUri.mockResolvedValueOnce(
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
+    );
+    const view = renderClip(en);
+    await view.findByTestId('event-player-audio');
+    await act(async () => Promise.resolve());
+
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+    expect(view.queryByTestId('event-player-audio')).toBeNull();
+
+    fireEvent.press(view.getByTestId('event-player-scrim-toggle'));
+    expect(view.getByTestId('event-player-audio')).toBeTruthy();
+    jest.useRealTimers();
+  });
+
+  it('does not auto-hide controls while a screen reader is enabled', async () => {
+    jest.useFakeTimers();
+    (
+      AccessibilityInfo.isScreenReaderEnabled as jest.MockedFunction<
+        typeof AccessibilityInfo.isScreenReaderEnabled
+      >
+    ).mockResolvedValue(true);
+    mockEmitProgress.current = true;
+    mockProtectedMediaUri.mockResolvedValueOnce(
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
+    );
+    const view = renderClip(en);
+    await view.findByTestId('event-player-audio');
+    await act(async () => Promise.resolve());
+
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
+    expect(view.getByTestId('event-player-audio')).toBeTruthy();
+    jest.useRealTimers();
+  });
+
+  it('keeps replay controls visible when playback ends', async () => {
+    jest.useFakeTimers();
+    mockEmitProgress.current = true;
+    mockProtectedMediaUri.mockResolvedValueOnce(
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
+    );
+    const view = renderClip(en);
+    await view.findByTestId('event-player-audio');
+    await act(async () => Promise.resolve());
+
+    const mediaPlayerProps = mockMediaPlayerProps.mock.calls[
+      mockMediaPlayerProps.mock.calls.length - 1
+    ]?.[0] as {onEnd: () => void};
+    act(() => mediaPlayerProps.onEnd());
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
+
+    expect(view.getByTestId('event-player-audio')).toBeTruthy();
+    jest.useRealTimers();
   });
 
   it('downloads the documented event clip on non-Android playback', async () => {

@@ -69,6 +69,8 @@ export default {
   'cameraEventClip.moreMenu': 'Ereignisaktionen',
   'cameraEventClip.download': 'Auf Gerät speichern',
   'cameraEventClip.downloadHint': 'Speichert eine Kopie des Clips auf diesem Gerät',
+  'cameraEventClip.close': 'Player schließen',
+  'cameraEventClip.closeHint': 'Kehrt zu den Ereignissen zurück',
   'cameraEventClip.toggleControls':
     'Player-Steuerelemente ein- oder ausblenden',
   'cameraEventClip.toggleControlsHint':
@@ -85,6 +87,7 @@ export default {
   'cameraEventClip.seekForwardHint': 'Springt 10 Sekunden vor',
   'cameraEventClip.progress': 'Videofortschritt',
   'cameraEventClip.progressHint': 'Passt die Position im Video an',
+  'cameraEventClip.progressValue': '{currentTime} von {duration}',
   'cameraPreview.audio.enable': 'Audio einschalten',
   'cameraPreview.audio.mute': 'Audio ausschalten',
   'cameraPreview.audio.unavailable': 'Audio nicht verfügbar',
@@ -150,6 +153,8 @@ export default {
   'logs.retry': 'Protokolle erneut laden',
   'menu.title': 'Mehr',
   'menu.button.label': 'Mehr',
+  'menu.button.refresh': 'Aktualisieren',
+  'menu.button.filter': 'Filtern',
   'menu.section.saved': 'Gespeichert',
   'menu.section.diagnostics': 'Diagnose',
   'menu.section.support': 'Support',

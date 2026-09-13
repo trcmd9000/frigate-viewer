@@ -8,9 +8,11 @@ import React, {
   useState,
 } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   BackHandler,
+  Dimensions,
   Platform,
   Pressable,
   StyleSheet,
@@ -20,7 +22,10 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {useIntl} from 'react-intl';
-import {NavigationFunctionComponent} from 'react-native-navigation';
+import {
+  Navigation,
+  NavigationFunctionComponent,
+} from 'react-native-navigation';
 import {selectServer} from '../../store/settings';
 import {useAppSelector} from '../../store/store';
 import {buildServerUrl} from '../../helpers/rest';
@@ -65,6 +70,7 @@ import {
   useServerScopeOwner,
   withServerScopeScreen,
 } from '../../helpers/serverScopeScreen';
+import {SecureLogger} from '../../helpers/secureLogger';
 
 interface ICameraEventClipProps extends ServerScopeScreenProps {
   event: ICameraEvent;
@@ -81,7 +87,10 @@ interface IVideoPlayerProps {
   fileName?: string;
   initiallyPaused?: boolean;
   activationId?: number;
+  onClose: () => void;
 }
+
+const CONTROLS_AUTO_HIDE_DELAY_MS = 3000;
 
 const VideoPlayer: FC<IVideoPlayerProps> = ({
   ownerScopeGeneration,
@@ -94,6 +103,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   fileName = 'clip.mp4',
   initiallyPaused = false,
   activationId = 0,
+  onClose,
 }) => {
   const {isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const actionIdentity = useRef({
@@ -127,20 +137,51 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     },
     [isCurrentScope],
   );
-  const {width: windowWidth} = useWindowDimensions();
-  const overflowMenuAnchorLeft = 48;
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const systemInsets = useMemo(() => {
+    let statusBarHeight = 0;
+    try {
+      statusBarHeight = Navigation.constantsSync?.().statusBarHeight ?? 0;
+    } catch (error) {
+      SecureLogger.logError(
+        error instanceof Error ? error : new Error(String(error)),
+        'CameraEventClip.system-insets',
+      );
+    }
+    const screen = Dimensions.get('screen');
+    const verticalSystemInset = Math.max(0, screen.height - windowHeight);
+    const horizontalSystemInset = Math.max(0, screen.width - windowWidth);
+    return {
+      top: Math.max(0, statusBarHeight),
+      bottom: Math.max(0, verticalSystemInset - statusBarHeight),
+      left: horizontalSystemInset,
+      right: horizontalSystemInset,
+    };
+  }, [windowHeight, windowWidth]);
   const overflowMenuMargin = 8;
-  const overflowMenuWidth = Math.max(1, Math.min(280, windowWidth - 16));
-  const overflowMenuLeft = Math.max(
-    overflowMenuMargin - overflowMenuAnchorLeft,
+  const overflowMenuAnchorLeft = systemInsets.left + 96;
+  const overflowMenuWidth = Math.max(
+    1,
     Math.min(
-      0,
+      280,
       windowWidth -
-        overflowMenuMargin -
-        overflowMenuWidth -
-        overflowMenuAnchorLeft,
+        systemInsets.left -
+        systemInsets.right -
+        overflowMenuMargin * 2,
     ),
   );
+  const overflowMenuScreenLeft = Math.max(
+    systemInsets.left + overflowMenuMargin,
+    Math.min(
+      overflowMenuAnchorLeft,
+      windowWidth -
+        systemInsets.right -
+        overflowMenuMargin -
+        overflowMenuWidth,
+    ),
+  );
+  const overflowMenuLeft =
+    overflowMenuScreenLeft - overflowMenuAnchorLeft;
   const styles = useStyles(({theme}) => ({
     wrapper: {
       backgroundColor: theme.mediaBackground,
@@ -166,6 +207,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       color: theme.mediaText,
       marginTop: 12,
     },
+    loadingContent: {
+      alignItems: 'center',
+    },
     retryText: {
       color: theme.mediaText,
       fontSize: 16,
@@ -175,8 +219,6 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     },
     tools: {
       position: 'absolute',
-      left: 0,
-      top: 0,
       zIndex: 3,
       elevation: 2,
       flexDirection: 'row',
@@ -280,6 +322,14 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     id: 'cameraEventClip.downloadHint',
     defaultMessage: 'Saves a copy of the clip on this device',
   });
+  const closeLabel = intl.formatMessage({
+    id: 'cameraEventClip.close',
+    defaultMessage: 'Close player',
+  });
+  const closeHint = intl.formatMessage({
+    id: 'cameraEventClip.closeHint',
+    defaultMessage: 'Returns to events',
+  });
   const toggleControlsLabel = intl.formatMessage({
     id: 'cameraEventClip.toggleControls',
     defaultMessage: 'Show or hide player controls',
@@ -316,13 +366,85 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  const autoHideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const progressAvailable = progressInfo !== undefined;
 
   useEffect(() => {
     setPlayerError(false);
     setMuted(true);
     setSpeedMenuOpen(false);
     setOverflowMenuOpen(false);
+    setControlsVisible(true);
   }, [active, media?.uri]);
+
+  const clearAutoHideTimer = useCallback(() => {
+    if (autoHideTimer.current) {
+      clearTimeout(autoHideTimer.current);
+      autoHideTimer.current = undefined;
+    }
+  }, []);
+
+  const scheduleAutoHide = useCallback(() => {
+    clearAutoHideTimer();
+    if (
+      !controlsVisible ||
+      !progressAvailable ||
+      paused ||
+      ended ||
+      screenReaderEnabled ||
+      speedMenuOpen ||
+      overflowMenuOpen
+    ) {
+      return;
+    }
+    autoHideTimer.current = setTimeout(() => {
+      setControlsVisible(false);
+    }, CONTROLS_AUTO_HIDE_DELAY_MS);
+  }, [
+    clearAutoHideTimer,
+    controlsVisible,
+    ended,
+    overflowMenuOpen,
+    paused,
+    progressAvailable,
+    screenReaderEnabled,
+    speedMenuOpen,
+  ]);
+
+  useEffect(() => {
+    let mounted = true;
+    const updateScreenReaderState = (enabled: boolean) => {
+      if (!mounted) {
+        return;
+      }
+      setScreenReaderEnabled(enabled);
+      if (enabled) {
+        setControlsVisible(true);
+      }
+    };
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then(updateScreenReaderState)
+      .catch(error => {
+        SecureLogger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+          'CameraEventClip.screen-reader-state',
+        );
+      });
+    const subscription = AccessibilityInfo.addEventListener(
+      'screenReaderChanged',
+      updateScreenReaderState,
+    );
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    scheduleAutoHide();
+    return clearAutoHideTimer;
+  }, [clearAutoHideTimer, scheduleAutoHide]);
 
   useEffect(() => {
     if (!controlsVisible) {
@@ -394,13 +516,15 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   );
 
   const onEnd = useCallback(() => {
+    clearAutoHideTimer();
     setPaused(true);
     setEnded(true);
+    setControlsVisible(true);
     if (progressInfo) {
       setPlaybackPosition(progressInfo.duration);
       setProgressInfo({...progressInfo, currentTime: progressInfo.duration});
     }
-  }, [progressInfo]);
+  }, [clearAutoHideTimer, progressInfo]);
 
   const onPausedChange = useCallback(
     (nextPaused: boolean) => {
@@ -527,6 +651,34 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     }
   }, [fileName, isCurrentAction, isCurrentScope, server, shareUrl, sharing]);
 
+  const closeButton = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={closeLabel}
+      accessibilityHint={closeHint}
+      onPress={onClose}
+      style={styles.toolButton}
+      testID="event-player-close"
+    >
+      <IconOutline
+        accessible={false}
+        name="close"
+        color={theme.mediaText}
+        size={24}
+      />
+    </Pressable>
+  );
+  const closeOnlyTools = (
+    <View
+      style={[
+        styles.tools,
+        {left: systemInsets.left, top: systemInsets.top},
+      ]}
+    >
+      {closeButton}
+    </View>
+  );
+
   if (mediaError || playerError) {
     const errorMessage = intl.formatMessage({
       id: 'cameraEventClip.error',
@@ -539,6 +691,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     });
     return (
       <View accessibilityLiveRegion="assertive" style={styles.overlayWrapper}>
+        {closeOnlyTools}
         <Text accessibilityRole="alert" style={styles.errorText}>
           {errorMessage}
         </Text>
@@ -565,25 +718,28 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       defaultMessage: 'Preparing media',
     });
     return (
-      <View
-        accessible
-        accessibilityRole="progressbar"
-        accessibilityLabel={loadingMessage}
-        accessibilityState={{busy: true}}
-        style={styles.overlayWrapper}
-      >
-        <ActivityIndicator
-          testID="event-player-loading-indicator"
-          size="large"
-          color={theme.mediaText}
-        />
-        <Text style={styles.loadingText}>{loadingMessage}</Text>
+      <View style={styles.overlayWrapper}>
+        {closeOnlyTools}
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={loadingMessage}
+          accessibilityState={{busy: true}}
+          style={styles.loadingContent}
+        >
+          <ActivityIndicator
+            testID="event-player-loading-indicator"
+            size="large"
+            color={theme.mediaText}
+          />
+          <Text style={styles.loadingText}>{loadingMessage}</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.wrapper}>
+    <View onTouchStart={scheduleAutoHide} style={styles.wrapper}>
       <Media3MediaPlayer
         ref={player}
         paused={paused || !active}
@@ -596,11 +752,13 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         onError={() => setPlayerError(true)}
         muted={muted}
       />
-      <View
-        testID="event-player-control-scrim"
-        pointerEvents="none"
-        style={styles.controlScrim}
-      />
+      {controlsVisible && (
+        <View
+          testID="event-player-control-scrim"
+          pointerEvents="none"
+          style={styles.controlScrim}
+        />
+      )}
       {progressInfo && (
         <Pressable
           testID="event-player-scrim-toggle"
@@ -616,6 +774,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
           paused={paused}
           currentTime={progressInfo.currentTime}
           duration={progressInfo.duration}
+          bottomInset={systemInsets.bottom}
+          leftInset={systemInsets.left}
+          rightInset={systemInsets.right}
           ended={ended}
           onPausePress={onPausedChange}
           onSeek={seek}
@@ -634,7 +795,14 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         />
       )}
       {controlsVisible && (
-        <View style={styles.tools}>
+        <View
+          testID="event-player-tools"
+          style={[
+            styles.tools,
+            {left: systemInsets.left, top: systemInsets.top},
+          ]}
+        >
+          {closeButton}
           <AudioToggle
             testID="event-player-audio"
             muted={muted}
@@ -782,7 +950,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
 
 const CameraEventClipContent: NavigationFunctionComponent<
   ICameraEventClipProps
-> = ({event, ownerScopeGeneration}) => {
+> = ({componentId, event, ownerScopeGeneration}) => {
   const {generation, isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const server = useAppSelector(selectServer);
   const [preparedMedia, setPreparedMedia] = useState<{
@@ -808,6 +976,13 @@ const CameraEventClipContent: NavigationFunctionComponent<
   );
 
   const fileName = useMemo(() => clipFilename(event), [event]);
+  const close = useCallback(
+    () =>
+      Promise.resolve(Navigation.dismissModal(componentId)).catch(error =>
+        handleError(error, 'CameraEventClip.close'),
+      ),
+    [componentId],
+  );
   const retryPreparation = useCallback(() => {
     if (!isCurrentScope()) {
       return;
@@ -934,6 +1109,7 @@ const CameraEventClipContent: NavigationFunctionComponent<
       fileName={fileName}
       initiallyPaused={activationId > 0}
       activationId={activationId}
+      onClose={close}
     />
   );
 };
