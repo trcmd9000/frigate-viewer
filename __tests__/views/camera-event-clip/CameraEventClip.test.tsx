@@ -10,6 +10,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import * as ReactNative from 'react-native';
 import en from '../../../i18n/en';
 import de from '../../../i18n/de';
 import {CameraEventClip} from '../../../views/camera-event-clip/CameraEventClip';
@@ -199,6 +200,12 @@ describe('CameraEventClip protected playback state', () => {
     mockUseScreenPlaybackLifecycle.mockReturnValue({
       active: true,
       activationId: 0,
+    });
+    jest.spyOn(ReactNative.Dimensions, 'get').mockReturnValue({
+      width: 240,
+      height: 640,
+      scale: 1,
+      fontScale: 1,
     });
     jest
       .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
@@ -564,7 +571,7 @@ describe('CameraEventClip protected playback state', () => {
     const menuStyle = StyleSheet.flatten(
       view.getByTestId('event-player-overflow-menu').props.style,
     );
-    expect(menuStyle.left).toBeGreaterThanOrEqual(-40);
+    expect(menuStyle.left).toBeGreaterThanOrEqual(-96);
     expect(menuStyle.width).toBeLessThanOrEqual(280);
 
     expect(view.getByTestId('event-player-audio')).toBeTruthy();
@@ -585,6 +592,25 @@ describe('CameraEventClip protected playback state', () => {
     ).toBe(true);
 
     fireEvent.press(shareButton);
+    expect(view.queryByTestId('event-player-overflow-menu')).toBeNull();
+  });
+
+  it('shows share and save as direct actions when the toolbar fits', async () => {
+    jest.spyOn(ReactNative.Dimensions, 'get').mockReturnValue({
+      width: 360,
+      height: 640,
+      scale: 1,
+      fontScale: 1,
+    });
+    mockEmitProgress.current = true;
+    mockProtectedMediaUri.mockResolvedValueOnce(
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
+    );
+    const view = renderClip(en);
+
+    expect(await view.findByTestId('event-player-share')).toBeTruthy();
+    expect(view.getByTestId('event-player-download')).toBeTruthy();
+    expect(view.queryByTestId('event-player-overflow')).toBeNull();
     expect(view.queryByTestId('event-player-overflow-menu')).toBeNull();
   });
 

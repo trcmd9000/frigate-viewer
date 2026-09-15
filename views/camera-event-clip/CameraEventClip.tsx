@@ -97,6 +97,8 @@ interface IVideoPlayerProps {
 }
 
 const CONTROLS_AUTO_HIDE_DELAY_MS = 3000;
+const TOOL_BUTTON_WIDTH = 48;
+const TOOLBAR_WIDTH_RESERVE = 8;
 
 const VideoPlayer: FC<IVideoPlayerProps> = ({
   ownerScopeGeneration,
@@ -380,6 +382,12 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const playbackFeedbackId = useRef(0);
   const autoHideTimer = useRef<ReturnType<typeof setTimeout>>();
   const progressAvailable = progressInfo !== undefined;
+  const directMediaActions =
+    progressAvailable &&
+    windowWidth - systemInsets.left - systemInsets.right >=
+      TOOL_BUTTON_WIDTH *
+        (canChangePlaybackSpeed ? 5 : 4) +
+        TOOLBAR_WIDTH_RESERVE;
 
   useEffect(() => {
     setPlayerError(false);
@@ -465,6 +473,12 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       setOverflowMenuOpen(false);
     }
   }, [controlsVisible]);
+
+  useEffect(() => {
+    if (directMediaActions) {
+      setOverflowMenuOpen(false);
+    }
+  }, [directMediaActions]);
 
   useEffect(() => {
     if (!speedMenuOpen && !overflowMenuOpen) {
@@ -715,6 +729,44 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       />
     </Pressable>
   );
+  const directShareButton = (
+    <Pressable
+      style={styles.toolButton}
+      accessibilityRole="button"
+      accessibilityLabel={shareLabel}
+      accessibilityHint={shareHint}
+      disabled={sharing}
+      hitSlop={12}
+      onPress={share}
+      testID="event-player-share"
+    >
+      <IconOutline
+        accessible={false}
+        name="share-alt"
+        color={theme.mediaText}
+        size={20}
+      />
+    </Pressable>
+  );
+  const directDownloadButton = (
+    <Pressable
+      style={styles.toolButton}
+      accessibilityRole="button"
+      accessibilityLabel={downloadLabel}
+      accessibilityHint={downloadHint}
+      disabled={sharing}
+      hitSlop={12}
+      onPress={download}
+      testID="event-player-download"
+    >
+      <IconOutline
+        accessible={false}
+        name="download"
+        color={theme.mediaText}
+        size={20}
+      />
+    </Pressable>
+  );
   const closeOnlyTools = (
     <View
       style={[
@@ -866,7 +918,13 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
             muted={muted}
             onToggle={() => setMuted(current => !current)}
           />
-          {progressInfo && (
+          {progressInfo && directMediaActions && (
+            <>
+              {directShareButton}
+              {directDownloadButton}
+            </>
+          )}
+          {progressInfo && !directMediaActions && (
             <>
               <View style={styles.speedMenuAnchor}>
                 <Pressable
