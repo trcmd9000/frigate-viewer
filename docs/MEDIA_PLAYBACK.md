@@ -11,30 +11,31 @@ accept the opaque scheme; transport and policy remain project-owned native code.
 
 ## Event VOD and generated event clips
 
-Android event playback uses the documented event-scoped VOD route. The
-[Frigate OpenAPI definition](https://github.com/blakeblackshear/frigate/blob/dev/docs/static/frigate-api.yaml)
+For events with a generated clip (`has_clip=true`), Android uses the documented
+event MP4 endpoint through the opaque native handle:
+
+```text
+/api/events/{eventId}/clip.mp4
+```
+
+This is the same official event media endpoint used by the app's share/download
+flow. It avoids requiring the event-scoped HLS VOD route for events that already
+have a generated clip.
+
+For events without a generated clip, Android uses the documented event-scoped
+VOD route. The [Frigate OpenAPI
+definition](https://github.com/blakeblackshear/frigate/blob/dev/docs/static/frigate-api.yaml)
 defines `GET /vod/event/{event_id}` as returning an HLS playlist and says to
-append `/master.m3u8` or `/index.m3u8` for HLS playback. The app uses the
-protected relative master-playlist path:
+append `/master.m3u8` or `/index.m3u8` for HLS playback:
 
 ```text
 /vod/event/{eventId}/master.m3u8
 ```
 
-The route accepts the documented optional integer `padding` parameter, whose
-default is `0`. The app does not infer media availability from an HTTP status.
-
 For share/download and non-Android display, the app uses the documented
 `GET /events/{event_id}/clip.mp4` endpoint (under the server's API base) and
-the managed local-download path:
-
-```text
-/events/{eventId}/clip.mp4
-```
-
-The documented optional integer `padding` parameter also defaults to `0`; no
-client-side status semantics are attached to this endpoint. The app's
-server-relative URL includes its API base as `/api/events/{eventId}/clip.mp4`.
+the managed local-download path. Both documented endpoints accept the optional
+integer `padding` parameter, whose default is `0`.
 
 The same native data source handles the master/media playlist, relative or
 absolute segments, initialization ranges, and AES-128 key requests.

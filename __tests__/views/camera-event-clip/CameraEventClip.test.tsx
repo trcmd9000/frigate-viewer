@@ -233,8 +233,28 @@ describe('CameraEventClip protected playback state', () => {
     30000,
   );
 
-  it('uses the documented event VOD path for Android playback', async () => {
+  it('uses the documented event MP4 path for generated Android clips', async () => {
     const view = renderClip(en, 'en', {...event, has_clip: true});
+    await waitFor(() => expect(view.getByTestId('media-player')).toBeTruthy());
+
+    expect(mockProtectedMediaUri).toHaveBeenCalledWith(
+      server,
+      '/api/events/event-1/clip.mp4',
+    );
+    expect(mockProtectedMediaUri).toHaveBeenCalledTimes(1);
+    expect(downloadMedia).not.toHaveBeenCalled();
+    expect(mockMediaPlayerProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media: expect.objectContaining({
+          mimeType: 'video/mp4',
+          mode: 'direct',
+        }),
+      }),
+    );
+  });
+
+  it('uses the documented event VOD path when no generated clip exists', async () => {
+    const view = renderClip(en, 'en', {...event, has_clip: false});
     await waitFor(() => expect(view.getByTestId('media-player')).toBeTruthy());
 
     expect(mockProtectedMediaUri).toHaveBeenCalledWith(

@@ -1082,13 +1082,16 @@ const CameraEventClipContent: NavigationFunctionComponent<
           return undefined;
         }
         if (Platform.OS === 'android') {
+          const resourcePath = event.has_clip
+            ? eventClipPath(event.id)
+            : eventVodPath(event.id);
           const uri = await protectedMediaUri(
             server,
-            eventVodPath(event.id),
+            resourcePath,
           );
           return {
             uri,
-            mimeType: 'application/x-mpegURL',
+            mimeType: event.has_clip ? 'video/mp4' : 'application/x-mpegURL',
             mode: 'direct',
           };
         }
@@ -1139,6 +1142,7 @@ const CameraEventClipContent: NavigationFunctionComponent<
     };
   }, [
     clipUrl,
+    event.has_clip,
     event.id,
     activationId,
     playbackActive,

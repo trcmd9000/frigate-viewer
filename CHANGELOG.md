@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.7] - 2026-09-15
+
+- Fixed Android event playback for generated Frigate clips by using the
+  documented event MP4 endpoint when `has_clip` is true.
+- Retained the documented event-scoped HLS VOD route for events without a
+  generated clip.
+
 ## [18.0.6] - 2026-09-15
 
 - Added tactile feedback and animated action overlays for event playback
