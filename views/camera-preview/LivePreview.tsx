@@ -64,7 +64,6 @@ import type {ProtectedLiveFailureReason} from '../../helpers/protectedLiveDiagno
 import {LiveAudioControl} from './LiveAudioControl';
 import {LiveStreamControl} from './LiveStreamControl';
 import type {ProtectedAudioStatus} from '../../helpers/protectedAudio';
-import type {Stats} from '../../helpers/interfaces';
 import {
   fetchStreamMetadata,
   planProtectedLiveStreams,
@@ -259,7 +258,6 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [streamFrameRates, setStreamFrameRates] = useState<
     Array<number | undefined>
   >([]);
-  const cameraFrameRateRef = useRef<number>();
   const [firstCompatibleStreamIndex, setFirstCompatibleStreamIndex] =
     useState(0);
   const streamName = streamNames[streamIndex];
@@ -703,7 +701,6 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setStreamNames([]);
     setStreamCodecs([]);
     setStreamFrameRates([]);
-    cameraFrameRateRef.current = undefined;
     setStreamOptions([]);
     setStreamOptionLabels({});
     setFallbackReason(undefined);
@@ -729,24 +726,6 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     }
 
     const deviceCapabilityRequest = probeDeviceCodecCapability();
-    const cameraFrameRateRequest = getRef.current<Stats>(server, 'stats')
-      .then(stats => {
-        const frameRate = stats.cameras?.[cameraName]?.camera_fps;
-        return typeof frameRate === 'number' &&
-          Number.isFinite(frameRate) && frameRate > 0
-          ? frameRate
-          : undefined;
-      })
-      .catch(() => undefined);
-    void cameraFrameRateRequest.then(cameraFrameRate => {
-      if (!active || cameraFrameRate === undefined) {
-        return;
-      }
-      cameraFrameRateRef.current = cameraFrameRate;
-      setStreamFrameRates(current => current.map(
-        frameRate => frameRate ?? cameraFrameRate,
-      ));
-    });
     const profileRegistrationRequest = protectedMseProbeEnabled()
       ? protectedMediaProfileId(server).then(() => true).catch(() => false)
       : Promise.resolve(false);
@@ -943,7 +922,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               ];
               return streamMetadata?.video?.find(
                 descriptor => descriptor.codec === candidate.codec,
-              )?.frameRate ?? cameraFrameRateRef.current;
+              )?.frameRate;
             }));
             setStreamIndex(0);
             setFirstCompatibleStreamIndex(

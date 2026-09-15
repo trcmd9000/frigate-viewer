@@ -495,7 +495,7 @@ describe('LivePreview audio render gate', () => {
     view.unmount();
   });
 
-  it('shows configured streams in the live view and persists a manual choice', async () => {
+  it('does not use Frigate camera FPS as the live stream FPS', async () => {
     mockGet.mockImplementation((_server: unknown, endpoint: string) =>
       Promise.resolve(endpoint === 'stats'
         ? {cameras: {front: {camera_fps: 12}}}
@@ -529,7 +529,7 @@ describe('LivePreview audio render gate', () => {
     await waitFor(() =>
       expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy(),
     );
-    expect(view.getByTestId('mock-live-status').props.frameRate).toBe(12);
+    expect(view.getByTestId('mock-live-status').props.frameRate).toBeUndefined();
     fireEvent.press(view.getByTestId('camera-preview-media-tap'));
     expect(view.getByTestId('camera-preview-stream-selector')).toBeTruthy();
     expect(view.queryByRole('radio')).toBeNull();
@@ -551,6 +551,25 @@ describe('LivePreview audio render gate', () => {
           preference: {mode: 'manual', streamName: 'original'},
         },
       }),
+    );
+    view.unmount();
+  });
+
+  it('uses the selected stream metadata FPS when it is available', async () => {
+    mockFetchStreamMetadata.mockResolvedValue({
+      video: [{kind: 'video', codec: 'h264', frameRate: 25}],
+      audio: [],
+      malformed: false,
+    });
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+
+    await waitFor(() =>
+      expect(view.getByTestId('mock-live-status').props.frameRate).toBe(25),
     );
     view.unmount();
   });

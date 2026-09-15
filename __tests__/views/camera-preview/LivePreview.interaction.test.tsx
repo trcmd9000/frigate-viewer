@@ -121,7 +121,7 @@ describe('LivePreview interaction layering', () => {
 
     fireEvent(media, 'touchEnd');
     fireEvent.press(retry);
-    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
 
     expect(retry).toBeTruthy();
     view.unmount();
