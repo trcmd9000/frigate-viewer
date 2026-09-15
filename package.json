@@ -1,6 +1,6 @@
 {
   "name": "FrigateViewer",
-  "version": "18.0.5",
+  "version": "18.0.6",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -9,6 +9,8 @@
     "android:bundle": "cd android && ./gradlew bundleRelease",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "licenses:generate": "node scripts/generate-js-licenses.cjs && node scripts/generate-android-license-overrides.cjs",
+    "licenses:check": "npm run licenses:generate && git diff --exit-code -- licenses/js-licenses.json licenses/android-license-overrides.json",
     "postinstall": "patch-package",
     "start": "react-native start",
     "test": "jest",

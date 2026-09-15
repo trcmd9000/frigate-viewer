@@ -1,0 +1,296 @@
+{
+  "@ant-design/icons-react-native@2.3.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/ant-design-ant-design-icons-dfe5c2183e82554ef991024afb81baac82c7e10a.txt",
+    "source": "https://github.com/ant-design/ant-design-icons/blob/master/LICENSE (Git blob dfe5c2183e82554ef991024afb81baac82c7e10a)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/assets-registry@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/babel-plugin-codegen@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/babel-preset@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/codegen@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/community-cli-plugin@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/dev-middleware@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/gradle-plugin@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/js-polyfills@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/metro-babel-transformer@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/normalize-color@2.1.0": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/normalize-colors@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "@react-native/virtualized-lists@0.75.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-native-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/react-native/blob/v0.75.2/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "abs-svg-path@0.1.1": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/jkroso-abs-svg-path-c9b77ebb4de12e2451ac7c67b43cf1ddceaf7739.txt",
+    "source": "https://github.com/jkroso/abs-svg-path/blob/master/License (Git blob c9b77ebb4de12e2451ac7c67b43cf1ddceaf7739)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "ansi-fragments@0.2.1": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/zamotany-ansi-fragments-metadata-ansi-fragments.txt",
+    "source": "https://github.com/zamotany/ansi-fragments.git and npm package author metadata",
+    "reason": "The published npm package and linked repository omit a license file; the declared SPDX text is paired with the published package author metadata."
+  },
+  "appdirsjs@1.2.8": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/codingjerk-appdirsjs-metadata-appdirsjs.txt",
+    "source": "https://github.com/codingjerk/appdirsjs.git and npm package author metadata",
+    "reason": "The published npm package and linked repository omit a license file; the declared SPDX text is paired with the published package author metadata."
+  },
+  "babel-core@7.0.0-bridge.0": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/babel-babel-f31575ec773bb199aeb7c0d0f1612cfe1c7038f1.txt",
+    "source": "https://github.com/babel/babel/blob/main/LICENSE (Git blob f31575ec773bb199aeb7c0d0f1612cfe1c7038f1)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "babel-plugin-transform-inline-environment-variables@0.0.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/babel-babili-f9f0a7f3ac44110eae3eccd5a9520227d3598f04.txt",
+    "source": "https://github.com/babel/minify/blob/master/LICENSE (Git blob f9f0a7f3ac44110eae3eccd5a9520227d3598f04)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "boolbase@1.0.0": {
+    "license": "ISC",
+    "licenseTextFile": "licenses/reviewed/fb55-boolbase-a689aae96e8957e4ab7a3a7449fe5271a6516e4b.txt",
+    "source": "https://github.com/fb55/boolbase/blob/master/LICENSE (Git blob a689aae96e8957e4ab7a3a7449fe5271a6516e4b)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "bser@2.1.1": {
+    "license": "Apache-2.0",
+    "licenseTextFile": "licenses/reviewed/facebook-watchman-1b277b98b674add4e8cd774e49465afb2b89021d.txt",
+    "source": "https://github.com/facebook/watchman/blob/main/LICENSE (Git blob 1b277b98b674add4e8cd774e49465afb2b89021d)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "denodeify@1.2.1": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/matthew-andrews-denodeify-metadata-denodeify.txt",
+    "source": "https://github.com/matthew-andrews/denodeify.git and npm package author metadata",
+    "reason": "The published npm package and linked repository omit a license file; the declared SPDX text is paired with the published package author metadata."
+  },
+  "deprecated-react-native-prop-types@2.3.0": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebookarchive-react-native-deprecated-modules-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/facebook/react-native-deprecated-modules/blob/main/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "eastasianwidth@0.2.0": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/komagata-eastasianwidth-e8f4a01dd0f84a8156dcb334eb505d2088b0d1ab.txt",
+    "source": "https://github.com/komagata/eastasianwidth/blob/master/MIT-LICENSE.txt (Git blob e8f4a01dd0f84a8156dcb334eb505d2088b0d1ab)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "fb-watchman@2.0.2": {
+    "license": "Apache-2.0",
+    "licenseTextFile": "licenses/reviewed/facebook-watchman-1b277b98b674add4e8cd774e49465afb2b89021d.txt",
+    "source": "https://github.com/facebook/watchman/blob/main/LICENSE (Git blob 1b277b98b674add4e8cd774e49465afb2b89021d)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "flow-parser@0.206.0": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-flow-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/facebook/flow/blob/main/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "formik@2.4.6": {
+    "license": "Apache-2.0",
+    "licenseTextFile": "licenses/reviewed/jaredpalmer-formik-3a60e31d9b5f50b3bed08bc2ced87bb93c18d928.txt",
+    "source": "https://github.com/jaredpalmer/formik/blob/main/LICENSE (Git blob 3a60e31d9b5f50b3bed08bc2ced87bb93c18d928)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "imurmurhash@0.1.4": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/jensyt-imurmurhash-js-3976989301b8efebc6140f6bd929ba1109e3f2f3.txt",
+    "source": "https://github.com/jensyt/imurmurhash-js/blob/master/LICENSE (Git blob 3976989301b8efebc6140f6bd929ba1109e3f2f3)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "isarray@1.0.0": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/juliangruber-isarray-de3226673c3874b1c6506db022393c753495655c.txt",
+    "source": "https://github.com/juliangruber/isarray/blob/master/LICENSE (Git blob de3226673c3874b1c6506db022393c753495655c)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-babel-transformer@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-cache@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-cache-key@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-config@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-core@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-file-map@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-minify-terser@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-resolver@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-runtime@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-source-map@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-symbolicate@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-transform-plugins@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "metro-transform-worker@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "ob1@0.80.12": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-metro-b93be90515ccd0b9daedaa589e42bf5929693f1f.txt",
+    "source": "https://github.com/react/metro/blob/v0.80.12/LICENSE (Git blob b93be90515ccd0b9daedaa589e42bf5929693f1f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "react-devtools-core@5.3.2": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/facebook-react-b96dcb0480a0b0be0727976e5202a1e7b23edc3f.txt",
+    "source": "https://github.com/react/react/blob/v18.3.1/LICENSE (Git blob b96dcb0480a0b0be0727976e5202a1e7b23edc3f)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "react-native-redash@12.6.1": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/wcandillon-redash-95ec5fe0726192b329d72c7b35d6dea357e3f58b.txt",
+    "source": "https://github.com/wcandillon/react-native-redash/blob/master/LICENSE (Git blob 95ec5fe0726192b329d72c7b35d6dea357e3f58b)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "readline@1.3.0": {
+    "license": "Apache-2.0",
+    "licenseTextFile": "licenses/reviewed/maleck13-readline-261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64.txt",
+    "source": "https://github.com/maleck13/readline/blob/master/LICENSE (Git blob 261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "tiny-case@1.0.3": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/jquense-tiny-case-metadata-tiny-case.txt",
+    "source": "https://github.com/jquense/tiny-case.git and npm package author metadata",
+    "reason": "The published npm package and linked repository omit a license file; the declared SPDX text is paired with the published package author metadata."
+  },
+  "tr46@0.0.3": {
+    "license": "MIT",
+    "licenseTextFile": "licenses/reviewed/Sebmaster-tr46.js-62c0de28a830d3ae3a006c9e1e7df19067e409a7.txt",
+    "source": "https://github.com/jsdom/tr46/blob/main/LICENSE.md (Git blob 62c0de28a830d3ae3a006c9e1e7df19067e409a7)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  },
+  "type-fest@2.19.0": {
+    "license": "(MIT OR CC0-1.0)",
+    "licenseTextFile": "licenses/reviewed/sindresorhus-type-fest-fa7ceba3eb4a9657a9db7f3ffca4e4e97a9019de+0e259d42c996742e9e3cba14c677129b2c1b6311.txt",
+    "source": "https://github.com/sindresorhus/type-fest/blob/v2.19.0/license-mit and https://github.com/sindresorhus/type-fest/blob/v2.19.0/license-cc0 (Git blob fa7ceba3eb4a9657a9db7f3ffca4e4e97a9019de+0e259d42c996742e9e3cba14c677129b2c1b6311)",
+    "reason": "The published npm package omits its license file; this text was reviewed from the linked upstream repository."
+  }
+}

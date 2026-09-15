@@ -79,6 +79,7 @@ describe('event player controls', () => {
       duration: 12,
       onSeek,
     });
+
     const timeline = view.getByTestId('event-player-timeline');
 
     fireEvent(timeline, 'accessibilityAction', {
@@ -94,6 +95,72 @@ describe('event player controls', () => {
       {name: 'increment', label: 'Forward 10 seconds'},
       {name: 'decrement', label: 'Back 10 seconds'},
     ]);
+  });
+
+  it('reports feedback only for direct transport button actions', () => {
+    const onTransportAction = jest.fn();
+    const onPausePress = jest.fn();
+    const onSkip = jest.fn();
+    const view = renderProgressBar(en, 'en', {
+      onPausePress,
+      onSkip,
+      onTransportAction,
+    });
+
+    fireEvent.press(view.getByTestId('event-player-play-toggle'));
+    fireEvent.press(view.getByTestId('event-player-skip-backward'));
+    fireEvent.press(view.getByTestId('event-player-skip-forward'));
+
+    expect(onTransportAction.mock.calls).toEqual([
+      ['play'],
+      ['seekBackward'],
+      ['seekForward'],
+    ]);
+
+    const timeline = view.getByTestId('event-player-timeline');
+    fireEvent(timeline, 'layout', {
+      nativeEvent: {layout: {width: 100}},
+    });
+    fireEvent(timeline, 'touchStart', {
+      nativeEvent: {locationX: 20},
+    });
+    fireEvent(timeline, 'touchEnd');
+    fireEvent(timeline, 'accessibilityAction', {
+      nativeEvent: {actionName: 'increment'},
+    });
+
+    expect(onTransportAction).toHaveBeenCalledTimes(3);
+  });
+
+  it('disables no-op seek actions at media boundaries', () => {
+    const onTransportAction = jest.fn();
+    const atStart = renderProgressBar(en, 'en', {
+      currentTime: 0,
+      duration: 10,
+      onTransportAction,
+    });
+
+    const backward = atStart.getByTestId('event-player-skip-backward');
+    expect(backward.props.accessibilityState).toEqual({disabled: true});
+    fireEvent.press(backward);
+    expect(onTransportAction).not.toHaveBeenCalled();
+
+    atStart.rerender(
+      <IntlProvider locale="en" messages={en}>
+        <ProgressBar
+          paused
+          currentTime={10}
+          duration={10}
+          onPausePress={jest.fn()}
+          onTransportAction={onTransportAction}
+        />
+      </IntlProvider>,
+    );
+
+    const forward = atStart.getByTestId('event-player-skip-forward');
+    expect(forward.props.accessibilityState).toEqual({disabled: true});
+    fireEvent.press(forward);
+    expect(onTransportAction).not.toHaveBeenCalled();
   });
 
   it('uses a separate full-width timeline row in portrait', () => {

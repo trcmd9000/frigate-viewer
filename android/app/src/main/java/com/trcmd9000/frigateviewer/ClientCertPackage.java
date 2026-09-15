@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * React Native package for the project-owned native bridges.
- * Registers the certificate and protected-audio modules for React Native.
+ * Registers the project-owned native modules for React Native.
  */
 public class ClientCertPackage implements ReactPackage {
 
@@ -20,6 +20,8 @@ public class ClientCertPackage implements ReactPackage {
     List<NativeModule> modules = new ArrayList<>();
     modules.add(new ClientCertModule(reactContext));
     modules.add(new ProtectedAudioModule(reactContext));
+    modules.add(new PlayerFeedbackModule(reactContext));
+    modules.add(new OssLicensesModule(reactContext));
     return modules;
   }
 

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "org.videolan.android:libvlc-all",
+      "version": "3.2.6",
+      "license": "LGPL-2.1-only",
+      "repository": "https://code.videolan.org/videolan/vlc-android/",
+      "licenseTextFile": "licenses/reviewed/lgpl-2.1.txt",
+      "source": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt",
+      "reason": "The upstream Maven metadata identifies this artifact only as “Android” and provides a URL instead of offline license terms. The package-specific VideoLAN/libVLC entry supplies the declared LGPL 2.1 text locally."
+    }
+  ]
+}

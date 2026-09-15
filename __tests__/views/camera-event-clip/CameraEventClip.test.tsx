@@ -18,6 +18,8 @@ const mockProtectedMediaUri = jest.fn();
 const mockUseAppSelector = jest.fn();
 const mockUseScreenPlaybackLifecycle = jest.fn();
 const mockMediaPlayerProps = jest.fn();
+const mockProgressBarProps = jest.fn();
+const mockPerformTransportHaptic = jest.fn();
 const mockEmitProgress = {current: false};
 let mockGeneration = 0;
 const mockPlayerCleanup = jest.fn();
@@ -99,8 +101,23 @@ jest.mock('../../../components/media/Media3MediaPlayer', () => ({
 }));
 
 jest.mock('../../../views/camera-event-clip/ProgressBar', () => ({
-  ['ProgressBar']: () => null,
+  ['ProgressBar']: (props: Record<string, unknown>) => {
+    const ReactModule = require('react');
+    const {View: NativeView} = require('react-native');
+    mockProgressBarProps(props);
+    return ReactModule.createElement(NativeView, {
+      testID: 'mock-progress-bar',
+    });
+  },
 }));
+
+jest.mock('../../../helpers/playerFeedback', () => {
+  const actual = jest.requireActual('../../../helpers/playerFeedback');
+  return {
+    ...actual,
+    performTransportHaptic: () => mockPerformTransportHaptic(),
+  };
+});
 
 jest.mock('../../../helpers/colors', () => ({
   useStyles: (fn: (value: unknown) => unknown) =>
@@ -234,6 +251,29 @@ describe('CameraEventClip protected playback state', () => {
         }),
       }),
     );
+  });
+
+  it('aggregates repeated seek feedback and resets when direction changes', async () => {
+    mockEmitProgress.current = true;
+    mockProtectedMediaUri.mockResolvedValueOnce(
+      'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
+    );
+    const view = renderClip(en);
+    await view.findByTestId('mock-progress-bar');
+    const transportAction = mockProgressBarProps.mock.lastCall[0]
+      .onTransportAction as (action: string) => void;
+
+    act(() => {
+      transportAction('seekForward');
+      transportAction('seekForward');
+    });
+    expect(view.getByText('+20', {includeHiddenElements: true})).toBeTruthy();
+
+    act(() => {
+      transportAction('seekBackward');
+    });
+    expect(view.getByText('-10', {includeHiddenElements: true})).toBeTruthy();
+    expect(mockPerformTransportHaptic).toHaveBeenCalledTimes(3);
   });
 
   it('shows a safe-inset 48dp close control and dismisses the modal', async () => {

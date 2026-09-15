@@ -14,6 +14,7 @@ import {
 import {useIntl} from 'react-intl';
 import {formatVideoTime} from '../../helpers/locale';
 import {useTheme, useStyles} from '../../helpers/colors';
+import {PlaybackAction} from '../../helpers/playerFeedback';
 
 interface IProgressBarProps {
   paused: boolean;
@@ -23,6 +24,7 @@ interface IProgressBarProps {
   onPausePress?: (paused: boolean) => void;
   onSeek?: (pos: number) => void;
   onSkip?: (seconds: number) => void;
+  onTransportAction?: (action: PlaybackAction) => void;
   bottomInset?: number;
   leftInset?: number;
   rightInset?: number;
@@ -36,6 +38,7 @@ export const ProgressBar: FC<IProgressBarProps> = ({
   onPausePress,
   onSeek,
   onSkip,
+  onTransportAction,
   bottomInset = 0,
   leftInset = 0,
   rightInset = 0,
@@ -75,6 +78,9 @@ export const ProgressBar: FC<IProgressBarProps> = ({
       height: 48,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    controlButtonDisabled: {
+      opacity: 0.35,
     },
     playerBarText: {
       fontSize: 12,
@@ -154,16 +160,25 @@ export const ProgressBar: FC<IProgressBarProps> = ({
   }, [onPausePress]);
 
   const togglePause = useCallback(() => {
+    onTransportAction?.(ended ? 'replay' : paused ? 'play' : 'pause');
     onPausePress?.(!paused);
-  }, [onPausePress, paused]);
+  }, [ended, onPausePress, onTransportAction, paused]);
 
   const skipBackward = useCallback(() => {
+    if (safeCurrentTime <= 0) {
+      return;
+    }
+    onTransportAction?.('seekBackward');
     onSkip?.(-10);
-  }, [onSkip]);
+  }, [onSkip, onTransportAction, safeCurrentTime]);
 
   const skipForward = useCallback(() => {
+    if (safeDuration <= 0 || safeCurrentTime >= safeDuration) {
+      return;
+    }
+    onTransportAction?.('seekForward');
     onSkip?.(10);
-  }, [onSkip]);
+  }, [onSkip, onTransportAction, safeCurrentTime, safeDuration]);
 
   const adjustTimeline = useCallback(
     (seconds: number) => {
@@ -300,6 +315,14 @@ export const ProgressBar: FC<IProgressBarProps> = ({
     },
     {currentTime: currentTimeStr, duration: durationStr},
   );
+  const backwardDisabled = safeCurrentTime <= 0;
+  const forwardDisabled =
+    safeDuration <= 0 || safeCurrentTime >= safeDuration;
+  const controlRipple = {
+    color: '#ffffff33',
+    borderless: true,
+    radius: 24,
+  };
 
   const playButton = (
     <Pressable
@@ -307,6 +330,7 @@ export const ProgressBar: FC<IProgressBarProps> = ({
       accessibilityLabel={playLabel}
       accessibilityHint={playHint}
       accessibilityRole="button"
+      android_ripple={controlRipple}
       onPress={togglePause}
       style={styles.controlButton}
     >
@@ -334,8 +358,14 @@ export const ProgressBar: FC<IProgressBarProps> = ({
       accessibilityLabel={backwardLabel}
       accessibilityHint={backwardHint}
       accessibilityRole="button"
+      accessibilityState={{disabled: backwardDisabled}}
+      android_ripple={controlRipple}
+      disabled={backwardDisabled}
       onPress={skipBackward}
-      style={styles.controlButton}
+      style={[
+        styles.controlButton,
+        backwardDisabled && styles.controlButtonDisabled,
+      ]}
     >
       <IconOutline
         accessible={false}
@@ -352,8 +382,14 @@ export const ProgressBar: FC<IProgressBarProps> = ({
       accessibilityLabel={forwardLabel}
       accessibilityHint={forwardHint}
       accessibilityRole="button"
+      accessibilityState={{disabled: forwardDisabled}}
+      android_ripple={controlRipple}
+      disabled={forwardDisabled}
       onPress={skipForward}
-      style={styles.controlButton}
+      style={[
+        styles.controlButton,
+        forwardDisabled && styles.controlButtonDisabled,
+      ]}
     >
       <IconOutline
         accessible={false}
