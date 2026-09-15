@@ -1,7 +1,7 @@
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 import {IntlProvider} from 'react-intl';
-import {Linking} from 'react-native';
+import {Linking, StyleSheet} from 'react-native';
 import de from '../../../i18n/de';
 import {Author} from '../../../views/author/Author';
 
@@ -31,13 +31,22 @@ jest.mock('../../../helpers/colors', () => ({
         link: '#05c',
       },
     }),
+    useTheme: () => ({
+    text: '#111',
+    textSecondary: '#555',
+    }),
 }));
 
 jest.mock('react-native-navigation', () => ({
   Navigation: {
     mergeOptions: jest.fn(),
     updateProps: jest.fn(),
+    showModal: jest.fn(() => Promise.resolve('licenses')),
   },
+}));
+
+jest.mock('@ant-design/icons-react-native', () => ({
+  IconOutline: () => null,
 }));
 
 describe('About page', () => {
@@ -63,19 +72,33 @@ describe('About page', () => {
     ).toBeTruthy();
     expect(view.getAllByText(/sp-engineering\/frigate-viewer/i)).not.toHaveLength(0);
     expect(view.queryByText(/Kauf mir einen Kaffee/i)).toBeNull();
-    expect(view.queryByText(/verwendeten Bibliotheken/i)).toBeNull();
+    expect(view.getByText('Version 18.0.6')).toBeTruthy();
+    expect(view.queryByText(/trcmd9000@gmail.com/i)).toBeNull();
+    expect(view.getByText('Versionshinweise')).toBeTruthy();
+    expect(view.getByText('Drittanbieter-Lizenzen')).toBeTruthy();
 
     const links = view.getAllByRole('link');
-    expect(links).toHaveLength(4);
-    links.forEach(link => {
-      expect(link.props.style).toEqual(
-        expect.objectContaining({minHeight: 48}),
+    expect(links).toHaveLength(5);
+    links.slice(0, 4).forEach(link => {
+      expect(StyleSheet.flatten(link.props.style)).toEqual(
+        expect.objectContaining({minHeight: 56}),
       );
     });
 
     fireEvent.press(links[0]);
     expect(Linking.canOpenURL).toHaveBeenCalledWith(
-      'mailto:trcmd9000@gmail.com',
+      'https://github.com/trcmd9000/frigate-viewer',
     );
+
+    fireEvent.press(
+      view.getByRole('button', {name: 'Drittanbieter-Lizenzen'}),
+    );
+    expect(
+      require('react-native-navigation').Navigation.showModal,
+    ).toHaveBeenCalledWith({
+      stack: {
+        children: [{component: {name: 'Licenses'}}],
+      },
+    });
   });
 });

@@ -65,6 +65,12 @@ import {
   useFeatureEnabled,
 } from '../../helpers/entitlements';
 import {ProgressBar} from './ProgressBar';
+import {PlaybackActionOverlay} from './PlaybackActionOverlay';
+import {
+  PlaybackAction,
+  PlaybackFeedback,
+  performTransportHaptic,
+} from '../../helpers/playerFeedback';
 import {
   ServerScopeScreenProps,
   useServerScopeOwner,
@@ -352,6 +358,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const sharingRef = useRef(false);
   const [playerError, setPlayerError] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
+  const playbackPositionRef = useRef(0);
   const [muted, setMuted] = useState(true);
   const wasActive = useRef(active);
   const previousInitiallyPaused = useRef(initiallyPaused);
@@ -367,6 +374,10 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  const [playbackFeedback, setPlaybackFeedback] =
+    useState<PlaybackFeedback>();
+  const playbackFeedbackRef = useRef<PlaybackFeedback>();
+  const playbackFeedbackId = useRef(0);
   const autoHideTimer = useRef<ReturnType<typeof setTimeout>>();
   const progressAvailable = progressInfo !== undefined;
 
@@ -376,6 +387,8 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     setSpeedMenuOpen(false);
     setOverflowMenuOpen(false);
     setControlsVisible(true);
+    setPlaybackFeedback(undefined);
+    playbackFeedbackRef.current = undefined;
   }, [active, media?.uri]);
 
   const clearAutoHideTimer = useCallback(() => {
@@ -488,6 +501,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   }, [canChangePlaybackSpeed]);
 
   const onProgress = useCallback((info: MediaProgress) => {
+    playbackPositionRef.current = info.currentTime;
     setPlaybackPosition(info.currentTime);
     setProgressInfo(info);
     if (info.duration > 0 && info.currentTime < info.duration) {
@@ -496,6 +510,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   }, []);
 
   const seek = useCallback((position: number) => {
+    playbackPositionRef.current = position;
     setPlaybackPosition(position);
     player.current?.seek(position);
   }, []);
@@ -508,7 +523,10 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       seek(
         Math.max(
           0,
-          Math.min(progressInfo.duration, progressInfo.currentTime + seconds),
+          Math.min(
+            progressInfo.duration,
+            playbackPositionRef.current + seconds,
+          ),
         ),
       );
     },
@@ -521,6 +539,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     setEnded(true);
     setControlsVisible(true);
     if (progressInfo) {
+      playbackPositionRef.current = progressInfo.duration;
       setPlaybackPosition(progressInfo.duration);
       setProgressInfo({...progressInfo, currentTime: progressInfo.duration});
     }
@@ -536,6 +555,34 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     },
     [ended],
   );
+
+  const onTransportAction = useCallback((action: PlaybackAction) => {
+    const previous = playbackFeedbackRef.current;
+    const delta =
+      action === 'seekBackward' ? -10 : action === 'seekForward' ? 10 : 0;
+    const amount =
+      delta !== 0 &&
+      previous?.action === action &&
+      previous.amount !== undefined
+        ? previous.amount + delta
+        : delta || undefined;
+    const feedback: PlaybackFeedback = {
+      action,
+      amount,
+      id: ++playbackFeedbackId.current,
+    };
+    playbackFeedbackRef.current = feedback;
+    setPlaybackFeedback(feedback);
+    performTransportHaptic();
+  }, []);
+
+  const onPlaybackFeedbackHidden = useCallback((id: number) => {
+    if (playbackFeedbackRef.current?.id !== id) {
+      return;
+    }
+    playbackFeedbackRef.current = undefined;
+    setPlaybackFeedback(undefined);
+  }, []);
 
   const share = async () => {
     const identity = actionIdentity.current;
@@ -749,8 +796,18 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
         style={styles.player}
         onProgress={onProgress}
         onEnd={onEnd}
-        onError={() => setPlayerError(true)}
+        onError={() => {
+          playbackFeedbackRef.current = undefined;
+          setPlaybackFeedback(undefined);
+          setPlayerError(true);
+        }}
         muted={muted}
+      />
+      <PlaybackActionOverlay
+        feedback={playbackFeedback}
+        leftInset={systemInsets.left}
+        rightInset={systemInsets.right}
+        onHidden={onPlaybackFeedbackHidden}
       />
       {controlsVisible && (
         <View
@@ -781,6 +838,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
           onPausePress={onPausedChange}
           onSeek={seek}
           onSkip={skip}
+          onTransportAction={onTransportAction}
         />
       )}
       {(overflowMenuOpen || speedMenuOpen) && (

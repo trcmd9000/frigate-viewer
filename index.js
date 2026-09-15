@@ -4,6 +4,8 @@ import {gestureHandlerRootHOC} from 'react-native-gesture-handler';
 import {TopBarButton} from './components/icons/TopBarButton';
 import {Author} from './views/author/Author';
 import {Report} from './views/report/Report';
+import {Licenses} from './views/licenses/Licenses';
+import {LicenseDetail} from './views/licenses/LicenseDetail';
 import {CameraEventClip} from './views/camera-event-clip/CameraEventClip';
 import {CameraPreview} from './views/camera-preview/CameraPreview';
 import {CameraEvents} from './views/camera-events/CameraEvents';
@@ -58,6 +60,8 @@ registerComponent('Settings', Settings, viewDecorators);
 registerComponent('ServerForm', ServerForm, viewDecorators);
 registerComponent('Author', Author, viewDecorators);
 registerComponent('Report', Report, viewDecorators);
+registerComponent('Licenses', Licenses, viewDecorators);
+registerComponent('LicenseDetail', LicenseDetail, viewDecorators);
 
 registerComponent('Menu', Menu, [
   gestureHandlerRootHOC,

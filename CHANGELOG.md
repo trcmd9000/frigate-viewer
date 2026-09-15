@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.6] - 2026-09-15
+
+- Added tactile feedback and animated action overlays for event playback
+  controls, including aggregated forward and reverse seek feedback.
+- Added a searchable offline JavaScript license catalog and Android OSS license
+  entry point.
+- Modernized the About screen with the current app version, project links,
+  release notes, privacy, and license information.
+
 ## [18.0.5] - 2026-09-13
 
 - Polished camera and event grids with adaptive columns, consistent gutters,

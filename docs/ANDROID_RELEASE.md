@@ -6,7 +6,7 @@ This fork continues the upstream Android version sequence. Every published build
 must increment both values in `android/app/build.gradle`:
 
 - `versionName`: user-visible semantic version, next release candidate
-  `18.0.5`
+  `18.0.6`
 - `versionCode`: monotonically increasing Play Store build number, next
   release candidate `28`
 
@@ -49,6 +49,7 @@ From the repository root:
 
 ```powershell
 npm ci
+npm run licenses:check
 npm test -- --runInBand
 npx tsc --noEmit
 Set-Location android
@@ -88,6 +89,13 @@ and the explicit self-signed-server option.
 
 Review `PRIVACY-POLICY.md` before each public release and ensure its statements
 still match the shipped dependencies and runtime behavior.
+
+The app bundles offline notices for JavaScript and native Android
+dependencies. `npm run licenses:generate` regenerates the tracked JavaScript
+catalog from production dependencies and fails when required license text is
+missing. CI runs `npm run licenses:check` to prevent stale notices. The Android
+release build uses Google's OSS Licenses plugin to generate the native library
+catalog.
 
 ## Pending network policy decision
 

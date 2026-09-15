@@ -1,19 +1,36 @@
 import React, {useEffect} from 'react';
 import {useIntl} from 'react-intl';
-import {Image, ImageStyle, Pressable, Text, View} from 'react-native';
+import {
+  Image,
+  ImageStyle,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
 import {menuButton, useMenu} from '../menu/menuHelpers';
 import {messages} from './messages';
 import {useOpenLink} from './useOpenLink';
 import {ScrollView} from 'react-native-gesture-handler';
-import {palette, useStyles} from '../../helpers/colors';
+import {palette, useStyles, useTheme} from '../../helpers/colors';
+import {
+  IconOutline,
+  OutlineGlyphMapType,
+} from '@ant-design/icons-react-native';
+import packageMetadata from '../../package.json';
+import {SecureLogger} from '../../helpers/secureLogger';
 
-export const Author: NavigationFunctionComponent = ({componentId}) => {
-  useMenu(componentId, 'author');
-  const intl = useIntl();
-  const openLink = useOpenLink();
+interface AboutRowProps {
+  icon: OutlineGlyphMapType;
+  label: string;
+  hint?: string;
+  external?: boolean;
+  onPress: () => void;
+  styles: ReturnType<typeof useAboutStyles>;
+}
 
-  const styles = useStyles(({theme}) => ({
+const useAboutStyles = () =>
+  useStyles(({theme}) => ({
     wrapper: {
       width: '100%',
       height: '100%',
@@ -21,21 +38,21 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
     },
     authorInfo: {
       marginTop: 20,
-      flexDirection: 'column',
       alignItems: 'center',
     },
     logoWrapper: {
       backgroundColor: palette.white,
-      borderRadius: 10,
+      borderRadius: 12,
+      overflow: 'hidden',
     },
     logo: {
-      width: 100,
-      height: 100,
-      marginHorizontal: 12,
+      width: 80,
+      height: 80,
       resizeMode: 'contain',
     },
     content: {
-      padding: 20,
+      paddingHorizontal: 16,
+      paddingBottom: 32,
     },
     heading: {
       color: theme.text,
@@ -44,21 +61,39 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
       marginTop: 12,
       textAlign: 'center',
     },
+    version: {
+      color: theme.textSecondary,
+      fontSize: 14,
+      marginTop: 4,
+      textAlign: 'center',
+    },
     body: {
-      color: theme.text,
+      color: theme.textSecondary,
       lineHeight: 21,
       marginTop: 16,
     },
     row: {
-      minHeight: 48,
-      justifyContent: 'center',
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
       marginTop: 8,
       paddingHorizontal: 12,
-      borderRadius: 6,
+      borderRadius: 8,
       backgroundColor: theme.surfaceElevated,
     },
+    rowPressed: {
+      opacity: 0.72,
+    },
+    rowIcon: {
+      width: 32,
+      alignItems: 'flex-start',
+    },
+    rowContent: {
+      flex: 1,
+      paddingVertical: 8,
+    },
     rowLabel: {
-      color: theme.link,
+      color: theme.text,
       fontSize: 16,
       fontWeight: '600',
     },
@@ -69,11 +104,61 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
     },
     section: {
       color: theme.text,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '700',
       marginTop: 24,
+      marginBottom: 2,
+    },
+    upstreamLink: {
+      color: theme.link,
+      fontWeight: '600',
     },
   }));
+
+const AboutRow = ({
+  icon,
+  label,
+  hint,
+  external = false,
+  onPress,
+  styles,
+}: AboutRowProps) => {
+  const theme = useTheme();
+  return (
+    <Pressable
+    accessibilityRole={external ? 'link' : 'button'}
+    accessibilityLabel={label}
+    onPress={onPress}
+    style={({pressed}) => [styles.row, pressed && styles.rowPressed]}
+  >
+    <View style={styles.rowIcon}>
+      <IconOutline
+        accessible={false}
+        name={icon}
+        color={theme.textSecondary}
+        size={20}
+      />
+    </View>
+    <View style={styles.rowContent}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+    </View>
+    <IconOutline
+      accessible={false}
+      name={external ? 'export' : 'right'}
+      color={theme.textSecondary}
+      size={16}
+    />
+    </Pressable>
+  );
+};
+
+export const Author: NavigationFunctionComponent = ({componentId}) => {
+  useMenu(componentId, 'author');
+  const intl = useIntl();
+  const openLink = useOpenLink();
+
+  const styles = useAboutStyles();
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {
@@ -98,51 +183,83 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
         <Text style={styles.heading}>
           {intl.formatMessage(messages.identity)}
         </Text>
+        <Text testID="about-version" style={styles.version}>
+          {intl.formatMessage(messages.version, {
+            version: packageMetadata.version,
+          })}
+        </Text>
       </View>
       <View style={styles.content}>
         <Text style={styles.body}>{intl.formatMessage(messages.disclaimer)}</Text>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={intl.formatMessage(messages.contact)}
-          onPress={openLink('mailto:trcmd9000@gmail.com')}
-          style={styles.row}
-        >
-          <Text style={styles.rowLabel}>{intl.formatMessage(messages.maintainer)}</Text>
-          <Text style={styles.rowHint}>trcmd9000@gmail.com</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={intl.formatMessage(messages.privacy)}
+        <Text style={styles.section}>
+          {intl.formatMessage(messages.projectSection)}
+        </Text>
+        <AboutRow
+          external
+          icon="github"
+          label={intl.formatMessage(messages.project)}
+          hint={intl.formatMessage(messages.projectHint)}
+          onPress={openLink('https://github.com/trcmd9000/frigate-viewer')}
+          styles={styles}
+        />
+        <AboutRow
+          external
+          icon="history"
+          label={intl.formatMessage(messages.releaseNotes)}
+          hint={intl.formatMessage(messages.releaseNotesHint)}
+          onPress={openLink(
+            'https://github.com/trcmd9000/frigate-viewer/blob/main/CHANGELOG.md',
+          )}
+          styles={styles}
+        />
+        <Text style={styles.section}>
+          {intl.formatMessage(messages.legalSection)}
+        </Text>
+        <AboutRow
+          external
+          icon="safety-certificate"
+          label={intl.formatMessage(messages.privacy)}
           onPress={openLink(
             'https://trcmd9000.github.io/frigate-viewer/privacy/',
           )}
-          style={styles.row}
-        >
-          <Text style={styles.rowLabel}>{intl.formatMessage(messages.privacy)}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={intl.formatMessage(messages.source)}
-          onPress={openLink('https://github.com/trcmd9000/frigate-viewer')}
-          style={styles.row}
-        >
-          <Text style={styles.rowLabel}>{intl.formatMessage(messages.source)}</Text>
-          <Text style={styles.rowHint}>
-            github.com/trcmd9000/frigate-viewer · GPL-3.0
-          </Text>
-        </Pressable>
+          styles={styles}
+        />
+        <AboutRow
+          external
+          icon="file-protect"
+          label={intl.formatMessage(messages.appLicense)}
+          hint={intl.formatMessage(messages.appLicenseHint)}
+          onPress={openLink(
+            'https://github.com/trcmd9000/frigate-viewer/blob/main/LICENSE',
+          )}
+          styles={styles}
+        />
+        <AboutRow
+          icon="profile"
+          label={intl.formatMessage(messages.thirdPartyLicenses)}
+          hint={intl.formatMessage(messages.thirdPartyLicensesHint)}
+          onPress={() => {
+            Navigation.showModal({
+              stack: {
+                children: [{component: {name: 'Licenses'}}],
+              },
+            }).catch(error => {
+              SecureLogger.logError(error, 'Author.open-licenses');
+            });
+          }}
+          styles={styles}
+        />
         <Text style={styles.section}>{intl.formatMessage(messages.upstream)}</Text>
         <Text style={styles.body}>
           {intl.formatMessage(messages.upstreamDescription)}
         </Text>
-        <Pressable
+        <Text
           accessibilityRole="link"
-          accessibilityLabel="sp-engineering/frigate-viewer"
           onPress={openLink('https://github.com/sp-engineering/frigate-viewer')}
-          style={styles.row}
+          style={[styles.body, styles.upstreamLink]}
         >
-          <Text style={styles.rowLabel}>sp-engineering/frigate-viewer</Text>
-        </Pressable>
+          sp-engineering/frigate-viewer
+        </Text>
       </View>
     </ScrollView>
   );
