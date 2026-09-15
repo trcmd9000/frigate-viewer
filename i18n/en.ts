@@ -32,7 +32,7 @@ export default {
   'author.privacy': 'Privacy policy',
   'author.source': 'Source code and license',
   'author.disclaimer':
-    'Frigate Viewer is an independent client compatible with Frigate. It is not affiliated with or endorsed by the Frigate project.',
+    'This app is not affiliated with, sponsored by, or endorsed by the Frigate project.',
   'author.upstream': 'Original upstream attribution',
   'author.upstreamDescription':
     'Originally based on sp-engineering/frigate-viewer. This attribution does not imply endorsement.',

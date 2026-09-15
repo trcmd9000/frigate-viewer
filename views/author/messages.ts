@@ -16,7 +16,7 @@ export const messages = makeMessages('author', {
   thirdPartyLicenses: 'Third-party licenses',
   thirdPartyLicensesHint: 'Open-source libraries used by the app',
   disclaimer:
-    'Frigate Viewer is an independent client compatible with Frigate. It is not affiliated with or endorsed by the Frigate project.',
+    'This app is not affiliated with, sponsored by, or endorsed by the Frigate project.',
   upstream: 'Origins',
   upstreamDescription:
     'Originally based on sp-engineering/frigate-viewer. This attribution does not imply endorsement.',

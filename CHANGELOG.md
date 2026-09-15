@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.8] - 2026-09-15
+
+- Standardized the app's visible name as Frigate Viewer.
+- Clarified the app's independent relationship to the Frigate project across
+  the app, store listing, and documentation.
+- Stopped presenting Frigate detection FPS as the selected live stream's FPS.
+
 ## [18.0.7] - 2026-09-15
 
 - Fixed Android event playback for generated Frigate clips by using the

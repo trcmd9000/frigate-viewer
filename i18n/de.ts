@@ -33,7 +33,7 @@ export default {
   'author.privacy': 'Datenschutzrichtlinie',
   'author.source': 'Quellcode und Lizenz',
   'author.disclaimer':
-    'Frigate Viewer ist ein unabhängiger, mit Frigate kompatibler Client. Es besteht keine Verbindung zum Frigate-Projekt und keine Billigung durch dieses Projekt.',
+    'Diese App ist nicht mit dem Frigate-Projekt verbunden, wird von diesem nicht gesponsert und nicht offiziell unterstützt.',
   'author.upstream': 'Ursprüngliche Upstream-Zuordnung',
   'author.upstreamDescription':
     'Ursprünglich basierend auf sp-engineering/frigate-viewer. Diese Zuordnung bedeutet keine Billigung.',

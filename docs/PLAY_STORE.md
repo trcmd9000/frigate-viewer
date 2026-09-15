@@ -7,9 +7,9 @@ Google Play review.
 
 - App name: `Frigate Viewer`
 - Package ID: `com.trcmd9000.frigateviewer`
-- Current public version name: `14.3.1`
-- Next release candidate version name: `18.0.0`
-- Next release candidate version code: `23`
+- Current public version name: `18.0.7`
+- Next release candidate version name: `18.0.8`
+- Next release candidate version code: `31`
 - Minimum Android version: API 24
 - Target Android version: API 36
 - Current release ABI: `arm64-v8a`
@@ -32,8 +32,8 @@ Securely view Frigate cameras, events, clips, and live feeds on Android.
 
 ### Full description
 
-Frigate Viewer is an unofficial Android client for user-operated Frigate NVR
-servers.
+Frigate Viewer is an independently maintained Android client for
+user-operated Frigate NVR servers.
 
 Browse camera events, snapshots, and clips, monitor live feeds, and configure
 multiple Frigate servers from one app. The app supports standard Frigate
@@ -44,8 +44,8 @@ Connections are made directly from the Android device to servers configured by
 the user. The app does not include advertising, analytics, Firebase, or
 automatic crash reporting.
 
-Frigate Viewer is independently maintained and is not affiliated with the
-official Frigate NVR project.
+This app is independently maintained and is not affiliated with, sponsored by,
+or endorsed by the Frigate project.
 
 ## Privacy policy
 

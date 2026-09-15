@@ -68,11 +68,13 @@ describe('About page', () => {
 
     expect(view.getByText('Frigate Viewer')).toBeTruthy();
     expect(
-      view.getByText(/unabhängiger, mit Frigate kompatibler Client/i),
+      view.getByText(
+        /nicht mit dem Frigate-Projekt verbunden, wird von diesem nicht gesponsert/i,
+      ),
     ).toBeTruthy();
     expect(view.getAllByText(/sp-engineering\/frigate-viewer/i)).not.toHaveLength(0);
     expect(view.queryByText(/Kauf mir einen Kaffee/i)).toBeNull();
-    expect(view.getByText('Version 18.0.7')).toBeTruthy();
+    expect(view.getByText('Version 18.0.8')).toBeTruthy();
     expect(view.queryByText(/trcmd9000@gmail.com/i)).toBeNull();
     expect(view.getByText('Versionshinweise')).toBeTruthy();
     expect(view.getByText('Drittanbieter-Lizenzen')).toBeTruthy();
