@@ -1,7 +1,7 @@
 import React from 'react';
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import {IntlProvider} from 'react-intl';
-import {Platform} from 'react-native';
+import {Dimensions, Platform} from 'react-native';
 import en from '../../../i18n/en';
 import {CameraEventClip} from '../../../views/camera-event-clip/CameraEventClip';
 import {
@@ -101,6 +101,16 @@ describe('CameraEventClip playback speed', () => {
       'frigate-media://0123456789abcdef0123456789abcdef/vod/front-door/master.m3u8',
     );
     (Platform as {OS: string}).OS = 'android';
+    jest.spyOn(Dimensions, 'get').mockReturnValue({
+      width: 240,
+      height: 640,
+      scale: 1,
+      fontScale: 1,
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('presents the menu and applies a selected supported speed', async () => {
