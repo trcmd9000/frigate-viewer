@@ -140,12 +140,16 @@ jobs:
           grep -aFq \
             'com/facebook/react/devsupport/CxxInspectorPackagerConnection' \
             "$RUNNER_TEMP/release-classes.dex"
-          unzip -p app/build/outputs/apk/release/app-release.apk resources.arsc |
-            tr -d '\000' > "$RUNNER_TEMP/release-resource-names.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump resources \
+            app/build/outputs/apk/release/app-release.apk \
+            > "$RUNNER_TEMP/release-resource-dump.txt"
           for resource in \
             assets_navigation_cameras \
             assets_navigation_events \
             assets_navigation_settings \
             views_author_frigateviewericon; do
-            grep -Fq "$resource" "$RUNNER_TEMP/release-resource-names.txt"
+            if ! grep -Fq "drawable/$resource" "$RUNNER_TEMP/release-resource-dump.txt"; then
+              echo "Missing release resource: $resource"
+              exit 1
+            fi
           done
