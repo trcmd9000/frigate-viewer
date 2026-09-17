@@ -135,8 +135,11 @@ jobs:
             --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m' \
             --stacktrace
-          unzip -p app/build/outputs/apk/release/app-release.apk classes.dex |
-            grep -aFq 'com/facebook/react/devsupport/CxxInspectorPackagerConnection'
+          unzip -p app/build/outputs/apk/release/app-release.apk classes.dex \
+            > "$RUNNER_TEMP/release-classes.dex"
+          grep -aFq \
+            'com/facebook/react/devsupport/CxxInspectorPackagerConnection' \
+            "$RUNNER_TEMP/release-classes.dex"
           unzip -p app/build/outputs/apk/release/app-release.apk resources.arsc |
             tr -d '\000' > "$RUNNER_TEMP/release-resource-names.txt"
           for resource in \
