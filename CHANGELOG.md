@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.9] - 2026-09-17
+
+- Simplified the app shell to keep Cameras and Events as the permanent
+  destinations.
+- Moved Settings and secondary destinations into a shared More-menu stack with
+  reliable Back navigation.
+- Added consistent horizontal/fade transitions and theme-stable system-bar
+  behavior for secondary screens.
+
 ## [18.0.8] - 2026-09-15
 
 - Standardized the app's visible name as Frigate Viewer.

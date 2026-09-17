@@ -15,8 +15,9 @@ decisions that future maintainers and coding agents must preserve.
 - Android is the actively maintained and validated target. Inherited iOS source
   is present, but iOS mTLS and release builds are not currently supported or
   validated.
-- Current public release: `18.0.7` with Android `versionCode 30`. The next
-  release candidate is `18.0.8` with Android `versionCode 32`.
+- Current production release: `18.0.7` with Android `versionCode 30`.
+- Current Internal Testing release: `18.0.8` with Android `versionCode 33`.
+- The next release candidate is `18.0.9` with Android `versionCode 34`.
 
 ## Public repository rules
 
