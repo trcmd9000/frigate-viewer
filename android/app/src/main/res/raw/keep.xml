@@ -1,2 +1,2 @@
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/assets_navigation_cameras,@drawable/assets_navigation_events,@drawable/assets_navigation_settings" />
+    tools:keep="@drawable/assets_navigation_cameras,@drawable/assets_navigation_events,@drawable/assets_navigation_settings,@drawable/views_author_frigateviewericon" />

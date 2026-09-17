@@ -3,7 +3,10 @@ import {act, cleanup, fireEvent, render} from '@testing-library/react-native';
 import {configureStore} from '@reduxjs/toolkit';
 import {Provider} from 'react-redux';
 import {Navigation} from 'react-native-navigation';
-import {CameraEvents} from '../../../views/camera-events/CameraEvents';
+import {
+  CameraEvents,
+  getCameraEventsTopInset,
+} from '../../../views/camera-events/CameraEvents';
 import type {ICameraEventsProps} from '../../../views/camera-events/CameraEvents';
 import type {ICameraEvent} from '../../../views/camera-events/CameraEvent';
 import {
@@ -62,6 +65,7 @@ jest.mock('../../../helpers/designTokens', () => ({useDesignTokens: () => ({
 jest.mock('../../../views/camera-events/CameraEvent', () => ({
   CameraEvent: (props: ICameraEvent & {
     onEventPress: (event: ICameraEvent) => void;
+    onRetainedChange: (eventId: string, retained: boolean) => void;
     onShare: (event: ICameraEvent) => void;
     mediaEnabled: boolean;
   }) => {
@@ -73,6 +77,10 @@ jest.mock('../../../views/camera-events/CameraEvent', () => ({
     }, [props.id]);
     return <View>
       <Pressable testID={`clip-${props.id}`} onPress={() => props.onEventPress(props)} />
+      <Pressable
+        testID={`unretain-${props.id}`}
+        onPress={() => props.onRetainedChange(props.id, false)}
+      />
       <Pressable testID={`share-${props.id}`} onPress={() => props.onShare(props)} />
       <Text testID={`media-${props.id}`}>{String(props.mediaEnabled)}</Text>
     </View>;
@@ -175,6 +183,25 @@ describe('CameraEvents server-scope requests', () => {
     expect(mockGet.mock.calls[4][2].queryParams.before).toBeUndefined();
     await settle(() => requests[4].resolve([event('fresh-a')]));
     expect(list(view).props.data.map((item: ICameraEvent) => item.id)).toEqual(['fresh-a']);
+  });
+
+  it('removes an unretained event from the saved-events view', async () => {
+    const view = mount(makeStore(), {retained: true});
+    await settle(() =>
+      requests[0].resolve([
+        {...event('saved-event'), retain_indefinitely: true},
+      ]),
+    );
+
+    fireEvent.press(view.getByTestId('unretain-saved-event'));
+
+    expect(list(view).props.data).toEqual([]);
+  });
+
+  it('reserves the status-bar inset only for the saved-events view', () => {
+    expect(getCameraEventsTopInset(true, 24)).toBe(24);
+    expect(getCameraEventsTopInset(false, 24)).toBe(0);
+    expect(getCameraEventsTopInset(true, undefined)).toBe(0);
   });
 
   it('keeps B empty on failure and resets every filter before requesting B', async () => {

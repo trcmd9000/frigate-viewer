@@ -67,6 +67,13 @@ describe('About page', () => {
     );
 
     expect(view.getByText('Frigate Viewer')).toBeTruthy();
+    expect(view.getByTestId('about-icon').props.style).toEqual(
+      expect.objectContaining({width: 80, height: 80}),
+    );
+    expect(view.getByRole('image', {name: 'Frigate Viewer'})).toBeTruthy();
+    expect(view.getByTestId('about-icon').props.source).toEqual({
+      testUri: '../../../views/author/frigate-viewer-icon.png',
+    });
     expect(
       view.getByText(
         /nicht mit dem Frigate-Projekt verbunden, wird von diesem nicht gesponsert/i,

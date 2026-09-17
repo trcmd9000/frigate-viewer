@@ -1,4 +1,5 @@
-import React, {FC, ComponentType, useCallback, useMemo, useState} from 'react';
+import React, {FC, ComponentType, useCallback, useMemo} from 'react';
+import {IconFill, IconOutline} from '@ant-design/icons-react-native';
 import {
   Image,
   Pressable,
@@ -27,6 +28,7 @@ import {
   gridCellGutters,
   gridCellWidth,
 } from '../../helpers/gridLayout';
+import {useEventRetention} from './useEventRetention';
 
 interface DrawerItemProps {
   text: string;
@@ -72,6 +74,7 @@ interface ICameraEventProps extends ICameraEvent {
   onSnapshotDimensions: (width: number, height: number) => void;
   onEventPress: (event: ICameraEvent) => void;
   onShare: (event: ICameraEvent) => void;
+  onRetainedChange: (eventId: string, retained: boolean) => void;
   mediaEnabled: boolean;
   layoutColumns?: number;
 }
@@ -82,6 +85,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     cameraEvent: {
       backgroundColor: palette.surface,
       flex: 1,
+      position: 'relative',
     },
     metadata: {
       padding: 10,
@@ -92,6 +96,18 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
       fontSize: 14,
       fontWeight: '600',
     },
+    retentionButton: {
+      position: 'absolute',
+      right: 8,
+      top: 8,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.mediaOverlayPanel,
+      zIndex: 1,
+    },
   }));
 
   const {
@@ -99,6 +115,7 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     onSnapshotDimensions,
     onEventPress,
     onShare,
+    onRetainedChange,
     mediaEnabled,
     layoutColumns,
     index = 0,
@@ -114,14 +131,24 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
     data,
     retain_indefinitely,
   } = event;
-  const [retained, setRetained] = useState(retain_indefinitely);
   const server = useAppSelector(selectServer);
   const snapshotHeight = useAppSelector(selectEventsSnapshotHeight);
   const preferredColumns = useAppSelector(selectEventsNumColumns) ?? 1;
   const numColumns = layoutColumns ?? preferredColumns;
   const {width: listWidth} = useWindowDimensions();
   const intl = useIntl();
-  const {del, post} = useRest();
+  const {del} = useRest();
+  const {
+    retained,
+    updating: retentionUpdating,
+    toggleRetained,
+    label: retentionLabel,
+    hint: retentionHint,
+  } = useEventRetention({
+    eventId: id,
+    initiallyRetained: retain_indefinitely,
+    onRetainedChange: nextRetained => onRetainedChange(id, nextRetained),
+  });
   const gutters = gridCellGutters(index, numColumns, 12);
   const cellWidth = gridCellWidth(listWidth, numColumns, 12);
 
@@ -162,27 +189,15 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
             text: intl.formatMessage(messages['action.unretain']),
             icon: require('./icons/star.png'),
             background: theme.error,
-            onPress: () => {
-              void del(server, `events/${id}/retain`, {json: false})
-                .then(() => {
-                  setRetained(false);
-                })
-                .catch(error => handleError(error, 'CameraEvent.unretain'));
-            },
+            onPress: toggleRetained,
           }
         : {
             text: intl.formatMessage(messages['action.retain']),
             icon: require('./icons/star.png'),
             background: theme.success,
-            onPress: () => {
-              void post(server, `events/${id}/retain`, {json: false})
-                .then(() => {
-                  setRetained(true);
-                })
-                .catch(error => handleError(error, 'CameraEvent.retain'));
-            },
+            onPress: toggleRetained,
           },
-    [del, id, intl, post, retained, server, theme],
+    [intl, retained, theme, toggleRetained],
   );
 
   const shareDrawerItem: DrawerItemProps = useMemo(
@@ -194,9 +209,8 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
         onShare(event);
       },
     }),
-    [event, intl, onShare],
+    [event, intl, onShare, theme.info],
   );
-
   return (
     <Drawer
       leftItem={deleteDrawerItem}
@@ -209,48 +223,79 @@ export const CameraEvent: FC<ICameraEventProps> = props => {
       }}
     >
       <SurfaceCard style={{padding: 0, overflow: 'hidden'}}>
-      <Pressable
-        onPress={() => onEventPress(event)}
-        accessibilityRole="button"
-        accessibilityLabel={`${event.camera}, ${label} event`}
-        accessibilityHint={intl.formatMessage(messages['action.open'])}
-      >
         <View style={styles.cameraEvent}>
-          <MediaSurface
-            style={{
-              aspectRatio: undefined,
-              height: snapshotHeight,
-              borderTopLeftRadius: 4,
-              borderTopRightRadius: 4,
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={retentionLabel}
+            accessibilityHint={retentionHint}
+            accessibilityState={{
+              busy: retentionUpdating,
+              disabled: retentionUpdating,
+              selected: retained,
             }}
-            accessible
-            accessibilityLabel={`${event.camera} ${label} event thumbnail`}
+            disabled={retentionUpdating}
+            hitSlop={8}
+            onPress={toggleRetained}
+            style={styles.retentionButton}
+            testID={`event-retention-${id}`}
           >
-          <EventSnapshot
-            id={id}
-            hasSnapshot={has_snapshot}
-            enabled={mediaEnabled}
-            onSnapshotLoad={onSnapshotLoad}
-          />
-          </MediaSurface>
-          <View style={styles.metadata}>
-            <Text style={styles.cameraName}>{event.camera}</Text>
-            <EventLabels
-              endTime={end_time}
-              label={label}
-              zones={zones}
-              topScore={data.top_score}
-              numColumns={numColumns}
-            />
-            <EventTitle
-              startTime={start_time}
-              endTime={end_time}
-              retained={retained}
-              numColumns={numColumns}
-            />
-          </View>
+            {retained ? (
+              <IconFill
+                accessible={false}
+                color={theme.warning}
+                name="star"
+                size={24}
+              />
+            ) : (
+              <IconOutline
+                accessible={false}
+                color={theme.mediaText}
+                name="star"
+                size={24}
+              />
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => onEventPress(event)}
+            accessibilityRole="button"
+            accessibilityLabel={`${event.camera}, ${label} event`}
+            accessibilityHint={intl.formatMessage(messages['action.open'])}
+          >
+            <MediaSurface
+              style={{
+                aspectRatio: undefined,
+                height: snapshotHeight,
+                borderTopLeftRadius: 4,
+                borderTopRightRadius: 4,
+              }}
+              accessible
+              accessibilityLabel={`${event.camera} ${label} event thumbnail`}
+            >
+              <EventSnapshot
+                id={id}
+                hasSnapshot={has_snapshot}
+                enabled={mediaEnabled}
+                onSnapshotLoad={onSnapshotLoad}
+              />
+            </MediaSurface>
+            <View style={styles.metadata}>
+              <Text style={styles.cameraName}>{event.camera}</Text>
+              <EventLabels
+                endTime={end_time}
+                label={label}
+                zones={zones}
+                topScore={data.top_score}
+                numColumns={numColumns}
+              />
+              <EventTitle
+                startTime={start_time}
+                endTime={end_time}
+                retained={retained}
+                numColumns={numColumns}
+              />
+            </View>
+          </Pressable>
         </View>
-      </Pressable>
       </SurfaceCard>
     </Drawer>
   );

@@ -32,7 +32,7 @@ import {buildServerUrl} from '../../helpers/rest';
 import Share from 'react-native-share';
 import {clipFilename} from '../camera-events/eventHelpers';
 import {ICameraEvent} from '../camera-events/CameraEvent';
-import {IconOutline} from '@ant-design/icons-react-native';
+import {IconFill, IconOutline} from '@ant-design/icons-react-native';
 import {useTheme, useStyles} from '../../helpers/colors';
 import {
   downloadMedia,
@@ -77,9 +77,11 @@ import {
   withServerScopeScreen,
 } from '../../helpers/serverScopeScreen';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {useEventRetention} from '../camera-events/useEventRetention';
 
 interface ICameraEventClipProps extends ServerScopeScreenProps {
   event: ICameraEvent;
+  onRetainedChange?: (retained: boolean) => void;
 }
 
 interface IVideoPlayerProps {
@@ -94,6 +96,9 @@ interface IVideoPlayerProps {
   initiallyPaused?: boolean;
   activationId?: number;
   onClose: () => void;
+  eventId: string;
+  initiallyRetained: boolean;
+  onRetainedChange?: (retained: boolean) => void;
 }
 
 const CONTROLS_AUTO_HIDE_DELAY_MS = 3000;
@@ -112,6 +117,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   initiallyPaused = false,
   activationId = 0,
   onClose,
+  eventId,
+  initiallyRetained,
+  onRetainedChange,
 }) => {
   const {isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const actionIdentity = useRef({
@@ -382,11 +390,22 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   const playbackFeedbackId = useRef(0);
   const autoHideTimer = useRef<ReturnType<typeof setTimeout>>();
   const progressAvailable = progressInfo !== undefined;
+  const {
+    retained,
+    updating: retentionUpdating,
+    toggleRetained,
+    label: retentionLabel,
+    hint: retentionHint,
+  } = useEventRetention({
+    eventId,
+    initiallyRetained,
+    onRetainedChange,
+  });
   const directMediaActions =
     progressAvailable &&
     windowWidth - systemInsets.left - systemInsets.right >=
       TOOL_BUTTON_WIDTH *
-        (canChangePlaybackSpeed ? 5 : 4) +
+        (canChangePlaybackSpeed ? 6 : 5) +
         TOOLBAR_WIDTH_RESERVE;
 
   useEffect(() => {
@@ -767,6 +786,39 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       />
     </Pressable>
   );
+  const retentionButton = (
+    <Pressable
+      style={styles.toolButton}
+      accessibilityRole="button"
+      accessibilityLabel={retentionLabel}
+      accessibilityHint={retentionHint}
+      accessibilityState={{
+        busy: retentionUpdating,
+        disabled: retentionUpdating,
+        selected: retained,
+      }}
+      disabled={retentionUpdating}
+      hitSlop={12}
+      onPress={toggleRetained}
+      testID="event-player-retention"
+    >
+      {retained ? (
+        <IconFill
+          accessible={false}
+          name="star"
+          color={theme.warning}
+          size={20}
+        />
+      ) : (
+        <IconOutline
+          accessible={false}
+          name="star"
+          color={theme.mediaText}
+          size={20}
+        />
+      )}
+    </Pressable>
+  );
   const closeOnlyTools = (
     <View
       style={[
@@ -918,6 +970,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
             muted={muted}
             onToggle={() => setMuted(current => !current)}
           />
+          {retentionButton}
           {progressInfo && directMediaActions && (
             <>
               {directShareButton}
@@ -1066,7 +1119,7 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
 
 const CameraEventClipContent: NavigationFunctionComponent<
   ICameraEventClipProps
-> = ({componentId, event, ownerScopeGeneration}) => {
+> = ({componentId, event, ownerScopeGeneration, onRetainedChange}) => {
   const {generation, isCurrentScope} = useServerScopeOwner(ownerScopeGeneration);
   const server = useAppSelector(selectServer);
   const [preparedMedia, setPreparedMedia] = useState<{
@@ -1230,6 +1283,9 @@ const CameraEventClipContent: NavigationFunctionComponent<
       initiallyPaused={activationId > 0}
       activationId={activationId}
       onClose={close}
+      eventId={event.id}
+      initiallyRetained={event.retain_indefinitely}
+      onRetainedChange={onRetainedChange}
     />
   );
 };

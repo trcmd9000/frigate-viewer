@@ -138,6 +138,14 @@ jest.mock('react-native-gesture-handler', () => {
 });
 
 jest.mock('@ant-design/icons-react-native', () => ({
+  ['IconFill']: (props: Record<string, unknown>) => {
+    const ReactModule = require('react');
+    const {Text: NativeText} = require('react-native');
+    return ReactModule.createElement(NativeText, {
+      ...props,
+      testID: 'filled-icon',
+    });
+  },
   ['IconOutline']: (props: Record<string, unknown>) => {
     const ReactModule = require('react');
     const {Text: NativeText} = require('react-native');
@@ -575,6 +583,12 @@ describe('CameraEventClip protected playback state', () => {
     expect(menuStyle.width).toBeLessThanOrEqual(280);
 
     expect(view.getByTestId('event-player-audio')).toBeTruthy();
+    expect(view.getByTestId('event-player-retention').props.accessibilityLabel).toBe(
+      'Ereignis speichern',
+    );
+    expect(view.getByTestId('event-player-retention').props.accessibilityHint).toBe(
+      'Behält das Ereignis dauerhaft auf dem Frigate-Server',
+    );
     expect(view.getByTestId('event-player-overflow')).toBeTruthy();
     const audio = view.getByTestId('event-player-audio');
     expect(audio.props.accessibilityLabel).toBe('Audio einschalten');
@@ -610,6 +624,7 @@ describe('CameraEventClip protected playback state', () => {
 
     expect(await view.findByTestId('event-player-share')).toBeTruthy();
     expect(view.getByTestId('event-player-download')).toBeTruthy();
+    expect(view.getByTestId('event-player-retention')).toBeTruthy();
     expect(view.queryByTestId('event-player-overflow')).toBeNull();
     expect(view.queryByTestId('event-player-overflow-menu')).toBeNull();
   });

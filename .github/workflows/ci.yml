@@ -139,6 +139,10 @@ jobs:
             grep -aFq 'com/facebook/react/devsupport/CxxInspectorPackagerConnection'
           unzip -p app/build/outputs/apk/release/app-release.apk resources.arsc |
             tr -d '\000' > "$RUNNER_TEMP/release-resource-names.txt"
-          for icon in cameras events settings; do
-            grep -Fq "assets_navigation_${icon}" "$RUNNER_TEMP/release-resource-names.txt"
+          for resource in \
+            assets_navigation_cameras \
+            assets_navigation_events \
+            assets_navigation_settings \
+            views_author_frigateviewericon; do
+            grep -Fq "$resource" "$RUNNER_TEMP/release-resource-names.txt"
           done

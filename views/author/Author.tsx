@@ -12,7 +12,7 @@ import {menuButton, useMenu} from '../menu/menuHelpers';
 import {messages} from './messages';
 import {useOpenLink} from './useOpenLink';
 import {ScrollView} from 'react-native-gesture-handler';
-import {palette, useStyles, useTheme} from '../../helpers/colors';
+import {useStyles, useTheme} from '../../helpers/colors';
 import {
   IconOutline,
   OutlineGlyphMapType,
@@ -40,15 +40,9 @@ const useAboutStyles = () =>
       marginTop: 20,
       alignItems: 'center',
     },
-    logoWrapper: {
-      backgroundColor: palette.white,
-      borderRadius: 12,
-      overflow: 'hidden',
-    },
     logo: {
       width: 80,
       height: 80,
-      resizeMode: 'contain',
     },
     content: {
       paddingHorizontal: 16,
@@ -126,29 +120,29 @@ const AboutRow = ({
   const theme = useTheme();
   return (
     <Pressable
-    accessibilityRole={external ? 'link' : 'button'}
-    accessibilityLabel={label}
-    onPress={onPress}
-    style={({pressed}) => [styles.row, pressed && styles.rowPressed]}
-  >
-    <View style={styles.rowIcon}>
+      accessibilityRole={external ? 'link' : 'button'}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({pressed}) => [styles.row, pressed && styles.rowPressed]}
+    >
+      <View style={styles.rowIcon}>
+        <IconOutline
+          accessible={false}
+          name={icon}
+          color={theme.textSecondary}
+          size={20}
+        />
+      </View>
+      <View style={styles.rowContent}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+      </View>
       <IconOutline
         accessible={false}
-        name={icon}
+        name={external ? 'export' : 'right'}
         color={theme.textSecondary}
-        size={20}
+        size={16}
       />
-    </View>
-    <View style={styles.rowContent}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
-    </View>
-    <IconOutline
-      accessible={false}
-      name={external ? 'export' : 'right'}
-      color={theme.textSecondary}
-      size={16}
-    />
     </Pressable>
   );
 };
@@ -174,12 +168,15 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
   return (
     <ScrollView style={styles.wrapper}>
       <View style={styles.authorInfo}>
-        <View style={styles.logoWrapper}>
-          <Image
-            source={require('./frigate-viewer-icon.png')}
-            style={styles.logo as ImageStyle}
-          />
-        </View>
+        <Image
+          accessible
+          accessibilityLabel={intl.formatMessage(messages.identity)}
+          accessibilityRole="image"
+          testID="about-icon"
+          source={require('./frigate-viewer-icon.png')}
+          style={styles.logo as ImageStyle}
+          resizeMode="contain"
+        />
         <Text style={styles.heading}>
           {intl.formatMessage(messages.identity)}
         </Text>

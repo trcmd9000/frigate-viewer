@@ -25,6 +25,7 @@ import {useAppDispatch, useAppSelector} from '../../store/store';
 import {MessageKey, messages} from './messages';
 import {ServerItem} from './ServerItem';
 import {deleteServerProfile} from './serverProfileDeletion';
+import {menuButton, useMenu} from '../menu/menuHelpers';
 
 const REGION_CODES = [
   'es_AR',
@@ -77,6 +78,7 @@ const withCurrentOption = <T extends string | number>(
     : [{value, label: labelForValue?.(value)}, ...options];
 
 export const Settings: NavigationFunctionComponent = ({componentId}) => {
+  useMenu(componentId, 'settings');
   const theme = useTheme();
   const intl = useIntl();
   const dispatch = useAppDispatch();
@@ -149,6 +151,7 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
     Navigation.mergeOptions(componentId, {
       topBar: {
         title: {text: intl.formatMessage(messages['topBar.title'])},
+        leftButtons: [menuButton],
       },
     });
   }, [componentId, intl]);

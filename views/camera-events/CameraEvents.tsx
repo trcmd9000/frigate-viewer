@@ -3,6 +3,7 @@ import {useIntl} from 'react-intl';
 import {useStore} from 'react-redux';
 import {
   FlatList,
+  StatusBar,
   ToastAndroid,
   Text,
   useWindowDimensions,
@@ -122,6 +123,20 @@ export interface ICameraEventsProps {
   ownerScopeGeneration?: number;
 }
 
+export const getCameraEventsTopInset = (
+  retained: boolean | undefined,
+  statusBarHeight = StatusBar.currentHeight,
+): number => {
+  if (
+    !retained ||
+    typeof statusBarHeight !== 'number' ||
+    statusBarHeight <= 0
+  ) {
+    return 0;
+  }
+  return statusBarHeight;
+};
+
 export const CameraEvents: NavigationFunctionComponent<
   ICameraEventsProps
 > = props => {
@@ -183,6 +198,9 @@ const CameraEventsContent: NavigationFunctionComponent<
   const intl = useIntl();
   const {orientation, setComponentId} = useOrientation();
   const {width: listWidth, fontScale} = useWindowDimensions();
+  // Saved events are shown in a full-screen modal without a native top bar.
+  // Reserve the Android status-bar/cutout inset before rendering the first row.
+  const savedEventsTopInset = getCameraEventsTopInset(retained);
   const numColumns = responsiveGridColumns(
     listWidth,
     preferredColumns,
@@ -455,6 +473,24 @@ const CameraEventsContent: NavigationFunctionComponent<
     );
   };
 
+  const onRetainedChange = useCallback(
+    (eventId: string, nextRetained: boolean) => {
+      if (!isCurrentScope()) {
+        return;
+      }
+      setEvents(currentEvents =>
+        !nextRetained && (retained || filtersRetained)
+          ? currentEvents.filter(event => event.id !== eventId)
+          : currentEvents.map(event =>
+              event.id === eventId
+                ? {...event, retain_indefinitely: nextRetained}
+                : event,
+            ),
+      );
+    },
+    [filtersRetained, isCurrentScope, retained],
+  );
+
   const onSnapshotDimensions = (width: number, height: number) => {
     if (isCurrentScope() && !snapshotDimensions) {
       setSnapshotDimensions([width, height]);
@@ -496,6 +532,8 @@ const CameraEventsContent: NavigationFunctionComponent<
             passProps: {
               event,
               ownerScopeGeneration: generation,
+              onRetainedChange: (nextRetained: boolean) =>
+                onRetainedChange(event.id, nextRetained),
             },
             options: {
               layout: {
@@ -556,6 +594,7 @@ const CameraEventsContent: NavigationFunctionComponent<
             onSnapshotDimensions={onSnapshotDimensions}
             onEventPress={showEventClip}
             onShare={setSharedEvent}
+            onRetainedChange={onRetainedChange}
           />
         )}
         key={numColumns}
@@ -595,6 +634,11 @@ const CameraEventsContent: NavigationFunctionComponent<
           )
         }
         ListHeaderComponent={filterHeader}
+        contentContainerStyle={
+          savedEventsTopInset > 0
+            ? {paddingTop: savedEventsTopInset}
+            : undefined
+        }
         stickyHeaderIndices={[0]}
         ListFooterComponent={
           error && events.length > 0 ? (

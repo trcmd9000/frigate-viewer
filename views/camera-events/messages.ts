@@ -2,7 +2,7 @@ import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('cameraEvents', {
   'topBar.general.title': 'Events',
-  'topBar.retained.title': 'Retained',
+  'topBar.retained.title': 'Saved events',
   'topBar.specificCamera.title': 'Events of {cameraName}',
   noEvents: 'No events',
   noFilteredEvents: 'No events match these filters.',
@@ -11,8 +11,10 @@ export const messages = makeMessages('cameraEvents', {
   'labels.inProgressLabel': 'In progress',
   'labels.duration': 'duration {duration}',
   'action.delete': 'Delete',
-  'action.retain': 'Retain',
-  'action.unretain': 'Unretain',
+  'action.retain': 'Save event',
+  'action.unretain': 'Remove from saved events',
+  'action.retainHint': 'Keeps the event on the Frigate server indefinitely',
+  'action.unretainHint': 'Allows Frigate to expire the event normally',
   'action.share': 'Share',
   'action.open': 'Opens the event clip',
   'share.snapshot.label': 'Snapshot',

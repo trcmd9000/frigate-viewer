@@ -148,6 +148,10 @@ jest.mock('../../../views/menu/Menu', () => ({
   storageMenuItem: {id: 'storage'},
   systemMenuItem: {id: 'system'},
 }));
+jest.mock('../../../views/menu/menuHelpers', () => ({
+  menuButton: {id: 'menu'},
+  useMenu: jest.fn(),
+}));
 jest.mock('@ant-design/icons-react-native', () => ({
   IconOutline: () => null,
 }));
@@ -192,7 +196,10 @@ describe('Settings modal navigation', () => {
     expect(Navigation.mergeOptions).toHaveBeenCalledWith(
       'settings',
       expect.objectContaining({
-        topBar: {title: {text: 'Einstellungen'}},
+        topBar: {
+          title: {text: 'Einstellungen'},
+          leftButtons: [{id: 'menu'}],
+        },
       }),
     );
     expect(getByText('Darstellung')).toBeTruthy();
@@ -221,7 +228,10 @@ describe('Settings modal navigation', () => {
     expect(Navigation.mergeOptions).toHaveBeenCalledWith(
       'settings',
       expect.objectContaining({
-        topBar: {title: {text: 'Settings'}},
+        topBar: {
+          title: {text: 'Settings'},
+          leftButtons: [{id: 'menu'}],
+        },
       }),
     );
     expect(getByText('Appearance')).toBeTruthy();
