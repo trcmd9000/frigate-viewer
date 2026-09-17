@@ -8,7 +8,7 @@ must increment both values in `android/app/build.gradle`:
 - `versionName`: user-visible semantic version, next release candidate
   `18.0.8`
 - `versionCode`: monotonically increasing Play Store build number, next
-  release candidate `32`
+  release candidate `33`
 
 ## Local prerequisites
 
