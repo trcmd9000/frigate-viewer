@@ -2,6 +2,7 @@ import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('storage', {
   'topBar.title': 'Storage',
+  'topBar.back': 'Back',
   error:
     'Unable to load storage information. Check your connection and try again.',
   retry: 'Retry loading storage',

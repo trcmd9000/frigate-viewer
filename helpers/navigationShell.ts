@@ -1,5 +1,6 @@
 import {Navigation} from 'react-native-navigation';
 import type {LayoutRoot} from 'react-native-navigation';
+import {presentSecondaryStack} from './secondaryNavigation';
 
 export const ROOT_TABS_ID = 'RootTabs';
 
@@ -20,24 +21,14 @@ export const PRIMARY_DESTINATIONS = [
     componentName: 'CameraEvents',
     stackId: 'EventsStack',
   },
-  {
-    key: 'settings',
-    label: 'Settings',
-    icon: require('../assets/navigation/settings.png'),
-    componentName: 'Settings',
-    stackId: 'SettingsStack',
-  },
 ] as const;
 
-export type PrimaryDestinationKey = (typeof PRIMARY_DESTINATIONS)[number]['key'];
-export type PrimaryDestinationLabels = Record<
-  PrimaryDestinationKey,
-  string
->;
+export type PrimaryDestinationKey =
+  (typeof PRIMARY_DESTINATIONS)[number]['key'];
+export type PrimaryDestinationLabels = Record<PrimaryDestinationKey, string>;
 
-export const primaryDestinationIndex = (
-  key: PrimaryDestinationKey,
-): number => PRIMARY_DESTINATIONS.findIndex(destination => destination.key === key);
+export const primaryDestinationIndex = (key: PrimaryDestinationKey): number =>
+  PRIMARY_DESTINATIONS.findIndex(destination => destination.key === key);
 
 export const updatePrimaryDestinationLabels = (
   labels: PrimaryDestinationLabels,
@@ -105,37 +96,10 @@ export const selectPrimaryDestination = (
     }),
   );
 
-let settingsModalNavigationInFlight = false;
-
 /**
- * Settings is presented as a modal from every entry point. Keeping the
- * transition guard here prevents a fast repeated tap from creating two
- * Settings modals.
+ * Compatibility entry point for callers that open Settings directly.
+ * Secondary navigation owns the duplicate guard for the modal's full
+ * lifetime, including while nested screens are pushed.
  */
-export const presentSettingsModal = (): Promise<unknown> => {
-  if (settingsModalNavigationInFlight) {
-    return Promise.resolve();
-  }
-
-  settingsModalNavigationInFlight = true;
-  try {
-    return Promise.resolve(
-      Navigation.showModal({
-        stack: {
-          children: [
-            {
-              component: {
-                name: 'Settings',
-              },
-            },
-          ],
-        },
-      }),
-    ).finally(() => {
-      settingsModalNavigationInFlight = false;
-    });
-  } catch (error) {
-    settingsModalNavigationInFlight = false;
-    return Promise.reject(error);
-  }
-};
+export const presentSettingsModal = (): Promise<string | undefined> =>
+  presentSecondaryStack({componentName: 'Settings'});

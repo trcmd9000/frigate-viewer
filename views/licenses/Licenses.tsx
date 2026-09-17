@@ -17,10 +17,7 @@ import {SecureLogger} from '../../helpers/secureLogger';
 import catalogJson from '../../licenses/js-licenses.json';
 import nativeCatalogJson from '../../licenses/android-license-overrides.json';
 import {messages} from './messages';
-import {
-  JavaScriptLicense,
-  JavaScriptLicenseCatalog,
-} from './types';
+import {JavaScriptLicense, JavaScriptLicenseCatalog} from './types';
 
 const catalog = catalogJson as JavaScriptLicenseCatalog;
 const nativeCatalog = nativeCatalogJson as JavaScriptLicenseCatalog;
@@ -93,26 +90,8 @@ export const Licenses: NavigationFunctionComponent = ({componentId}) => {
     Navigation.mergeOptions(componentId, {
       topBar: {
         title: {text: intl.formatMessage(messages['topBar.title'])},
-        leftButtons: [
-          {
-            id: 'closeLicenses',
-            text: intl.formatMessage(messages.close),
-          },
-        ],
       },
     });
-    const subscription =
-      Navigation.events().registerNavigationButtonPressedListener(event => {
-        if (
-          event.componentId === componentId &&
-          event.buttonId === 'closeLicenses'
-        ) {
-          Navigation.dismissModal(componentId).catch(error => {
-            SecureLogger.logError(error, 'Licenses.close');
-          });
-        }
-      });
-    return () => subscription.remove();
   }, [componentId, intl]);
 
   const filteredLicenses = useMemo(() => {

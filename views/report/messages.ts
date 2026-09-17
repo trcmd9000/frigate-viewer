@@ -3,6 +3,7 @@ import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('report', {
   'topBar.title': 'Report problem',
+  'topBar.back': 'Back',
   'introduction.info':
     'Describe the problem below. The app will open a new issue on GitHub; no diagnostics or credentials are uploaded automatically.',
   'issue.header': 'Issue',

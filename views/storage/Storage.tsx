@@ -22,6 +22,11 @@ import {CamerasStorageTable} from './CamerasStorageTable';
 import {StorageChart} from './StorageChart';
 import {StorageTable} from './StorageTable';
 import {useStyles, useTheme} from '../../helpers/colors';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+  SECONDARY_ROOT_COMPONENT_ID,
+} from '../../helpers/secondaryNavigation';
 
 export const Storage: NavigationFunctionComponent = ({componentId}) => {
   const theme = useTheme();
@@ -43,6 +48,7 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
   const getRef = useRef(get);
   const mounted = useRef(true);
   const requestId = useRef(0);
+  const isSecondaryRoot = componentId === SECONDARY_ROOT_COMPONENT_ID;
 
   useEffect(() => {
     getRef.current = get;
@@ -89,11 +95,28 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
         title: {
           text: intl.formatMessage(messages['topBar.title']),
         },
-        leftButtons: [menuButton],
+        leftButtons: [
+          isSecondaryRoot
+            ? createSecondaryStackDismissButton(
+                intl.formatMessage(messages['topBar.back']),
+              )
+            : menuButton,
+        ],
         rightButtons: [refreshButton(refresh)],
       },
     });
-  }, [componentId, intl, refresh]);
+  }, [componentId, intl, isSecondaryRoot, refresh]);
+
+  useEffect(() => {
+    if (!isSecondaryRoot) {
+      return undefined;
+    }
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        handleSecondaryStackNavigationButton(event).catch(() => undefined);
+      });
+    return () => subscription.remove();
+  }, [isSecondaryRoot]);
 
   useEffect(() => {
     const timeoutId = setTimeout(refresh, 0);

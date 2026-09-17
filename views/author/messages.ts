@@ -2,6 +2,7 @@ import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('author', {
   'topBar.title': 'About',
+  'topBar.back': 'Back',
   identity: 'Frigate Viewer',
   version: 'Version {version}',
   projectSection: 'Project & support',

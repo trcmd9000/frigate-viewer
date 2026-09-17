@@ -31,6 +31,7 @@ import {normalizeRemoteHttpConsent} from '../../helpers/remoteHttpPolicy';
 interface ServerProps {
   server?: Server;
   onSubmit: (server: Server) => void | Promise<void>;
+  stackPushed?: boolean;
 }
 
 const formServer = (server?: Server): Server => {
@@ -68,12 +69,11 @@ const formServer = (server?: Server): Server => {
         server?.localTls?.allowSelfSignedServer ??
         server?.localTls?.clientCertConfig?.allowSelfSignedServer ??
         false,
-      clientCertConfig:
-        localClientCertAlias
-          ? {alias: localClientCertAlias}
-          : server?.clientCertConfig?.alias
-            ? {alias: server.clientCertConfig.alias}
-            : undefined,
+      clientCertConfig: localClientCertAlias
+        ? {alias: localClientCertAlias}
+        : server?.clientCertConfig?.alias
+        ? {alias: server.clientCertConfig.alias}
+        : undefined,
     },
     rtsp: {
       ...emptyRtsp,
@@ -198,6 +198,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
   componentId,
   server,
   onSubmit,
+  stackPushed = false,
 }) => {
   const initialServerState = useMemo(() => formServer(server), [server]);
 
@@ -365,9 +366,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
           'remote-http-consent',
           remoteHttpConsentRequiredError,
           function (value) {
-            return (
-              this.from?.[1]?.value?.protocol !== 'http' || value === true
-            );
+            return this.from?.[1]?.value?.protocol !== 'http' || value === true;
           },
         ),
       host: yup.string().required(requiredError),
@@ -487,11 +486,16 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
     });
   }, [intl]);
 
-  const cancel = useCallback(() => {
-    void Promise.resolve(Navigation.dismissModal(componentId)).catch(error => {
-      void handleError(error, 'navigation.dismiss-server-form');
+  const close = useCallback(() => {
+    const transition = stackPushed
+      ? Navigation.pop(componentId)
+      : Navigation.dismissModal(componentId);
+    void Promise.resolve(transition).catch(error => {
+      void handleError(error, 'navigation.close-server-form');
     });
-  }, [componentId]);
+  }, [componentId, stackPushed]);
+
+  const cancel = close;
 
   const save = useCallback(
     async (
@@ -510,9 +514,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
           serverToSubmit.allowInsecureRemoteHttp !== true
         ) {
           throw new Error(
-            intl.formatMessage(
-              messages['server.external.httpConsentRequired'],
-            ),
+            intl.formatMessage(messages['server.external.httpConsentRequired']),
           );
         }
         if (serverToSubmit.auth !== 'none' && serverToSubmit.credentials) {
@@ -530,11 +532,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         }
         await onSubmit(serverToSubmit);
         Keyboard.dismiss();
-        void Promise.resolve(Navigation.dismissModal(componentId)).catch(
-          error => {
-            void handleError(error, 'navigation.dismiss-server-form');
-          },
-        );
+        close();
       } catch (error) {
         const appError = await handleError(error, 'saving-server', {
           showToUser: true,
@@ -549,7 +547,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         }
       }
     },
-    [componentId, intl, onSubmit, server],
+    [close, intl, onSubmit, server],
   );
 
   const validateBeforeSubmit = useCallback(
@@ -623,8 +621,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         const formatSummary = (key: keyof typeof messages) =>
           intl.formatMessage(messages[key]);
         const remoteHttpNeedsConsent =
-          values.protocol === 'http' &&
-          values.allowInsecureRemoteHttp !== true;
+          values.protocol === 'http' && values.allowInsecureRemoteHttp !== true;
         const remoteHttpConsentError = intl.formatMessage(
           messages['server.external.httpConsentRequired'],
         );
@@ -698,26 +695,26 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         const localSummary = !values.localRoutingEnabled
           ? formatSummary('server.summary.disabled')
           : localNeedsAttention
-            ? values.localRoutingEnabled &&
-              localEndpoint?.host &&
-              isDeterminablyPublicLocalHost(localEndpoint.host)
-              ? formatSummary('server.summary.local.privateTarget')
-              : formatSummary('server.summary.local.endpointIncomplete')
-            : !localEndpointComplete
-              ? formatSummary('server.summary.local.endpointIncomplete')
-              : localEndpoint?.protocol === 'http'
-                ? formatSummary('server.summary.local.http')
-                : formatSummary('server.summary.configured');
+          ? values.localRoutingEnabled &&
+            localEndpoint?.host &&
+            isDeterminablyPublicLocalHost(localEndpoint.host)
+            ? formatSummary('server.summary.local.privateTarget')
+            : formatSummary('server.summary.local.endpointIncomplete')
+          : !localEndpointComplete
+          ? formatSummary('server.summary.local.endpointIncomplete')
+          : localEndpoint?.protocol === 'http'
+          ? formatSummary('server.summary.local.http')
+          : formatSummary('server.summary.configured');
         const localTlsSummary =
           localTls?.mtlsEnabled !== true
             ? formatSummary('server.summary.disabled')
             : localEndpoint?.protocol !== 'https'
-              ? formatSummary('server.summary.local.tlsHttps')
-              : localTlsNeedsAttention
-                ? formatSummary('server.summary.local.tlsCertificate')
-                : localTls.clientCertConfig?.alias
-                  ? formatSummary('server.summary.configured')
-                  : formatSummary('server.summary.local.tlsCertificate');
+            ? formatSummary('server.summary.local.tlsHttps')
+            : localTlsNeedsAttention
+            ? formatSummary('server.summary.local.tlsCertificate')
+            : localTls.clientCertConfig?.alias
+            ? formatSummary('server.summary.configured')
+            : formatSummary('server.summary.local.tlsCertificate');
         const localRouteValid =
           values.localRoutingEnabled === true &&
           localEndpointComplete &&
@@ -727,13 +724,12 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
           rtsp?.enabled !== true
             ? formatSummary('server.summary.disabled')
             : rtspNeedsAttention
-              ? formatSummary('server.summary.needsAttention')
-              : !localRouteValid
-                ? formatSummary('server.summary.needsValidLocalRoute')
-                : values.auth !== 'none' &&
-                    rtsp.allowInsecureCredentials !== true
-                  ? formatSummary('server.summary.needsConsent')
-                  : formatSummary('server.summary.configured');
+            ? formatSummary('server.summary.needsAttention')
+            : !localRouteValid
+            ? formatSummary('server.summary.needsValidLocalRoute')
+            : values.auth !== 'none' && rtsp.allowInsecureCredentials !== true
+            ? formatSummary('server.summary.needsConsent')
+            : formatSummary('server.summary.configured');
 
         const togglePasswordVisibility = () => {
           setPasswordVisible(current => !current);
@@ -836,8 +832,8 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     : externalNeedsAttention
                     ? formatSummary('server.summary.needsAttention')
                     : externalConfigured
-                      ? formatSummary('server.summary.configured')
-                      : formatSummary('server.summary.needsSetup')
+                    ? formatSummary('server.summary.configured')
+                    : formatSummary('server.summary.needsSetup')
                 }
                 invalid={externalNeedsAttention || remoteHttpNeedsConsent}
               >
@@ -971,10 +967,10 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                   authNeedsAttention
                     ? formatSummary('server.summary.needsAttention')
                     : values.auth === 'none'
-                      ? formatSummary('server.summary.disabled')
-                      : authConfigured
-                        ? formatSummary('server.summary.configured')
-                        : formatSummary('server.summary.needsSetup')
+                    ? formatSummary('server.summary.disabled')
+                    : authConfigured
+                    ? formatSummary('server.summary.configured')
+                    : formatSummary('server.summary.needsSetup')
                 }
                 invalid={authNeedsAttention}
               >
@@ -1095,10 +1091,10 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     !values.mtlsEnabled
                       ? formatSummary('server.summary.disabled')
                       : certificateNeedsAttention
-                        ? formatSummary('server.summary.needsAttention')
-                        : values.clientCertConfig?.alias
-                          ? formatSummary('server.summary.configured')
-                          : formatSummary('server.summary.needsSetup')
+                      ? formatSummary('server.summary.needsAttention')
+                      : values.clientCertConfig?.alias
+                      ? formatSummary('server.summary.configured')
+                      : formatSummary('server.summary.needsSetup')
                   }
                   invalid={certificateNeedsAttention}
                 >
@@ -1440,9 +1436,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       testID="server-section-local-trust"
                       compact
                       alwaysExpanded
-                      summary={
-                        localTlsSummary
-                      }
+                      summary={localTlsSummary}
                       invalid={localTlsNeedsAttention}
                     >
                       <Label
@@ -1602,9 +1596,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                           >
                             <Switch
                               testID="server-local-mtls-self-signed-toggle"
-                              value={
-                                localTls.allowSelfSignedServer === true
-                              }
+                              value={localTls.allowSelfSignedServer === true}
                               accessibilityRole="switch"
                               accessibilityLabel={intl.formatMessage(
                                 messages['server.local.mtls.selfSigned.label'],

@@ -4,6 +4,7 @@ export default {
   'api.error.unauthorized':
     'Неправильні облікові дані при спробі доступу до {url}.',
   'author.topBar.title': 'Про застосунок',
+  'author.topBar.back': 'Назад',
   'author.error.cantOpenLink':
     'Не можете знайти додаток, щоб відкрити це посилання.',
   'camerasList.topBar.title': 'Список камер',
@@ -51,6 +52,7 @@ export default {
   'settings.error.max': 'Максимальне значення до {max}',
   'settings.action.save': 'Зберігати',
   'settings.action.cancel': 'Скасувати',
+  'settings.topBar.back': 'Назад',
   'settings.action.add': 'Додати',
   'settings.action.edit': 'Редагувати',
   'settings.server.header': 'Сервер',
@@ -160,4 +162,9 @@ export default {
   'system.usageChart.usage': 'Використання',
   'system.usageChart.memory': "Пам'ять",
   'system.cameraInfoChart.usage': 'Використання',
+  'cameraEvents.topBar.back': 'Назад',
+  'logs.topBar.back': 'Назад',
+  'report.topBar.back': 'Назад',
+  'storage.topBar.back': 'Назад',
+  'system.topBar.back': 'Назад',
 };

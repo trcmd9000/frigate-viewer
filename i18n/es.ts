@@ -4,6 +4,7 @@ export default {
   'api.error.unauthorized':
     'Credenciales incorrectas al intentar acceder a {url}.',
   'author.topBar.title': 'Acerca de',
+  'author.topBar.back': 'Atrás',
   'author.error.cantOpenLink':
     'No se puede encontrar ninguna aplicación para abrir este enlace.',
   'camerasList.topBar.title': 'Lista de cámaras',
@@ -51,6 +52,7 @@ export default {
   'settings.error.max': 'El valor máximo es {max}',
   'settings.action.save': 'Salvar',
   'settings.action.cancel': 'Cancelar',
+  'settings.topBar.back': 'Atrás',
   'settings.action.add': 'Agregar',
   'settings.action.edit': 'Editar',
   'settings.server.header': 'Servidor',
@@ -161,4 +163,9 @@ export default {
   'system.usageChart.usage': 'Uso',
   'system.usageChart.memory': 'Memoria',
   'system.cameraInfoChart.usage': 'Uso',
+  'cameraEvents.topBar.back': 'Atrás',
+  'logs.topBar.back': 'Atrás',
+  'report.topBar.back': 'Atrás',
+  'storage.topBar.back': 'Atrás',
+  'system.topBar.back': 'Atrás',
 };

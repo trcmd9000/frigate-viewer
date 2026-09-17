@@ -17,11 +17,16 @@ import type {Server} from '../../../store/settings';
 import {createServerScopeReducer} from '../../../store/serverScope';
 import {SecureLogger} from '../../../helpers/secureLogger';
 import {useEventsFilters} from '../../../views/events-filters/eventsFiltersHelpers';
+import {useNoServer} from '../../../views/settings/useNoServer';
 
 const mockGet = jest.fn();
 const mockSetComponentId = jest.fn();
 const mockTileMount = jest.fn();
 const mockTileUnmount = jest.fn();
+const mockHandleSecondaryButton = jest.fn().mockResolvedValue(true);
+let mockNavigationButtonListener:
+  | ((event: {componentId: string; buttonId: string}) => void)
+  | undefined;
 jest.mock('../../../store/store', () => {
   const redux = require('react-redux') as typeof import('react-redux');
   return {useAppDispatch: redux.useDispatch, useAppSelector: redux.useSelector};
@@ -30,7 +35,15 @@ jest.mock('../../../helpers/rest', () => ({useRest: () => ({get: mockGet})}));
 jest.mock('../../../helpers/secureLogger', () => ({SecureLogger: {logError: jest.fn()}}));
 jest.mock('react-native-navigation', () => ({Navigation: {
   mergeOptions: jest.fn(), updateProps: jest.fn(), showModal: jest.fn(),
-  events: () => ({registerComponentListener: () => ({remove: jest.fn()})}),
+  events: () => ({
+    registerComponentListener: () => ({remove: jest.fn()}),
+    registerNavigationButtonPressedListener: (
+      listener: (event: {componentId: string; buttonId: string}) => void,
+    ) => {
+      mockNavigationButtonListener = listener;
+      return {remove: jest.fn()};
+    },
+  }),
 }}));
 jest.mock('react-intl', () => ({
   useIntl: () => ({formatMessage: ({id}: {id: string}) => id}),
@@ -38,6 +51,15 @@ jest.mock('react-intl', () => ({
 }));
 jest.mock('../../../views/settings/useNoServer', () => ({useNoServer: jest.fn()}));
 jest.mock('../../../views/menu/menuHelpers', () => ({useMenu: jest.fn(), menuButton: {}}));
+jest.mock('../../../helpers/secondaryNavigation', () => ({
+  SECONDARY_ROOT_COMPONENT_ID: 'SecondaryStackRoot',
+  createSecondaryStackDismissButton: (text: string) => ({
+    id: 'dismissSecondaryStack',
+    text,
+  }),
+  handleSecondaryStackNavigationButton: (event: unknown) =>
+    mockHandleSecondaryButton(event),
+}));
 jest.mock('../../../views/events-filters/eventsFiltersHelpers', () => ({
   useEventsFilters: jest.fn(), filterButton: () => ({}),
 }));
@@ -136,6 +158,7 @@ const loadMore = (view: Screen) => act(() => list(view).props.onEndReached());
 describe('CameraEvents server-scope requests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockNavigationButtonListener = undefined;
     requests = [];
     frames = [];
     mockGet.mockImplementation(() => {
@@ -149,6 +172,37 @@ describe('CameraEvents server-scope requests', () => {
     });
   });
   afterEach(() => { cleanup(); jest.restoreAllMocks(); });
+
+  it('keeps the Events-tab Burger but gives retained secondary roots Back', () => {
+    const primary = mount(makeStore());
+    expect(useNoServer).toHaveBeenCalledWith('events');
+    expect((Navigation.mergeOptions as jest.Mock).mock.calls.at(-1)[1].topBar)
+      .toMatchObject({leftButtons: [{}]});
+    expect(mockNavigationButtonListener).toBeUndefined();
+    primary.unmount();
+
+    render(
+      <Provider store={makeStore()}>
+        <CameraEvents
+          componentId="SecondaryStackRoot"
+          componentName="CameraEvents"
+          retained
+        />
+      </Provider>,
+    );
+    expect((Navigation.mergeOptions as jest.Mock).mock.calls.at(-1)[1].topBar)
+      .toMatchObject({
+        title: {text: 'cameraEvents.topBar.retained.title'},
+        leftButtons: [{id: 'dismissSecondaryStack', text: 'cameraEvents.topBar.back'}],
+        rightButtons: [{}],
+      });
+    const buttonEvent = {
+      componentId: 'SecondaryStackRoot',
+      buttonId: 'dismissSecondaryStack',
+    };
+    act(() => mockNavigationButtonListener?.(buttonEvent));
+    expect(mockHandleSecondaryButton).toHaveBeenCalledWith(buttonEvent);
+  });
 
   it('drops rows and sharing on A-B-A, remounts identical IDs and fetches first pages on the same host', async () => {
     const store = makeStore();

@@ -47,6 +47,11 @@ import {
   gridCellWidth,
   responsiveGridColumns,
 } from '../../helpers/gridLayout';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+  SECONDARY_ROOT_COMPONENT_ID,
+} from '../../helpers/secondaryNavigation';
 
 const EventListSkeleton: FC<{
   label: string;
@@ -143,7 +148,7 @@ const CameraEventsContent: NavigationFunctionComponent<
     () => cameraNames && cameraNames.length === 1,
     [cameraNames],
   );
-  useNoServer();
+  useNoServer(componentId);
   useMenu(
     componentId,
     !retained
@@ -192,6 +197,7 @@ const CameraEventsContent: NavigationFunctionComponent<
   );
   const {get} = useRest();
   const getRef = useRef(get);
+  const isSecondaryRoot = componentId === SECONDARY_ROOT_COMPONENT_ID;
 
   const isCurrentScope = useCallback(
     () =>
@@ -258,7 +264,13 @@ const CameraEventsContent: NavigationFunctionComponent<
             title: {
               text: intl.formatMessage(messages['topBar.retained.title']),
             },
-            leftButtons: [menuButton],
+            leftButtons: [
+              isSecondaryRoot
+                ? createSecondaryStackDismissButton(
+                    intl.formatMessage(messages['topBar.back']),
+                  )
+                : menuButton,
+            ],
             rightButtons: [filterButton(filterCount)],
           }
         : isSpecificCamera
@@ -275,11 +287,36 @@ const CameraEventsContent: NavigationFunctionComponent<
             title: {
               text: intl.formatMessage(messages['topBar.general.title']),
             },
-            leftButtons: [menuButton],
+            leftButtons: [
+              isSecondaryRoot
+                ? createSecondaryStackDismissButton(
+                    intl.formatMessage(messages['topBar.back']),
+                  )
+                : menuButton,
+            ],
             rightButtons: [filterButton(filterCount)],
           },
     });
-  }, [componentId, intl, cameraNames, filterCount]);
+  }, [
+    componentId,
+    intl,
+    cameraNames,
+    filterCount,
+    isSpecificCamera,
+    isSecondaryRoot,
+    retained,
+  ]);
+
+  useEffect(() => {
+    if (!isSecondaryRoot) {
+      return undefined;
+    }
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        handleSecondaryStackNavigationButton(event).catch(() => undefined);
+      });
+    return () => subscription.remove();
+  }, [isSecondaryRoot]);
 
   useEffect(() => {
     Navigation.updateProps('FilterButton', {

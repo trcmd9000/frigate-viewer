@@ -9,6 +9,7 @@ export const messages = makeMessages('menu', {
   'items.label': 'Secondary navigation',
   'close.label': 'Close menu',
   'close.hint': 'Dismisses the secondary navigation',
+  'section.app': 'App',
   'section.saved': 'Saved',
   'section.diagnostics': 'Diagnostics',
   'section.support': 'Support',

@@ -1,24 +1,18 @@
 import React, {useEffect} from 'react';
 import {useIntl} from 'react-intl';
-import {
-  Image,
-  ImageStyle,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import {Image, ImageStyle, Pressable, Text, View} from 'react-native';
 import {Navigation, NavigationFunctionComponent} from 'react-native-navigation';
-import {menuButton, useMenu} from '../menu/menuHelpers';
 import {messages} from './messages';
 import {useOpenLink} from './useOpenLink';
 import {ScrollView} from 'react-native-gesture-handler';
 import {useStyles, useTheme} from '../../helpers/colors';
-import {
-  IconOutline,
-  OutlineGlyphMapType,
-} from '@ant-design/icons-react-native';
+import {IconOutline, OutlineGlyphMapType} from '@ant-design/icons-react-native';
 import packageMetadata from '../../package.json';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+} from '../../helpers/secondaryNavigation';
 
 interface AboutRowProps {
   icon: OutlineGlyphMapType;
@@ -148,7 +142,6 @@ const AboutRow = ({
 };
 
 export const Author: NavigationFunctionComponent = ({componentId}) => {
-  useMenu(componentId, 'author');
   const intl = useIntl();
   const openLink = useOpenLink();
 
@@ -160,9 +153,23 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
         title: {
           text: intl.formatMessage(messages['topBar.title']),
         },
-        leftButtons: [menuButton],
+        leftButtons: [
+          createSecondaryStackDismissButton(
+            intl.formatMessage(messages['topBar.back']),
+          ),
+        ],
       },
     });
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        void handleSecondaryStackNavigationButton(event).catch(error => {
+          SecureLogger.logError(
+            error instanceof Error ? error : new Error(String(error)),
+            'navigation.author-dismiss',
+          );
+        });
+      });
+    return () => subscription.remove();
   }, [componentId, intl]);
 
   return (
@@ -187,7 +194,9 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
         </Text>
       </View>
       <View style={styles.content}>
-        <Text style={styles.body}>{intl.formatMessage(messages.disclaimer)}</Text>
+        <Text style={styles.body}>
+          {intl.formatMessage(messages.disclaimer)}
+        </Text>
         <Text style={styles.section}>
           {intl.formatMessage(messages.projectSection)}
         </Text>
@@ -236,9 +245,9 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
           label={intl.formatMessage(messages.thirdPartyLicenses)}
           hint={intl.formatMessage(messages.thirdPartyLicensesHint)}
           onPress={() => {
-            Navigation.showModal({
-              stack: {
-                children: [{component: {name: 'Licenses'}}],
+            Navigation.push(componentId, {
+              component: {
+                name: 'Licenses',
               },
             }).catch(error => {
               SecureLogger.logError(error, 'Author.open-licenses');
@@ -246,7 +255,9 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
           }}
           styles={styles}
         />
-        <Text style={styles.section}>{intl.formatMessage(messages.upstream)}</Text>
+        <Text style={styles.section}>
+          {intl.formatMessage(messages.upstream)}
+        </Text>
         <Text style={styles.body}>
           {intl.formatMessage(messages.upstreamDescription)}
         </Text>

@@ -4,6 +4,7 @@ export default {
   'api.error.unauthorized':
     'Nieprawidłowe dane logowania podczas próby dotarcia do {url}.',
   'author.topBar.title': 'O aplikacji',
+  'author.topBar.back': 'Wstecz',
   'author.error.cantOpenLink':
     'Nie można znaleźć żadnej aplikacji, aby otworzyć ten link.',
   'camerasList.topBar.title': 'Lista kamer',
@@ -51,6 +52,7 @@ export default {
   'settings.error.max': 'Maksymalną wartością jest {max}',
   'settings.action.save': 'Zapisz',
   'settings.action.cancel': 'Anuluj',
+  'settings.topBar.back': 'Wstecz',
   'settings.action.add': 'Dodaj',
   'settings.action.edit': 'Edytuj',
   'settings.server.header': 'Serwer',
@@ -159,4 +161,9 @@ export default {
   'system.usageChart.usage': 'Użycie',
   'system.usageChart.memory': 'Pamięć',
   'system.cameraInfoChart.usage': 'Użycie',
+  'cameraEvents.topBar.back': 'Wstecz',
+  'logs.topBar.back': 'Wstecz',
+  'report.topBar.back': 'Wstecz',
+  'storage.topBar.back': 'Wstecz',
+  'system.topBar.back': 'Wstecz',
 };

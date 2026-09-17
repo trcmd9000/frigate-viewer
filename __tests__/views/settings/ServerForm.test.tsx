@@ -1,5 +1,10 @@
 import React from 'react';
-import {fireEvent, render, waitFor, within} from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import {Alert} from 'react-native';
 import {IntlProvider} from 'react-intl';
 import {
@@ -68,8 +73,7 @@ let mockTheme = {
 
 jest.mock('../../../helpers/colors', () => ({
   useTheme: () => mockTheme,
-  useStyles: (fn: any) =>
-    fn({theme: mockTheme}),
+  useStyles: (fn: any) => fn({theme: mockTheme}),
 }));
 
 jest.mock('../../../helpers/secureStorage', () => ({
@@ -131,6 +135,40 @@ describe('ServerForm Component', () => {
     expect(isDeterminablyPublicLocalHost('frigate.local')).toBe(false);
   });
 
+  it('pops a stack-pushed form when cancelled', () => {
+    const {getByTestId} = render(
+      <ServerFormTestWrapper
+        componentId={mockComponentId}
+        stackPushed
+        onSubmit={mockOnSubmit}
+      />,
+    );
+
+    fireEvent.press(getByTestId('server-form-cancel'));
+
+    expect(Navigation.pop).toHaveBeenCalledWith(mockComponentId);
+    expect(Navigation.dismissModal).not.toHaveBeenCalled();
+  });
+
+  it('submits before popping a stack-pushed form', async () => {
+    const server = {...emptyServer(), host: 'example.com'};
+    const {getByTestId} = render(
+      <ServerFormTestWrapper
+        componentId={mockComponentId}
+        server={server}
+        stackPushed
+        onSubmit={mockOnSubmit}
+      />,
+    );
+
+    fireEvent.press(getByTestId('server-form-submit'));
+
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalled();
+      expect(Navigation.pop).toHaveBeenCalledWith(mockComponentId);
+    });
+  });
+
   describe('Form Rendering', () => {
     it('should render with empty server', () => {
       const {toJSON} = render(
@@ -183,7 +221,8 @@ describe('ServerForm Component', () => {
         />,
       );
       expect(
-        existingProfile.getByTestId('server-form-submit').props.accessibilityLabel,
+        existingProfile.getByTestId('server-form-submit').props
+          .accessibilityLabel,
       ).toBe('Save changes');
 
       const germanNewProfile = render(
@@ -376,11 +415,7 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      fireEvent(
-        getByTestId('server-local-route-toggle'),
-        'valueChange',
-        true,
-      );
+      fireEvent(getByTestId('server-local-route-toggle'), 'valueChange', true);
       expect(
         within(getByTestId('server-section-local')).getByText(
           'Complete the local endpoint',
@@ -416,7 +451,9 @@ describe('ServerForm Component', () => {
         />,
       );
       expect(authenticated.getByLabelText('Username')).toBeTruthy();
-      expect(authenticated.getByLabelText('Type of authorization')).toBeTruthy();
+      expect(
+        authenticated.getByLabelText('Type of authorization'),
+      ).toBeTruthy();
     });
 
     it('renders German section summaries without English defaults or message IDs', () => {
@@ -492,7 +529,12 @@ describe('ServerForm Component', () => {
         'incomplete',
         {
           localRoutingEnabled: true,
-          localEndpoint: {protocol: 'https', host: '', port: 8971, basePath: ''},
+          localEndpoint: {
+            protocol: 'https',
+            host: '',
+            port: 8971,
+            basePath: '',
+          },
         },
       ],
       [
@@ -984,7 +1026,9 @@ describe('ServerForm Component', () => {
       fireEvent.press(getByTestId('server-form-submit'));
       await waitFor(() => {
         expect(
-          getByText('Explicit consent is required before using a remote HTTP endpoint.'),
+          getByText(
+            'Explicit consent is required before using a remote HTTP endpoint.',
+          ),
         ).toBeTruthy();
       });
       expect(mockOnSubmit).not.toHaveBeenCalled();
@@ -1310,9 +1354,9 @@ describe('ServerForm Component', () => {
             }),
           }),
         );
-        expect(mockOnSubmit.mock.calls[0][0].localTls.clientCertConfig).not.toHaveProperty(
-          'allowSelfSignedServer',
-        );
+        expect(
+          mockOnSubmit.mock.calls[0][0].localTls.clientCertConfig,
+        ).not.toHaveProperty('allowSelfSignedServer');
       });
     });
   });

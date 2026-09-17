@@ -82,14 +82,15 @@ describe('third-party license center', () => {
         },
       },
     });
+    expect(mockMergeOptions).toHaveBeenCalledWith('licenses', {
+      topBar: {title: {text: 'Third-party licenses'}},
+    });
   });
 
   it('opens the offline Android license activity', async () => {
     const view = renderLicenses();
 
-    fireEvent.press(
-      view.getByRole('button', {name: 'All Android libraries'}),
-    );
+    fireEvent.press(view.getByRole('button', {name: 'All Android libraries'}));
 
     await waitFor(() =>
       expect(mockOpenAndroidLicenses).toHaveBeenCalledWith(

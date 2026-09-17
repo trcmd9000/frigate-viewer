@@ -12,6 +12,11 @@ import {messages} from './messages';
 import {useTheme, useStyles} from '../../helpers/colors';
 import {menuButton, useMenu} from '../menu/menuHelpers';
 import {handleError} from '../../helpers/errorHandler';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+  SECONDARY_ROOT_COMPONENT_ID,
+} from '../../helpers/secondaryNavigation';
 
 interface Problem {
   issue: {
@@ -52,6 +57,7 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
 
   const formRef = useRef<FormikProps<Problem>>(null);
   const intl = useIntl();
+  const isSecondaryRoot = componentId === SECONDARY_ROOT_COMPONENT_ID;
 
   useMenu(componentId, 'report');
 
@@ -61,10 +67,27 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
         title: {
           text: intl.formatMessage(messages['topBar.title']),
         },
-        leftButtons: [menuButton],
+        leftButtons: [
+          isSecondaryRoot
+            ? createSecondaryStackDismissButton(
+                intl.formatMessage(messages['topBar.back']),
+              )
+            : menuButton,
+        ],
       },
     });
-  }, [componentId, intl]);
+  }, [componentId, intl, isSecondaryRoot]);
+
+  useEffect(() => {
+    if (!isSecondaryRoot) {
+      return undefined;
+    }
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        handleSecondaryStackNavigationButton(event).catch(() => undefined);
+      });
+    return () => subscription.remove();
+  }, [isSecondaryRoot]);
 
   const send = async (problem: Problem) => {
     Keyboard.dismiss();

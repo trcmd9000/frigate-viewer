@@ -64,6 +64,7 @@ describe('adaptive color scheme', () => {
     expect(options.statusBar.backgroundColor).toBe(darkTheme.surface);
     expect(options.statusBar.style).toBe('light');
     expect(options.statusBar.drawBehind).toBe(false);
+    expect(options.layout.fitSystemWindows).toBe(true);
     expect(options.topBar.background.color).toBe(darkTheme.surface);
     expect(options.topBar.title.color).toBe(darkTheme.text);
     expect(options.navigationBar.backgroundColor).toBe(darkTheme.background);
@@ -117,7 +118,7 @@ describe('adaptive color scheme', () => {
     ).toBe(false);
     expect(
       navigationThemeOptions(lightTheme, 'light').statusBar.drawBehind,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       navigationThemeOptions(lightTheme, 'light', 'media').statusBar.drawBehind,
     ).toBe(true);

@@ -2,6 +2,7 @@ import React from 'react';
 import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 import {Navigation} from 'react-native-navigation';
 import {CamerasList} from '../../../views/cameras-list/CamerasList';
+import {useNoServer} from '../../../views/settings/useNoServer';
 
 const state = {
   server: {host: ''},
@@ -13,6 +14,7 @@ const state = {
 const mockGet = jest.fn();
 const mockDispatch = jest.fn();
 const mockStore = {getState: () => ({events: {scopeGeneration: 0}})};
+const mockPresentSecondaryStack = jest.fn();
 
 jest.mock('react-redux', () => ({
   useStore: () => mockStore,
@@ -28,12 +30,19 @@ jest.mock('react-native-navigation', () => ({
   },
 }));
 
+jest.mock('../../../helpers/secondaryNavigation', () => ({
+  presentSecondaryStack: (options: unknown) =>
+    mockPresentSecondaryStack(options),
+}));
+
 jest.mock('react-intl', () => ({
   useIntl: () => ({
     formatMessage: ({id}: {id: string}) => {
-      const messages = (state.locale === 'en_US'
-        ? require('../../../i18n/en')
-        : require('../../../i18n/de')).default as Record<string, string>;
+      const messages = (
+        state.locale === 'en_US'
+          ? require('../../../i18n/en')
+          : require('../../../i18n/de')
+      ).default as Record<string, string>;
       return messages[id] || id;
     },
   }),
@@ -88,15 +97,10 @@ jest.mock('../../../components/Refresh', () => ({
 }));
 
 jest.mock('../../../components/RetryState', () => ({
-  RetryState: ({
-    onRetry,
-    testID,
-  }: {
-    onRetry: () => void;
-    testID?: string;
-  }) => {
+  RetryState: ({onRetry, testID}: {onRetry: () => void; testID?: string}) => {
     const ReactRuntime = require('react') as typeof React;
-    const {Pressable} = require('react-native') as typeof import('react-native');
+    const {Pressable} =
+      require('react-native') as typeof import('react-native');
     return ReactRuntime.createElement(Pressable, {testID, onPress: onRetry});
   },
 }));
@@ -108,7 +112,11 @@ jest.mock('../../../components/primitives', () => ({
 
 jest.mock('../../../helpers/designTokens', () => ({
   useDesignTokens: () => ({
-    colors: {accent: '#145dcc', mediaBackground: '#eee', surfaceElevated: '#ddd'},
+    colors: {
+      accent: '#145dcc',
+      mediaBackground: '#eee',
+      surfaceElevated: '#ddd',
+    },
   }),
 }));
 
@@ -133,10 +141,15 @@ describe('CamerasList Settings navigation', () => {
   ])('uses the overview heading for %s', async (locale, title) => {
     state.locale = locale;
     render(<CamerasList componentId="cameras" componentName="CamerasList" />);
-    await waitFor(() => expect(Navigation.mergeOptions).toHaveBeenCalledWith(
-      'cameras',
-      expect.objectContaining({topBar: expect.objectContaining({title: {text: title}})}),
-    ));
+    expect(useNoServer).toHaveBeenCalledWith('cameras');
+    await waitFor(() =>
+      expect(Navigation.mergeOptions).toHaveBeenCalledWith(
+        'cameras',
+        expect.objectContaining({
+          topBar: expect.objectContaining({title: {text: title}}),
+        }),
+      ),
+    );
   });
 
   it('passes each item index and resolved column count to camera tiles', () => {
@@ -165,23 +178,22 @@ describe('CamerasList Settings navigation', () => {
     );
   });
 
-  it('opens no-server Configure as a modal and suppresses duplicate taps', async () => {
-    const showModal = Navigation.showModal as jest.Mock;
-    showModal.mockReturnValue(new Promise<void>(() => undefined));
+  it('opens no-server Configure in the guarded secondary stack', async () => {
+    mockPresentSecondaryStack.mockResolvedValue('SecondaryStackRoot');
 
     const {getByTestId} = render(
       <CamerasList componentId="cameras" componentName="CamerasList" />,
     );
-    const configure = await waitFor(() => getByTestId('cameras-list-configure'));
+    const configure = await waitFor(() =>
+      getByTestId('cameras-list-configure'),
+    );
 
     fireEvent.press(configure);
     fireEvent.press(configure);
 
-    expect(showModal).toHaveBeenCalledTimes(1);
-    expect(showModal).toHaveBeenCalledWith({
-      stack: {
-        children: [{component: {name: 'Settings'}}],
-      },
+    expect(mockPresentSecondaryStack).toHaveBeenCalledTimes(2);
+    expect(mockPresentSecondaryStack).toHaveBeenCalledWith({
+      componentName: 'Settings',
     });
   });
 
@@ -190,9 +202,7 @@ describe('CamerasList Settings navigation', () => {
       'react-native-navigation',
     ) as {Navigation: typeof Navigation};
 
-    render(
-      <CamerasList componentId="cameras" componentName="CamerasList" />,
-    );
+    render(<CamerasList componentId="cameras" componentName="CamerasList" />);
 
     await waitFor(() => {
       expect(mockedNavigation.mergeOptions).toHaveBeenCalledWith(
@@ -203,9 +213,9 @@ describe('CamerasList Settings navigation', () => {
         'EventsStack',
         {bottomTab: {text: 'Ereignisse'}},
       );
-      expect(mockedNavigation.mergeOptions).toHaveBeenCalledWith(
+      expect(mockedNavigation.mergeOptions).not.toHaveBeenCalledWith(
         'SettingsStack',
-        {bottomTab: {text: 'Einstellungen'}},
+        expect.anything(),
       );
     });
   });
@@ -242,12 +252,10 @@ describe('CamerasList Settings navigation', () => {
   it('keeps the explicit retry action when refresh fails', async () => {
     state.server = {host: 'frigate.example'};
     state.cameras = ['front-door'];
-    mockGet
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce({
-        cameras: {},
-        objects: {track: []},
-      });
+    mockGet.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
+      cameras: {},
+      objects: {track: []},
+    });
 
     const view = render(
       <CamerasList componentId="cameras" componentName="CamerasList" />,

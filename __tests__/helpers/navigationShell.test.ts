@@ -11,33 +11,37 @@ import {
 jest.mock('react-native-navigation', () => ({
   Navigation: {
     mergeOptions: jest.fn(),
-    showModal: jest.fn(),
   },
 }));
 
+const mockPresentSecondaryStack = jest.fn();
+jest.mock('../../helpers/secondaryNavigation', () => ({
+  presentSecondaryStack: (options: unknown) =>
+    mockPresentSecondaryStack(options),
+}));
+
 describe('media-first navigation shell', () => {
-  it('starts with Cameras and exposes only the three primary destinations', () => {
+  it('starts with Cameras and exposes only the two primary destinations', () => {
     const layout = createRootLayout();
     const tabs = layout.root.bottomTabs!;
 
     expect(PRIMARY_DESTINATIONS.map(destination => destination.key)).toEqual([
       'cameras',
       'events',
-      'settings',
     ]);
     expect(tabs.options?.bottomTabs?.currentTabIndex).toBe(0);
-    expect(tabs.children).toHaveLength(3);
+    expect(tabs.children).toHaveLength(2);
     expect(tabs.children?.map(child => child.stack?.id)).toEqual([
       'CamerasStack',
       'EventsStack',
-      'SettingsStack',
     ]);
     expect(PRIMARY_DESTINATIONS.map(destination => destination.icon)).toEqual([
       expect.anything(),
       expect.anything(),
-      expect.anything(),
     ]);
-    expect(tabs.children?.map(child => child.stack?.options?.bottomTab)).toEqual(
+    expect(
+      tabs.children?.map(child => child.stack?.options?.bottomTab),
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           icon: PRIMARY_DESTINATIONS[0].icon,
@@ -51,12 +55,6 @@ describe('media-first navigation shell', () => {
           iconHeight: 24,
           testID: 'destination-events',
         }),
-        expect.objectContaining({
-          icon: PRIMARY_DESTINATIONS[2].icon,
-          iconWidth: 24,
-          iconHeight: 24,
-          testID: 'destination-settings',
-        }),
       ]),
     );
     expect(tabs.children?.[0].stack?.options?.bottomTab).not.toHaveProperty(
@@ -68,9 +66,9 @@ describe('media-first navigation shell', () => {
     const layout = createRootLayout();
     const tabs = layout.root.bottomTabs!;
 
-    expect(tabs.children?.every(child => child.stack?.children?.length === 1)).toBe(
-      true,
-    );
+    expect(
+      tabs.children?.every(child => child.stack?.children?.length === 1),
+    ).toBe(true);
     expect(tabs.options?.bottomTabs?.animate).toBe(false);
     expect(tabs.options?.hardwareBackButton).toEqual({
       popStackOnPress: true,
@@ -91,7 +89,6 @@ describe('media-first navigation shell', () => {
     await updatePrimaryDestinationLabels({
       cameras: 'Kamera',
       events: 'Ereignisse',
-      settings: 'Einstellungen',
     });
 
     expect(Navigation.mergeOptions).toHaveBeenCalledWith('CamerasStack', {
@@ -100,32 +97,19 @@ describe('media-first navigation shell', () => {
     expect(Navigation.mergeOptions).toHaveBeenCalledWith('EventsStack', {
       bottomTab: {text: 'Ereignisse'},
     });
-    expect(Navigation.mergeOptions).toHaveBeenCalledWith('SettingsStack', {
-      bottomTab: {text: 'Einstellungen'},
-    });
+    expect(Navigation.mergeOptions).not.toHaveBeenCalledWith(
+      'SettingsStack',
+      expect.anything(),
+    );
   });
 
-  it('presents Settings as a guarded modal', async () => {
-    const showModal = Navigation.showModal as jest.Mock;
-    let resolvePresentation: (() => void) | undefined;
-    showModal.mockReturnValue(
-      new Promise<void>(resolve => {
-        resolvePresentation = resolve;
-      }),
-    );
+  it('presents Settings in the guarded secondary stack', async () => {
+    mockPresentSecondaryStack.mockResolvedValue('SecondaryStackRoot');
 
-    const firstPresentation = presentSettingsModal();
-    const secondPresentation = presentSettingsModal();
+    await expect(presentSettingsModal()).resolves.toBe('SecondaryStackRoot');
 
-    expect(showModal).toHaveBeenCalledTimes(1);
-    expect(showModal).toHaveBeenCalledWith({
-      stack: {
-        children: [{component: {name: 'Settings'}}],
-      },
+    expect(mockPresentSecondaryStack).toHaveBeenCalledWith({
+      componentName: 'Settings',
     });
-
-    resolvePresentation?.();
-    await firstPresentation;
-    await secondPresentation;
   });
 });

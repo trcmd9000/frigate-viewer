@@ -4,6 +4,7 @@ export const messages = makeMessages('cameraEvents', {
   'topBar.general.title': 'Events',
   'topBar.retained.title': 'Saved events',
   'topBar.specificCamera.title': 'Events of {cameraName}',
+  'topBar.back': 'Back',
   noEvents: 'No events',
   noFilteredEvents: 'No events match these filters.',
   noServer: 'Add a server to see events.',

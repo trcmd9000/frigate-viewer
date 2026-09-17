@@ -2,19 +2,25 @@ import React from 'react';
 import {act, fireEvent, render} from '@testing-library/react-native';
 import {Navigation} from 'react-native-navigation';
 import {Menu, navigateToMenuItem, retainedMenuItem, secondaryMenuSections} from '../../../views/menu/Menu';
+import {presentSecondaryStack} from '../../../helpers/secondaryNavigation';
 import {openSecondaryMenu} from '../../../views/menu/menuHelpers';
 
 let mockLocale = 'en';
 let mockGeneration = 0;
 const mockUnsubscribe = jest.fn();
+let mockStoreListener: (() => void) | undefined;
 jest.mock('../../../store/store', () => ({
   store: {
     getState: () => ({events: {scopeGeneration: mockGeneration}}),
-    subscribe: () => mockUnsubscribe,
+    subscribe: (listener: () => void) => {
+      mockStoreListener = listener;
+      return mockUnsubscribe;
+    },
   },
 }));
 const germanMenuMessages: Record<string, string> = {
   'menu.title': 'Mehr',
+  'menu.section.app': 'App',
   'menu.section.saved': 'Gespeichert',
   'menu.section.diagnostics': 'Diagnose',
   'menu.section.support': 'Support',
@@ -73,11 +79,20 @@ jest.mock('../../../helpers/secureLogger', () => ({
   },
 }));
 
+jest.mock('../../../helpers/secondaryNavigation', () => ({
+  presentSecondaryStack: jest.fn(
+    async (options: {onPresented?: (componentId: string) => void}) => {
+      options.onPresented?.('SecondaryStackRoot');
+      return 'SecondaryStackRoot';
+    },
+  ),
+}));
+
 jest.mock('react-native-navigation', () => ({
   Navigation: {
     dismissOverlay: jest.fn(() => Promise.resolve()),
+    dismissModal: jest.fn(() => Promise.resolve()),
     showOverlay: jest.fn(() => Promise.resolve()),
-    showModal: jest.fn(() => Promise.resolve()),
     events: () => ({registerModalDismissedListener: () => ({remove: jest.fn()})}),
   },
 }));
@@ -86,15 +101,17 @@ describe('secondary overflow menu', () => {
   beforeEach(() => {
     mockLocale = 'en';
     mockGeneration = 0;
+    mockStoreListener = undefined;
     jest.clearAllMocks();
   });
 
-  it('contains only reachable secondary destinations', () => {
+  it('places Settings first in an App section and keeps only reachable destinations', () => {
     const ids = secondaryMenuSections.flatMap(section =>
       section.items.map(item => item.id),
     );
 
     expect(ids).toEqual([
+      'settings',
       'retained',
       'storage',
       'system',
@@ -103,8 +120,12 @@ describe('secondary overflow menu', () => {
       'author',
     ]);
     expect(ids).not.toEqual(
-      expect.arrayContaining(['camerasList', 'cameraEvents', 'settings']),
+      expect.arrayContaining(['camerasList', 'cameraEvents']),
     );
+    expect(secondaryMenuSections[0]).toMatchObject({
+      id: 'app',
+      label: 'section.app',
+    });
   });
 
   it('exposes selected rows and 48dp accessible controls', () => {
@@ -128,6 +149,7 @@ describe('secondary overflow menu', () => {
     );
 
     expect(getByText('Mehr')).toBeTruthy();
+    expect(getByText('App')).toBeTruthy();
     expect(getByText('Gespeichert')).toBeTruthy();
     expect(getByText('Diagnose')).toBeTruthy();
     expect(getByText('Support')).toBeTruthy();
@@ -139,7 +161,7 @@ describe('secondary overflow menu', () => {
     expect(queryByText('menu.section.saved')).toBeNull();
   });
 
-  it('dismisses on outside tap and navigates secondary rows once', async () => {
+  it('dismisses on outside tap and presents secondary rows once after dismissal', async () => {
     const {getByRole, getByTestId} = render(
       <Menu componentId="menu" componentName="Menu" />,
     );
@@ -153,13 +175,14 @@ describe('secondary overflow menu', () => {
 
     await act(async () => {
       fireEvent.press(getByRole('button', {name: 'System'}));
+      fireEvent.press(getByRole('button', {name: 'System'}));
     });
-    expect(Navigation.showModal).toHaveBeenCalledWith({
-      stack: {
-        children: [
-          {component: {name: 'System', passProps: undefined}},
-        ],
-      },
+    expect(presentSecondaryStack).toHaveBeenCalledTimes(1);
+    expect(presentSecondaryStack).toHaveBeenCalledWith({
+      componentName: 'System',
+      passProps: undefined,
+      isCurrentScope: undefined,
+      onPresented: undefined,
     });
   });
 
@@ -182,22 +205,23 @@ describe('secondary overflow menu', () => {
     });
   });
 
-  it('passes the captured generation for retained events and rejects old callbacks', async () => {
+  it('uses lifecycle hooks to dismiss retained events once when their scope changes', async () => {
     const navigate = navigateToMenuItem(retainedMenuItem);
     await navigate();
-    expect(Navigation.showModal).toHaveBeenCalledWith({
-      stack: {
-        children: [
-          {component: {
-            name: 'CameraEvents',
-            passProps: {retained: true, ownerScopeGeneration: 0},
-          }},
-        ],
-      },
+    expect(presentSecondaryStack).toHaveBeenCalledWith({
+      componentName: 'CameraEvents',
+      passProps: {retained: true, ownerScopeGeneration: 0},
+      isCurrentScope: expect.any(Function),
+      onPresented: expect.any(Function),
     });
+
     mockGeneration = 1;
+    mockStoreListener?.();
+    expect(Navigation.dismissModal).toHaveBeenCalledTimes(1);
+    expect(Navigation.dismissModal).toHaveBeenCalledWith('SecondaryStackRoot');
+
     await navigate();
-    expect(Navigation.showModal).toHaveBeenCalledTimes(1);
+    expect(presentSecondaryStack).toHaveBeenCalledTimes(1);
   });
 
   it('does not navigate after a menu dismissal delayed across a scope change', async () => {
@@ -207,7 +231,7 @@ describe('secondary overflow menu', () => {
     fireEvent.press(view.getByRole('button', {name: 'Retained'}));
     mockGeneration = 1;
     await act(async () => dismiss());
-    expect(Navigation.showModal).not.toHaveBeenCalled();
+    expect(presentSecondaryStack).not.toHaveBeenCalled();
   });
 
   it('continues same-scope navigation after the menu itself unmounts', async () => {
@@ -217,15 +241,11 @@ describe('secondary overflow menu', () => {
     fireEvent.press(view.getByRole('button', {name: 'Retained'}));
     view.unmount();
     await act(async () => dismiss());
-    expect(Navigation.showModal).toHaveBeenCalledWith({
-      stack: {
-        children: [
-          {component: {
-            name: 'CameraEvents',
-            passProps: {retained: true, ownerScopeGeneration: 0},
-          }},
-        ],
-      },
+    expect(presentSecondaryStack).toHaveBeenCalledWith({
+      componentName: 'CameraEvents',
+      passProps: {retained: true, ownerScopeGeneration: 0},
+      isCurrentScope: expect.any(Function),
+      onPresented: expect.any(Function),
     });
   });
 });

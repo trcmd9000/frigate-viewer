@@ -21,6 +21,11 @@ import {useTheme, useStyles} from '../../helpers/colors';
 import {useRest} from '../../helpers/rest';
 import {RetryState} from '../../components/RetryState';
 import {handleError, getUserFriendlyMessage} from '../../helpers/errorHandler';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+  SECONDARY_ROOT_COMPONENT_ID,
+} from '../../helpers/secondaryNavigation';
 
 const LOG_TYPES = ['frigate', 'go2rtc', 'nginx'] as const;
 const PAGE_SIZE = 500;
@@ -99,6 +104,7 @@ export const Logs: NavigationFunctionComponent = ({componentId}) => {
     nginx: 0,
   });
   const inFlight = useRef<Set<LogType>>(new Set());
+  const isSecondaryRoot = componentId === SECONDARY_ROOT_COMPONENT_ID;
 
   useEffect(() => {
     getRef.current = get;
@@ -283,11 +289,28 @@ export const Logs: NavigationFunctionComponent = ({componentId}) => {
         title: {
           text: intl.formatMessage(messages['topBar.title']),
         },
-        leftButtons: [menuButton],
+        leftButtons: [
+          isSecondaryRoot
+            ? createSecondaryStackDismissButton(
+                intl.formatMessage(messages['topBar.back']),
+              )
+            : menuButton,
+        ],
         rightButtons: [refreshButton(refresh)],
       },
     });
-  }, [componentId, intl, refresh]);
+  }, [componentId, intl, isSecondaryRoot, refresh]);
+
+  useEffect(() => {
+    if (!isSecondaryRoot) {
+      return undefined;
+    }
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        handleSecondaryStackNavigationButton(event).catch(() => undefined);
+      });
+    return () => subscription.remove();
+  }, [isSecondaryRoot]);
 
   useEffect(() => {
     const timeoutId = setTimeout(refresh, 0);

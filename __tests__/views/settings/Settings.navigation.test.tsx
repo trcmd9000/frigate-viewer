@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {fireEvent, render} from '@testing-library/react-native';
 import {IntlProvider} from 'react-intl';
 import {initialSettings} from '../../../store/settings';
 import {Settings} from '../../../views/settings/Settings';
@@ -8,10 +8,24 @@ import de from '../../../i18n/de';
 
 jest.mock('react-native-navigation', () => ({
   Navigation: {
-    dismissModal: jest.fn(),
-    showModal: jest.fn().mockResolvedValue(undefined),
+    push: jest.fn().mockResolvedValue(undefined),
     mergeOptions: jest.fn(),
+    events: () => ({
+      registerNavigationButtonPressedListener: jest.fn(() => ({
+        remove: jest.fn(),
+      })),
+    }),
   },
+}));
+
+const mockHandleSecondaryButton = jest.fn().mockResolvedValue(true);
+jest.mock('../../../helpers/secondaryNavigation', () => ({
+  createSecondaryStackDismissButton: (text: string) => ({
+    id: 'dismissSecondaryStack',
+    text,
+  }),
+  handleSecondaryStackNavigationButton: (event: unknown) =>
+    mockHandleSecondaryButton(event),
 }));
 
 jest.mock('../../../store/store', () => ({
@@ -26,7 +40,11 @@ jest.mock('react-native-gesture-handler', () => ({
 jest.mock('react-native-ui-lib', () => {
   const {Pressable, Text, View} = require('react-native');
   return {
-    ActionBar: ({actions}: {actions: Array<{label: string; onPress: () => void}>}) => (
+    ActionBar: ({
+      actions,
+    }: {
+      actions: Array<{label: string; onPress: () => void}>;
+    }) => (
       <View>
         {actions.map(action => (
           <Pressable
@@ -40,8 +58,8 @@ jest.mock('react-native-ui-lib', () => {
       </View>
     ),
     Button: Object.assign(
-      ({label, onPress}: {label: string; onPress: () => void}) => (
-        <Pressable onPress={onPress}>
+      ({label, onPress, ...props}: {label: string; onPress: () => void}) => (
+        <Pressable onPress={onPress} {...props}>
           <Text>{label}</Text>
         </Pressable>
       ),
@@ -81,9 +99,16 @@ jest.mock('formik', () => ({
 }));
 
 jest.mock('../../../helpers/colors', () => ({
-  useTheme: () => ({background: '#fff', text: '#000', link: '#06c', border: '#ddd'}),
+  useTheme: () => ({
+    background: '#fff',
+    text: '#000',
+    link: '#06c',
+    border: '#ddd',
+  }),
   useStyles: (fn: (value: {theme: Record<string, string>}) => unknown) =>
-    fn({theme: {background: '#fff', text: '#000', link: '#06c', border: '#ddd'}}),
+    fn({
+      theme: {background: '#fff', text: '#000', link: '#06c', border: '#ddd'},
+    }),
 }));
 
 jest.mock('../../../helpers/secureLogger', () => ({
@@ -121,7 +146,9 @@ jest.mock('../../../components/forms/Label', () => ({
 jest.mock('../../../components/forms/Section', () => ({
   Section: ({children}: {children: React.ReactNode}) => <>{children}</>,
 }));
-jest.mock('../../../views/settings/ServerItem', () => ({ServerItem: () => null}));
+jest.mock('../../../views/settings/ServerItem', () => ({
+  ServerItem: () => null,
+}));
 jest.mock('../../../components/primitives', () => {
   const {Text} = require('react-native');
   return {
@@ -157,12 +184,13 @@ jest.mock('@ant-design/icons-react-native', () => ({
 }));
 
 describe('Settings modal navigation', () => {
-  const renderSettings = (
-    locale: string,
-    messages: Record<string, string>,
-  ) =>
+  const renderSettings = (locale: string, messages: Record<string, string>) =>
     render(
-      <IntlProvider locale={locale} messages={messages} onError={() => undefined}>
+      <IntlProvider
+        locale={locale}
+        messages={messages}
+        onError={() => undefined}
+      >
         <Settings componentId="settings" componentName="Settings" />
       </IntlProvider>,
     );
@@ -187,10 +215,7 @@ describe('Settings modal navigation', () => {
   });
 
   it('renders German headings and TalkBack labels without IDs or English fallback', () => {
-    const {getByText, getByLabelText, queryByText} = renderSettings(
-      'de',
-      de,
-    );
+    const {getByText, getByLabelText, queryByText} = renderSettings('de', de);
 
     const {Navigation} = require('react-native-navigation');
     expect(Navigation.mergeOptions).toHaveBeenCalledWith(
@@ -198,7 +223,7 @@ describe('Settings modal navigation', () => {
       expect.objectContaining({
         topBar: {
           title: {text: 'Einstellungen'},
-          leftButtons: [{id: 'menu'}],
+          leftButtons: [{id: 'dismissSecondaryStack', text: 'Zurück'}],
         },
       }),
     );
@@ -219,10 +244,7 @@ describe('Settings modal navigation', () => {
   });
 
   it('falls back to English defaults without exposing message IDs', () => {
-    const {getByText, getByLabelText, queryByText} = renderSettings(
-      'fr',
-      {},
-    );
+    const {getByText, getByLabelText, queryByText} = renderSettings('fr', {});
 
     const {Navigation} = require('react-native-navigation');
     expect(Navigation.mergeOptions).toHaveBeenCalledWith(
@@ -230,7 +252,7 @@ describe('Settings modal navigation', () => {
       expect.objectContaining({
         topBar: {
           title: {text: 'Settings'},
-          leftButtons: [{id: 'menu'}],
+          leftButtons: [{id: 'dismissSecondaryStack', text: 'Back'}],
         },
       }),
     );
@@ -246,6 +268,23 @@ describe('Settings modal navigation', () => {
     expect(
       queryByText('{seconds, plural, one {# second} other {# seconds}}'),
     ).toBeNull();
+  });
+
+  it('pushes ServerForm onto the current secondary stack', () => {
+    const {getByTestId} = renderSettings('en', {});
+
+    fireEvent.press(getByTestId('settings-add-server'));
+
+    const {Navigation} = require('react-native-navigation');
+    expect(Navigation.push).toHaveBeenCalledWith('settings', {
+      component: {
+        name: 'ServerForm',
+        passProps: {
+          stackPushed: true,
+          onSubmit: expect.any(Function),
+        },
+      },
+    });
   });
 
   it('labels a persisted nonstandard refresh interval instead of showing a raw value', () => {

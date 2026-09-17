@@ -3,6 +3,7 @@ export default {
     'Auktoriseringsfel, kontrollera dina uppgifter.',
   'api.error.unauthorized': 'Felaktiga uppgifter vid försök att nå {url}.',
   'author.topBar.title': 'Om appen',
+  'author.topBar.back': 'Tillbaka',
   'author.error.cantOpenLink':
     'Det går inte att hitta någon app för att öppna den här länken.',
   'camerasList.topBar.title': 'Lista över kameror',
@@ -50,6 +51,7 @@ export default {
   'settings.error.max': 'Maxvärdet är {max}',
   'settings.action.save': 'Spara',
   'settings.action.cancel': 'Avbryt',
+  'settings.topBar.back': 'Tillbaka',
   'settings.action.add': 'Lägg till',
   'settings.action.edit': 'Redigera',
   'settings.server.header': 'Server',
@@ -159,4 +161,9 @@ export default {
   'system.usageChart.usage': 'Användning',
   'system.usageChart.memory': 'Minne',
   'system.cameraInfoChart.usage': 'Användning',
+  'cameraEvents.topBar.back': 'Tillbaka',
+  'logs.topBar.back': 'Tillbaka',
+  'report.topBar.back': 'Tillbaka',
+  'storage.topBar.back': 'Tillbaka',
+  'system.topBar.back': 'Tillbaka',
 };

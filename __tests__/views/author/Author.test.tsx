@@ -31,18 +31,31 @@ jest.mock('../../../helpers/colors', () => ({
         link: '#05c',
       },
     }),
-    useTheme: () => ({
+  useTheme: () => ({
     text: '#111',
     textSecondary: '#555',
-    }),
+  }),
 }));
 
 jest.mock('react-native-navigation', () => ({
   Navigation: {
     mergeOptions: jest.fn(),
     updateProps: jest.fn(),
-    showModal: jest.fn(() => Promise.resolve('licenses')),
+    push: jest.fn(() => Promise.resolve('licenses')),
+    events: () => ({
+      registerNavigationButtonPressedListener: jest.fn(() => ({
+        remove: jest.fn(),
+      })),
+    }),
   },
+}));
+
+jest.mock('../../../helpers/secondaryNavigation', () => ({
+  createSecondaryStackDismissButton: (text: string) => ({
+    id: 'dismissSecondaryStack',
+    text,
+  }),
+  handleSecondaryStackNavigationButton: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('@ant-design/icons-react-native', () => ({
@@ -79,7 +92,9 @@ describe('About page', () => {
         /nicht mit dem Frigate-Projekt verbunden, wird von diesem nicht gesponsert/i,
       ),
     ).toBeTruthy();
-    expect(view.getAllByText(/sp-engineering\/frigate-viewer/i)).not.toHaveLength(0);
+    expect(
+      view.getAllByText(/sp-engineering\/frigate-viewer/i),
+    ).not.toHaveLength(0);
     expect(view.queryByText(/Kauf mir einen Kaffee/i)).toBeNull();
     expect(view.getByText('Version 18.0.8')).toBeTruthy();
     expect(view.queryByText(/trcmd9000@gmail.com/i)).toBeNull();
@@ -99,14 +114,20 @@ describe('About page', () => {
       'https://github.com/trcmd9000/frigate-viewer',
     );
 
-    fireEvent.press(
-      view.getByRole('button', {name: 'Drittanbieter-Lizenzen'}),
-    );
+    fireEvent.press(view.getByRole('button', {name: 'Drittanbieter-Lizenzen'}));
     expect(
-      require('react-native-navigation').Navigation.showModal,
-    ).toHaveBeenCalledWith({
-      stack: {
-        children: [{component: {name: 'Licenses'}}],
+      require('react-native-navigation').Navigation.push,
+    ).toHaveBeenCalledWith('about', {
+      component: {
+        name: 'Licenses',
+      },
+    });
+    expect(
+      require('react-native-navigation').Navigation.mergeOptions,
+    ).toHaveBeenCalledWith('about', {
+      topBar: {
+        title: {text: 'Über die App'},
+        leftButtons: [{id: 'dismissSecondaryStack', text: 'Zurück'}],
       },
     });
   });

@@ -4,38 +4,80 @@ import {ToastAndroid} from 'react-native';
 import {useAppSelector} from '../../store/store';
 import {messages} from './messages';
 import {selectServer} from '../../store/settings';
-import {presentSettingsModal} from '../../helpers/navigationShell';
 import {Navigation} from 'react-native-navigation';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {presentSecondaryStack} from '../../helpers/secondaryNavigation';
 
-export const useNoServer = (componentId?: string) => {
+interface NoServerPromptOwner {
+  token: symbol;
+  focused: boolean;
+  mounted: boolean;
+  promptActive: boolean;
+  suppressCurrentFocus: boolean;
+  suppressNextAppearance: boolean;
+}
+
+let activePromptOwner: symbol | undefined;
+
+export const useNoServer = (componentId: string) => {
   const server = useAppSelector(selectServer);
   const intl = useIntl();
-  const focused = useRef(true);
-  const promptInFlight = useRef(false);
-  const dismissedWhileFocused = useRef(false);
+  const ownerRef = useRef<NoServerPromptOwner>({
+    token: Symbol(componentId),
+    focused: false,
+    mounted: true,
+    promptActive: false,
+    suppressCurrentFocus: false,
+    suppressNextAppearance: false,
+  });
 
   const prompt = useCallback(() => {
+    const owner = ownerRef.current;
     if (
       server.host ||
-      !focused.current ||
-      promptInFlight.current ||
-      dismissedWhileFocused.current
+      !owner.focused ||
+      owner.promptActive ||
+      owner.suppressCurrentFocus ||
+      activePromptOwner
     ) {
       return;
     }
 
-    promptInFlight.current = true;
-    void presentSettingsModal()
+    owner.promptActive = true;
+    activePromptOwner = owner.token;
+    void presentSecondaryStack({
+      componentName: 'Settings',
+      onDismissed: () => {
+        if (activePromptOwner === owner.token) {
+          activePromptOwner = undefined;
+        }
+        owner.promptActive = false;
+        if (!owner.mounted) {
+          return;
+        }
+        if (owner.focused) {
+          owner.suppressCurrentFocus = true;
+        } else {
+          owner.suppressNextAppearance = true;
+        }
+      },
+    })
+      .then(rootComponentId => {
+        if (!rootComponentId && activePromptOwner === owner.token) {
+          activePromptOwner = undefined;
+          owner.promptActive = false;
+        }
+      })
       .catch(error => {
+        if (activePromptOwner === owner.token) {
+          activePromptOwner = undefined;
+        }
+        owner.promptActive = false;
         SecureLogger.logError(
           error instanceof Error ? error : new Error(String(error)),
           'navigation.no-server-settings',
         );
-        dismissedWhileFocused.current = true;
-      })
-      .finally(() => {
-        promptInFlight.current = false;
+        owner.suppressCurrentFocus = true;
       });
     ToastAndroid.showWithGravity(
       intl.formatMessage(messages['toast.noServerData']),
@@ -43,48 +85,63 @@ export const useNoServer = (componentId?: string) => {
       ToastAndroid.TOP,
     );
   }, [intl, server.host]);
+  const promptRef = useRef(prompt);
 
   useEffect(() => {
-    if (!componentId) {
-      prompt();
-      return undefined;
-    }
+    promptRef.current = prompt;
+  }, [prompt]);
 
+  useEffect(() => {
+    const owner = ownerRef.current;
     const listener = Navigation.events().registerComponentListener(
       {
         componentDidAppear() {
-          if (focused.current) {
+          if (owner.focused) {
             return;
           }
-          focused.current = true;
-          dismissedWhileFocused.current = false;
-          prompt();
+          owner.focused = true;
+          if (owner.suppressNextAppearance) {
+            owner.suppressNextAppearance = false;
+            owner.suppressCurrentFocus = true;
+            return;
+          }
+          owner.suppressCurrentFocus = false;
+          promptRef.current();
         },
         componentDidDisappear() {
-          focused.current = false;
+          owner.focused = false;
+          owner.suppressCurrentFocus = false;
         },
       },
       componentId,
     );
-    prompt();
-    return () => listener.remove();
-  }, [componentId, prompt]);
+    return () => {
+      owner.focused = false;
+      listener.remove();
+    };
+  }, [componentId]);
 
   useEffect(() => {
+    const owner = ownerRef.current;
     if (server.host) {
-      dismissedWhileFocused.current = false;
+      owner.suppressCurrentFocus = false;
+      owner.suppressNextAppearance = false;
+    } else {
+      prompt();
     }
-  }, [server.host]);
+  }, [prompt, server.host]);
 
-  useEffect(() => {
-    const listener = Navigation.events().registerModalDismissedListener(
-      ({componentName}) => {
-        if (componentName === 'Settings') {
-          dismissedWhileFocused.current = true;
-          promptInFlight.current = false;
+  useEffect(
+    () => {
+      const owner = ownerRef.current;
+      return () => {
+        owner.mounted = false;
+        owner.promptActive = false;
+        if (activePromptOwner === owner.token) {
+          activePromptOwner = undefined;
         }
-      },
-    );
-    return () => listener.remove();
-  }, []);
+      };
+    },
+    [],
+  );
 };

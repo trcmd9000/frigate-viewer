@@ -3,6 +3,7 @@ export default {
     'Erro de autorização, verifique suas credenciais.',
   'api.error.unauthorized': 'Credenciais incorretas ao tentar acessar {url}.',
   'author.topBar.title': 'Sobre',
+  'author.topBar.back': 'Voltar',
   'author.error.cantOpenLink':
     'Não consigo encontrar nenhum aplicativo para abrir este link.',
   'camerasList.topBar.title': 'Lista de câmeras',
@@ -50,6 +51,7 @@ export default {
   'settings.error.max': 'O valor máximo é {max}',
   'settings.action.save': 'Salvar',
   'settings.action.cancel': 'Cancelar',
+  'settings.topBar.back': 'Voltar',
   'settings.action.add': 'Adicionar',
   'settings.action.edit': 'Editar',
   'settings.server.header': 'Servidor',
@@ -159,4 +161,9 @@ export default {
   'system.usageChart.usage': 'Uso',
   'system.usageChart.memory': 'Memória',
   'system.cameraInfoChart.usage': 'Uso',
+  'cameraEvents.topBar.back': 'Voltar',
+  'logs.topBar.back': 'Voltar',
+  'report.topBar.back': 'Voltar',
+  'storage.topBar.back': 'Voltar',
+  'system.topBar.back': 'Voltar',
 };

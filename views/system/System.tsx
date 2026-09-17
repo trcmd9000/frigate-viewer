@@ -28,6 +28,11 @@ import {SectionTitle} from './SectionTitle';
 import {SystemInfo} from './SystemInfo';
 import {RetryState} from '../../components/RetryState';
 import {handleError} from '../../helpers/errorHandler';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+  SECONDARY_ROOT_COMPONENT_ID,
+} from '../../helpers/secondaryNavigation';
 
 const refreshFrequency = 30;
 
@@ -66,6 +71,7 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
   const getRef = useRef(get);
   const mounted = useRef(true);
   const requestInFlight = useRef(false);
+  const isSecondaryRoot = componentId === SECONDARY_ROOT_COMPONENT_ID;
 
   useEffect(() => {
     getRef.current = get;
@@ -123,11 +129,28 @@ export const System: NavigationFunctionComponent = ({componentId}) => {
         title: {
           text: intl.formatMessage(messages['topBar.title']),
         },
-        leftButtons: [menuButton],
+        leftButtons: [
+          isSecondaryRoot
+            ? createSecondaryStackDismissButton(
+                intl.formatMessage(messages['topBar.back']),
+              )
+            : menuButton,
+        ],
         rightButtons: [refreshButton(refresh)],
       },
     });
-  }, [componentId, intl, refresh]);
+  }, [componentId, intl, isSecondaryRoot, refresh]);
+
+  useEffect(() => {
+    if (!isSecondaryRoot) {
+      return undefined;
+    }
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        handleSecondaryStackNavigationButton(event).catch(() => undefined);
+      });
+    return () => subscription.remove();
+  }, [isSecondaryRoot]);
 
   useEffect(() => {
     if (!screenVisible) {

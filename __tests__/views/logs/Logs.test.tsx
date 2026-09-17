@@ -4,6 +4,10 @@ import {Logs} from '../../../views/logs/Logs';
 
 const mockGet = jest.fn();
 const mockMergeOptions = jest.fn();
+const mockHandleSecondaryButton = jest.fn().mockResolvedValue(true);
+let mockNavigationButtonListener:
+  | ((event: {componentId: string; buttonId: string}) => void)
+  | undefined;
 let mockServer = {profileId: 'a', host: 'frigate.test'};
 
 jest.mock('../../../helpers/rest', () => ({
@@ -17,7 +21,16 @@ jest.mock('../../../store/settings', () => ({
 }));
 jest.mock('../../../views/menu/menuHelpers', () => ({
   useMenu: jest.fn(),
-  menuButton: {},
+  menuButton: {id: 'menu'},
+}));
+jest.mock('../../../helpers/secondaryNavigation', () => ({
+  SECONDARY_ROOT_COMPONENT_ID: 'SecondaryStackRoot',
+  createSecondaryStackDismissButton: (text: string) => ({
+    id: 'dismissSecondaryStack',
+    text,
+  }),
+  handleSecondaryStackNavigationButton: (event: unknown) =>
+    mockHandleSecondaryButton(event),
 }));
 jest.mock('../../../helpers/buttonts', () => ({
   refreshButton: (onPress: () => void) => ({onPress}),
@@ -42,7 +55,17 @@ jest.mock('react-intl', () => ({
   }),
 }));
 jest.mock('react-native-navigation', () => ({
-  Navigation: {mergeOptions: (...args: unknown[]) => mockMergeOptions(...args)},
+  Navigation: {
+    mergeOptions: (...args: unknown[]) => mockMergeOptions(...args),
+    events: () => ({
+      registerNavigationButtonPressedListener: (
+        listener: (event: {componentId: string; buttonId: string}) => void,
+      ) => {
+        mockNavigationButtonListener = listener;
+        return {remove: jest.fn()};
+      },
+    }),
+  },
 }));
 jest.mock('react-native-ui-lib', () => {
   const ReactModule = require('react') as typeof React;
@@ -100,6 +123,7 @@ describe('Logs request ownership and paging', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    mockNavigationButtonListener = undefined;
     mockServer = {profileId: 'a', host: 'frigate.test'};
   });
 
@@ -194,5 +218,31 @@ describe('Logs request ownership and paging', () => {
     await act(async () => initial[0].resolve('stale\n'));
 
     expect(view.getByTestId('data-frigate').props.children).toBe('fresh-0');
+  });
+
+  it('uses and handles Back only when presented as the secondary root', () => {
+    const primary = render(
+      <Logs componentId="logs" componentName="Logs" />,
+    );
+    expect(mockMergeOptions.mock.calls.at(-1)[1].topBar.leftButtons).toEqual([
+      {id: 'menu'},
+    ]);
+    expect(mockNavigationButtonListener).toBeUndefined();
+    primary.unmount();
+
+    render(
+      <Logs componentId="SecondaryStackRoot" componentName="Logs" />,
+    );
+    expect(mockMergeOptions.mock.calls.at(-1)[1].topBar.leftButtons).toEqual([
+      {id: 'dismissSecondaryStack', text: 'Back'},
+    ]);
+    expect(mockNavigationButtonListener).toBeDefined();
+
+    const event = {
+      componentId: 'SecondaryStackRoot',
+      buttonId: 'dismissSecondaryStack',
+    };
+    act(() => mockNavigationButtonListener?.(event));
+    expect(mockHandleSecondaryButton).toHaveBeenCalledWith(event);
   });
 });

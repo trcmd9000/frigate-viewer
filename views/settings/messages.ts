@@ -3,6 +3,7 @@ import {makeMessages} from '../../helpers/locale';
 
 export const messages = makeMessages('settings', {
   'topBar.title': 'Settings',
+  'topBar.back': 'Back',
   'error.required': 'This field is required.',
   'error.min': 'Minimum value is {min}.',
   'error.max': 'Maximum value is {max}',

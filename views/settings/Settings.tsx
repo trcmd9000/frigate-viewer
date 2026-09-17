@@ -25,7 +25,10 @@ import {useAppDispatch, useAppSelector} from '../../store/store';
 import {MessageKey, messages} from './messages';
 import {ServerItem} from './ServerItem';
 import {deleteServerProfile} from './serverProfileDeletion';
-import {menuButton, useMenu} from '../menu/menuHelpers';
+import {
+  createSecondaryStackDismissButton,
+  handleSecondaryStackNavigationButton,
+} from '../../helpers/secondaryNavigation';
 
 const REGION_CODES = [
   'es_AR',
@@ -78,7 +81,6 @@ const withCurrentOption = <T extends string | number>(
     : [{value, label: labelForValue?.(value)}, ...options];
 
 export const Settings: NavigationFunctionComponent = ({componentId}) => {
-  useMenu(componentId, 'settings');
   const theme = useTheme();
   const intl = useIntl();
   const dispatch = useAppDispatch();
@@ -136,8 +138,8 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
       Array.isArray(selectedServers)
         ? selectedServers
         : Array.isArray(currentSettings?.servers)
-          ? currentSettings.servers
-          : [],
+        ? currentSettings.servers
+        : [],
     [currentSettings.servers, selectedServers],
   );
   const activeProfileId =
@@ -151,9 +153,23 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
     Navigation.mergeOptions(componentId, {
       topBar: {
         title: {text: intl.formatMessage(messages['topBar.title'])},
-        leftButtons: [menuButton],
+        leftButtons: [
+          createSecondaryStackDismissButton(
+            intl.formatMessage(messages['topBar.back']),
+          ),
+        ],
       },
     });
+    const subscription =
+      Navigation.events().registerNavigationButtonPressedListener(event => {
+        void handleSecondaryStackNavigationButton(event).catch(error => {
+          SecureLogger.logError(
+            error instanceof Error ? error : new Error(String(error)),
+            'navigation.settings-dismiss',
+          );
+        });
+      });
+    return () => subscription.remove();
   }, [componentId, intl]);
 
   const persist = useCallback(
@@ -183,13 +199,15 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
         return;
       }
       serverFormNavigationInFlight.current = true;
-      Navigation.showModal({
+      Navigation.push(componentId, {
         component: {
           name: 'ServerForm',
           passProps: {
             ...(server ? {server} : {}),
+            stackPushed: true,
             onSubmit: (submittedServer: Server) => {
-              const profileId = submittedServer.profileId || emptyServer().profileId;
+              const profileId =
+                submittedServer.profileId || emptyServer().profileId;
               const normalizedServer = {...submittedServer, profileId};
               if (server) {
                 invalidateServerSession(server);
@@ -227,7 +245,7 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
           serverFormNavigationInFlight.current = false;
         });
     },
-    [activeProfileId, currentSettings, persist, servers],
+    [activeProfileId, componentId, currentSettings, persist, servers],
   );
 
   const selectProfile = useCallback(
@@ -280,7 +298,9 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
                     showToUser: true,
                   });
                   Alert.alert(
-                    intl.formatMessage(messages['server.profile.delete.failure']),
+                    intl.formatMessage(
+                      messages['server.profile.delete.failure'],
+                    ),
                   );
                 } finally {
                   profileDeletionInFlight.current.delete(profileId);
@@ -347,7 +367,10 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
       ),
     [currentSettings.cameras.refreshFrequency, intl],
   );
-  const columnsOptions = useMemo(() => [{value: 1}, {value: 2}, {value: 3}], []);
+  const columnsOptions = useMemo(
+    () => [{value: 1}, {value: 2}, {value: 3}],
+    [],
+  );
 
   return (
     <View style={styles.wrapper}>
@@ -605,7 +628,8 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
                 messages['events.lockLandscapePlaybackOrientation.label'],
               )}
               accessibilityState={{
-                checked: currentSettings.events.lockLandscapePlaybackOrientation,
+                checked:
+                  currentSettings.events.lockLandscapePlaybackOrientation,
               }}
               onValueChange={value =>
                 updateSetting(settings => ({

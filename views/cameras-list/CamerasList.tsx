@@ -34,10 +34,8 @@ import {Refresh} from '../../components/Refresh';
 import {RetryState} from '../../components/RetryState';
 import {InlineState} from '../../components/primitives';
 import {useDesignTokens} from '../../helpers/designTokens';
-import {
-  presentSettingsModal,
-  updatePrimaryDestinationLabels,
-} from '../../helpers/navigationShell';
+import {updatePrimaryDestinationLabels} from '../../helpers/navigationShell';
+import {presentSecondaryStack} from '../../helpers/secondaryNavigation';
 import {
   gridCellGutters,
   gridCellWidth,
@@ -83,7 +81,10 @@ const CameraListSkeleton = ({
   const tokens = useDesignTokens();
   const {width: listWidth} = useWindowDimensions();
   return (
-    <View testID="cameras-list-loading" style={{flexDirection: 'row', flexWrap: 'wrap'}}>
+    <View
+      testID="cameras-list-loading"
+      style={{flexDirection: 'row', flexWrap: 'wrap'}}
+    >
       {Array.from({length: Math.max(numColumns * 2, 4)}, (_, index) => (
         <View
           key={index}
@@ -127,7 +128,9 @@ const CameraListSkeleton = ({
 
 export const CamerasList: NavigationFunctionComponent = props => {
   const generation = useAppSelector(selectServerScopeGeneration);
-  return <CamerasListContent key={generation} {...props} generation={generation} />;
+  return (
+    <CamerasListContent key={generation} {...props} generation={generation} />
+  );
 };
 
 const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
@@ -183,7 +186,8 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
     const currentRequest = ++refreshRequestId.current;
     setLoading(true);
     setError(false);
-    getRef.current<IConfigResponse>(server, 'config')
+    getRef
+      .current<IConfigResponse>(server, 'config')
       .then(config => {
         if (!isCurrentRequest(currentRequest)) {
           return;
@@ -266,7 +270,6 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
     void updatePrimaryDestinationLabels({
       cameras: intl.formatMessage(messages['tab.cameras']),
       events: intl.formatMessage(messages['tab.events']),
-      settings: intl.formatMessage(messages['tab.settings']),
     }).catch(navigationError => {
       if (isCurrentScope()) {
         handleError(navigationError, 'CamerasList.updateTabLabels');
@@ -287,11 +290,13 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
     if (!isCurrentScope()) {
       return;
     }
-    void presentSettingsModal().catch(navigationError => {
-      if (isCurrentScope()) {
-        handleError(navigationError, 'CamerasList.openSettings');
-      }
-    });
+    void presentSecondaryStack({componentName: 'Settings'}).catch(
+      navigationError => {
+        if (isCurrentScope()) {
+          handleError(navigationError, 'CamerasList.openSettings');
+        }
+      },
+    );
   }, [isCurrentScope]);
   const refreshLabel = intl.formatMessage(messages.refresh);
   const onAccessibilityAction = useCallback(

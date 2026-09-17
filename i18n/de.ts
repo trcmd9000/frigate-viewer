@@ -4,6 +4,7 @@ export default {
   'api.error.unauthorized':
     'Falsche Anmeldedaten beim Versuch, {url} zu erreichen.',
   'author.topBar.title': 'Über die App',
+  'author.topBar.back': 'Zurück',
   'author.identity': 'Frigate Viewer',
   'author.version': 'Version {version}',
   'author.projectSection': 'Projekt & Support',
@@ -186,6 +187,7 @@ export default {
   'menu.button.label': 'Mehr',
   'menu.button.refresh': 'Aktualisieren',
   'menu.button.filter': 'Filtern',
+  'menu.section.app': 'App',
   'menu.section.saved': 'Gespeichert',
   'menu.section.diagnostics': 'Diagnose',
   'menu.section.support': 'Support',
@@ -214,6 +216,7 @@ export default {
   'settings.action.save': 'Speichern',
   'settings.action.saveChanges': 'Änderungen speichern',
   'settings.action.cancel': 'Abbrechen',
+  'settings.topBar.back': 'Zurück',
   'settings.action.add': 'Hinzufügen',
   'settings.action.edit': 'Bearbeiten',
   'settings.server.header': 'Server',
@@ -461,4 +464,9 @@ export default {
   'system.usageChart.usage': 'Auslastung',
   'system.usageChart.memory': 'Speicher',
   'system.cameraInfoChart.usage': 'Auslastung',
+  'cameraEvents.topBar.back': 'Zurück',
+  'logs.topBar.back': 'Zurück',
+  'report.topBar.back': 'Zurück',
+  'storage.topBar.back': 'Zurück',
+  'system.topBar.back': 'Zurück',
 };

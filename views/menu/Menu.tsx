@@ -16,6 +16,7 @@ import {
 import {ScrollView} from 'react-native-gesture-handler';
 import {ICameraEventsProps} from '../camera-events/CameraEvents';
 import {useDesignTokens} from '../../helpers/designTokens';
+import {presentSecondaryStack} from '../../helpers/secondaryNavigation';
 import {SecureLogger} from '../../helpers/secureLogger';
 import {
   currentServerScopeGeneration,
@@ -36,7 +37,6 @@ export interface IMenuItem<P extends object = object> {
   label?: string;
   view?: string;
   passProps?: P;
-  modal?: boolean;
   disabled?: boolean;
 }
 
@@ -45,20 +45,6 @@ export interface MenuSection {
   label: MessageKey;
   items: readonly IMenuItem[];
 }
-
-// These are retained for the Settings screen, which intentionally keeps
-// secondary links reachable without opening the overflow menu first.
-export const camerasListMenuItem: IMenuItem = {
-  id: 'camerasList',
-  icon: 'video-camera',
-  view: 'CamerasList',
-};
-
-export const cameraEventsMenuItem: IMenuItem = {
-  id: 'cameraEvents',
-  icon: 'unordered-list',
-  view: 'CameraEvents',
-};
 
 export const retainedMenuItem: IMenuItem<ICameraEventsProps> = {
   id: 'retained',
@@ -91,7 +77,6 @@ export const settingsMenuItem: IMenuItem = {
   id: 'settings',
   icon: 'tool',
   view: 'Settings',
-  modal: true,
 };
 
 export const authorMenuItem: IMenuItem = {
@@ -106,11 +91,12 @@ export const reportProblemMenuItem: IMenuItem = {
   view: 'Report',
 };
 
-/**
- * The overflow is deliberately limited to destinations which are not already
- * represented by the Cameras, Events, and Settings bottom tabs.
- */
 export const secondaryMenuSections: readonly MenuSection[] = [
+  {
+    id: 'app',
+    label: 'section.app',
+    items: [settingsMenuItem],
+  },
   {
     id: 'saved',
     label: 'section.saved',
@@ -128,11 +114,9 @@ export const secondaryMenuSections: readonly MenuSection[] = [
   },
 ];
 
-const pendingNavigations = new Set<string>();
-
 export const navigateToMenuItem =
   <P extends object>(
-    {view, modal, passProps}: IMenuItem<P>,
+    {view, passProps}: IMenuItem<P>,
     ownerScopeGeneration = currentServerScopeGeneration(),
   ) =>
   (): Promise<void> => {
@@ -141,45 +125,32 @@ export const navigateToMenuItem =
       return Promise.resolve();
     }
 
-    const navigationKey = `${modal ? 'modal' : 'secondary'}:${view}`;
-    if (pendingNavigations.has(navigationKey)) {
-      return Promise.resolve();
-    }
-
-    pendingNavigations.add(navigationKey);
-    const clearPendingNavigation = () => {
-      pendingNavigations.delete(navigationKey);
-    };
     const scopedPassProps = scoped
       ? {...passProps, ownerScopeGeneration}
       : passProps;
 
     try {
       return Promise.resolve(
-        Navigation.showModal({
-          stack: {
-            children: [
-              {
-                component: {
-                  name: view,
-                  passProps: scopedPassProps,
-                },
-              },
-            ],
-          },
+        presentSecondaryStack({
+          componentName: view,
+          passProps: scopedPassProps,
+          isCurrentScope: scoped
+            ? () => isCurrentServerScope(ownerScopeGeneration)
+            : undefined,
+          onPresented: scoped
+            ? componentId =>
+                dismissModalWhenServerScopeChanges(
+                  componentId,
+                  ownerScopeGeneration,
+                )
+            : undefined,
         }),
       )
-        .then(componentId => {
-          if (view === 'CameraEvents') {
-            dismissModalWhenServerScopeChanges(componentId, ownerScopeGeneration);
-          }
-        })
-        .finally(clearPendingNavigation)
+        .then(() => undefined)
         .catch(error => {
           SecureLogger.logError(error as Error, 'navigation.show-secondary');
         });
     } catch (error) {
-      clearPendingNavigation();
       SecureLogger.logError(error as Error, 'navigation.show-secondary');
       return Promise.resolve();
     }

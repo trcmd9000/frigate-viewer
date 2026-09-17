@@ -4,6 +4,7 @@ export default {
   'api.error.unauthorized':
     "Identifiants incorrects lors de la tentative d'atteindre {url}.",
   'author.topBar.title': 'À propos',
+  'author.topBar.back': 'Retour',
   'author.error.cantOpenLink':
     'Impossible de trouver une application pour ouvrir ce lien.',
   'camerasList.topBar.title': 'Liste des caméras',
@@ -51,6 +52,7 @@ export default {
   'settings.error.max': 'La valeur maximale est {max}',
   'settings.action.save': 'Sauver',
   'settings.action.cancel': 'Annuler',
+  'settings.topBar.back': 'Retour',
   'settings.action.add': 'Ajouter',
   'settings.action.edit': 'Modifier',
   'settings.server.header': 'Serveur',
@@ -161,4 +163,9 @@ export default {
   'system.usageChart.usage': 'Utilisation',
   'system.usageChart.memory': 'Mémoire',
   'system.cameraInfoChart.usage': 'Utilisation',
+  'cameraEvents.topBar.back': 'Retour',
+  'logs.topBar.back': 'Retour',
+  'report.topBar.back': 'Retour',
+  'storage.topBar.back': 'Retour',
+  'system.topBar.back': 'Retour',
 };
