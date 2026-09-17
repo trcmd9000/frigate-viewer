@@ -3,7 +3,6 @@ import {
   Navigation,
   OptionsTopBarButton,
 } from 'react-native-navigation';
-import type {OptionsModalPresentationStyle} from 'react-native-navigation';
 import {SecureLogger} from '../../helpers/secureLogger';
 
 export type MenuId =
@@ -39,17 +38,12 @@ export const openSecondaryMenu = () => {
   pendingSecondaryMenu = true;
   try {
     void Promise.resolve(
-      Navigation.showModal({
+      Navigation.showOverlay({
         component: {
           name: 'Menu',
           options: {
-            // A transparent native modal lets the component provide a compact
-            // bottom sheet and keeps outside-tap dismissal consistent on both
-            // platforms.
-            modalPresentationStyle:
-              'overFullScreen' as OptionsModalPresentationStyle,
-            modal: {
-              swipeToDismiss: true,
+            overlay: {
+              interceptTouchOutside: true,
             },
             layout: {
               backgroundColor: 'transparent',

@@ -3,10 +3,7 @@ import {act, cleanup, fireEvent, render} from '@testing-library/react-native';
 import {configureStore} from '@reduxjs/toolkit';
 import {Provider} from 'react-redux';
 import {Navigation} from 'react-native-navigation';
-import {
-  CameraEvents,
-  getCameraEventsTopInset,
-} from '../../../views/camera-events/CameraEvents';
+import {CameraEvents} from '../../../views/camera-events/CameraEvents';
 import type {ICameraEventsProps} from '../../../views/camera-events/CameraEvents';
 import type {ICameraEvent} from '../../../views/camera-events/CameraEvent';
 import {
@@ -196,12 +193,6 @@ describe('CameraEvents server-scope requests', () => {
     fireEvent.press(view.getByTestId('unretain-saved-event'));
 
     expect(list(view).props.data).toEqual([]);
-  });
-
-  it('reserves the status-bar inset only for the saved-events view', () => {
-    expect(getCameraEventsTopInset(true, 24)).toBe(24);
-    expect(getCameraEventsTopInset(false, 24)).toBe(0);
-    expect(getCameraEventsTopInset(true, undefined)).toBe(0);
   });
 
   it('keeps B empty on failure and resets every filter before requesting B', async () => {

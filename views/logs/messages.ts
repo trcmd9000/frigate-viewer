@@ -5,4 +5,8 @@ export const messages = makeMessages('logs', {
   noLogs: 'No logs',
   error: 'Unable to load logs. Check your connection and try again.',
   retry: 'Retry loading logs',
+  loadOlder: 'Load older',
+  loadingOlder: 'Loading older logs',
+  loadOlderError: 'Older logs could not be loaded.',
+  endOfLogs: 'No older logs',
 });

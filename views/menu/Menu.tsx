@@ -30,7 +30,7 @@ interface IMenuProps {
   current?: MenuId;
 }
 
-export interface IMenuItem<P = unknown> {
+export interface IMenuItem<P extends object = object> {
   id: MenuId;
   icon: OutlineGlyphMapType;
   label?: string;
@@ -131,8 +131,8 @@ export const secondaryMenuSections: readonly MenuSection[] = [
 const pendingNavigations = new Set<string>();
 
 export const navigateToMenuItem =
-  (
-    {view, modal, passProps}: IMenuItem,
+  <P extends object>(
+    {view, modal, passProps}: IMenuItem<P>,
     ownerScopeGeneration = currentServerScopeGeneration(),
   ) =>
   (): Promise<void> => {
@@ -150,15 +150,22 @@ export const navigateToMenuItem =
     const clearPendingNavigation = () => {
       pendingNavigations.delete(navigationKey);
     };
+    const scopedPassProps = scoped
+      ? {...passProps, ownerScopeGeneration}
+      : passProps;
 
     try {
       return Promise.resolve(
         Navigation.showModal({
-          component: {
-            name: view,
-            passProps: scoped
-              ? {...(passProps as object), ownerScopeGeneration}
-              : passProps,
+          stack: {
+            children: [
+              {
+                component: {
+                  name: view,
+                  passProps: scopedPassProps,
+                },
+              },
+            ],
           },
         }),
       )
@@ -194,7 +201,7 @@ export const Menu: NavigationFunctionComponent<IMenuProps> = ({
 
     dismissalInFlight.current = true;
     try {
-      return Promise.resolve(Navigation.dismissModal(componentId))
+      return Promise.resolve(Navigation.dismissOverlay(componentId))
         .then(() => undefined)
         .finally(() => {
           dismissalInFlight.current = false;

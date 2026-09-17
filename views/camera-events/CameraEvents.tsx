@@ -3,7 +3,6 @@ import {useIntl} from 'react-intl';
 import {useStore} from 'react-redux';
 import {
   FlatList,
-  StatusBar,
   ToastAndroid,
   Text,
   useWindowDimensions,
@@ -123,20 +122,6 @@ export interface ICameraEventsProps {
   ownerScopeGeneration?: number;
 }
 
-export const getCameraEventsTopInset = (
-  retained: boolean | undefined,
-  statusBarHeight = StatusBar.currentHeight,
-): number => {
-  if (
-    !retained ||
-    typeof statusBarHeight !== 'number' ||
-    statusBarHeight <= 0
-  ) {
-    return 0;
-  }
-  return statusBarHeight;
-};
-
 export const CameraEvents: NavigationFunctionComponent<
   ICameraEventsProps
 > = props => {
@@ -198,9 +183,6 @@ const CameraEventsContent: NavigationFunctionComponent<
   const intl = useIntl();
   const {orientation, setComponentId} = useOrientation();
   const {width: listWidth, fontScale} = useWindowDimensions();
-  // Saved events are shown in a full-screen modal without a native top bar.
-  // Reserve the Android status-bar/cutout inset before rendering the first row.
-  const savedEventsTopInset = getCameraEventsTopInset(retained);
   const numColumns = responsiveGridColumns(
     listWidth,
     preferredColumns,
@@ -634,11 +616,6 @@ const CameraEventsContent: NavigationFunctionComponent<
           )
         }
         ListHeaderComponent={filterHeader}
-        contentContainerStyle={
-          savedEventsTopInset > 0
-            ? {paddingTop: savedEventsTopInset}
-            : undefined
-        }
         stickyHeaderIndices={[0]}
         ListFooterComponent={
           error && events.length > 0 ? (

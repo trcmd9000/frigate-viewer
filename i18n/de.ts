@@ -178,6 +178,10 @@ export default {
   'logs.error':
     'Protokolle konnten nicht geladen werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
   'logs.retry': 'Protokolle erneut laden',
+  'logs.loadOlder': 'Ältere laden',
+  'logs.loadingOlder': 'Ältere Protokolle werden geladen',
+  'logs.loadOlderError': 'Ältere Protokolle konnten nicht geladen werden.',
+  'logs.endOfLogs': 'Keine älteren Protokolle',
   'menu.title': 'Mehr',
   'menu.button.label': 'Mehr',
   'menu.button.refresh': 'Aktualisieren',

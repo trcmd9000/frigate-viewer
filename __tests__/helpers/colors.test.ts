@@ -61,8 +61,9 @@ describe('adaptive color scheme', () => {
   it('maps theme colors to navigation chrome', () => {
     const options = navigationThemeOptions(darkTheme, 'dark');
     expect(options.layout.backgroundColor).toBe(darkTheme.background);
-    expect(options.statusBar.backgroundColor).toBe('transparent');
+    expect(options.statusBar.backgroundColor).toBe(darkTheme.surface);
     expect(options.statusBar.style).toBe('light');
+    expect(options.statusBar.drawBehind).toBe(false);
     expect(options.topBar.background.color).toBe(darkTheme.surface);
     expect(options.topBar.title.color).toBe(darkTheme.text);
     expect(options.navigationBar.backgroundColor).toBe(darkTheme.background);
@@ -116,6 +117,9 @@ describe('adaptive color scheme', () => {
     ).toBe(false);
     expect(
       navigationThemeOptions(lightTheme, 'light').statusBar.drawBehind,
+    ).toBe(false);
+    expect(
+      navigationThemeOptions(lightTheme, 'light', 'media').statusBar.drawBehind,
     ).toBe(true);
 
     (Platform as {OS: string}).OS = originalPlatform;

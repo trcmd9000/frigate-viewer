@@ -75,7 +75,8 @@ jest.mock('../../../helpers/secureLogger', () => ({
 
 jest.mock('react-native-navigation', () => ({
   Navigation: {
-    dismissModal: jest.fn(() => Promise.resolve()),
+    dismissOverlay: jest.fn(() => Promise.resolve()),
+    showOverlay: jest.fn(() => Promise.resolve()),
     showModal: jest.fn(() => Promise.resolve()),
     events: () => ({registerModalDismissedListener: () => ({remove: jest.fn()})}),
   },
@@ -148,27 +149,34 @@ describe('secondary overflow menu', () => {
         getByTestId('secondary-menu-scrim', {includeHiddenElements: true}),
       );
     });
-    expect(Navigation.dismissModal).toHaveBeenCalledWith('menu');
+    expect(Navigation.dismissOverlay).toHaveBeenCalledWith('menu');
 
     await act(async () => {
       fireEvent.press(getByRole('button', {name: 'System'}));
     });
     expect(Navigation.showModal).toHaveBeenCalledWith({
-      component: {name: 'System', passProps: undefined},
+      stack: {
+        children: [
+          {component: {name: 'System', passProps: undefined}},
+        ],
+      },
     });
   });
 
-  it('guards repeated overflow taps while the modal is presenting', () => {
+  it('guards repeated overflow taps while the overlay is presenting', () => {
     openSecondaryMenu();
     openSecondaryMenu();
 
-    expect(Navigation.showModal).toHaveBeenCalledTimes(1);
-    expect(Navigation.showModal).toHaveBeenCalledWith({
+    expect(Navigation.showOverlay).toHaveBeenCalledTimes(1);
+    expect(Navigation.showOverlay).toHaveBeenCalledWith({
       component: {
         name: 'Menu',
         options: expect.objectContaining({
-          modalPresentationStyle: 'overFullScreen',
-          modal: {swipeToDismiss: true},
+          overlay: {interceptTouchOutside: true},
+          layout: {
+            backgroundColor: 'transparent',
+            componentBackgroundColor: 'transparent',
+          },
         }),
       },
     });
@@ -177,9 +185,16 @@ describe('secondary overflow menu', () => {
   it('passes the captured generation for retained events and rejects old callbacks', async () => {
     const navigate = navigateToMenuItem(retainedMenuItem);
     await navigate();
-    expect(Navigation.showModal).toHaveBeenCalledWith({component: {
-      name: 'CameraEvents', passProps: {retained: true, ownerScopeGeneration: 0},
-    }});
+    expect(Navigation.showModal).toHaveBeenCalledWith({
+      stack: {
+        children: [
+          {component: {
+            name: 'CameraEvents',
+            passProps: {retained: true, ownerScopeGeneration: 0},
+          }},
+        ],
+      },
+    });
     mockGeneration = 1;
     await navigate();
     expect(Navigation.showModal).toHaveBeenCalledTimes(1);
@@ -187,7 +202,7 @@ describe('secondary overflow menu', () => {
 
   it('does not navigate after a menu dismissal delayed across a scope change', async () => {
     let dismiss!: () => void;
-    (Navigation.dismissModal as jest.Mock).mockReturnValueOnce(new Promise<void>(resolve => { dismiss = resolve; }));
+    (Navigation.dismissOverlay as jest.Mock).mockReturnValueOnce(new Promise<void>(resolve => { dismiss = resolve; }));
     const view = render(<Menu componentId="menu" componentName="Menu" />);
     fireEvent.press(view.getByRole('button', {name: 'Retained'}));
     mockGeneration = 1;
@@ -197,13 +212,20 @@ describe('secondary overflow menu', () => {
 
   it('continues same-scope navigation after the menu itself unmounts', async () => {
     let dismiss!: () => void;
-    (Navigation.dismissModal as jest.Mock).mockReturnValueOnce(new Promise<void>(resolve => { dismiss = resolve; }));
+    (Navigation.dismissOverlay as jest.Mock).mockReturnValueOnce(new Promise<void>(resolve => { dismiss = resolve; }));
     const view = render(<Menu componentId="menu" componentName="Menu" />);
     fireEvent.press(view.getByRole('button', {name: 'Retained'}));
     view.unmount();
     await act(async () => dismiss());
-    expect(Navigation.showModal).toHaveBeenCalledWith({component: {
-      name: 'CameraEvents', passProps: {retained: true, ownerScopeGeneration: 0},
-    }});
+    expect(Navigation.showModal).toHaveBeenCalledWith({
+      stack: {
+        children: [
+          {component: {
+            name: 'CameraEvents',
+            passProps: {retained: true, ownerScopeGeneration: 0},
+          }},
+        ],
+      },
+    });
   });
 });

@@ -145,10 +145,11 @@ export const navigationThemeOptions = (
     componentBackgroundColor: theme.background,
   },
   statusBar: {
-    backgroundColor: 'transparent',
+    backgroundColor:
+      surface === 'app' ? theme.surface : 'transparent',
     style: scheme === 'dark' ? ('light' as const) : ('dark' as const),
     visible: Platform.OS !== 'android' || surface === 'app',
-    drawBehind: Platform.OS === 'android',
+    drawBehind: Platform.OS === 'android' && surface !== 'app',
     animate: true,
   },
   navigationBar: {
