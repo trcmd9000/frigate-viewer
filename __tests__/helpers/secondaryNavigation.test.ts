@@ -130,7 +130,7 @@ describe('secondary navigation', () => {
       );
       expect(options.statusBar).toEqual({
         visible: true,
-        drawBehind: true,
+        drawBehind: false,
         translucent: false,
         hideWithTopBar: false,
         backgroundColor: theme.surface,

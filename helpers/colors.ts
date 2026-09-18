@@ -1,4 +1,4 @@
-import {Platform, StyleSheet, useColorScheme} from 'react-native';
+import {StyleSheet, useColorScheme} from 'react-native';
 import {selectAppColorScheme} from '../store/settings';
 import {useAppSelector} from '../store/store';
 import {useMemo} from 'react';
@@ -145,21 +145,27 @@ export const navigationThemeOptions = (
 ) => {
   const mediaOptions =
     surface === 'app' ? undefined : mediaNavigationOptions(orientation);
+  const mediaSurface = surface !== 'app';
 
   return {
     layout: {
-      backgroundColor: theme.background,
-      componentBackgroundColor: theme.background,
+      backgroundColor: mediaSurface ? theme.mediaBackground : theme.background,
+      componentBackgroundColor: mediaSurface
+        ? theme.mediaBackground
+        : theme.background,
       fitSystemWindows: mediaOptions?.layout.fitSystemWindows ?? true,
-      ...(mediaOptions ? {insets: mediaOptions.layout.insets} : {}),
     },
     statusBar: {
       backgroundColor:
-        surface === 'app' ? theme.surface : theme.mediaBackground,
-      style: scheme === 'dark' ? ('light' as const) : ('dark' as const),
+        mediaSurface ? theme.mediaBackground : theme.surface,
+      style: mediaSurface
+        ? ('light' as const)
+        : scheme === 'dark'
+        ? ('light' as const)
+        : ('dark' as const),
       visible: mediaOptions?.statusBar.visible ?? true,
       drawBehind:
-        mediaOptions?.statusBar.drawBehind ?? Platform.OS === 'android',
+        mediaOptions?.statusBar.drawBehind ?? false,
       ...(mediaOptions
         ? {translucent: mediaOptions.statusBar.translucent}
         : {}),

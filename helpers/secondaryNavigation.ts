@@ -88,7 +88,7 @@ export const createSecondaryNavigationOptions = (
   },
   statusBar: {
     visible: true,
-    drawBehind: true,
+    drawBehind: false,
     translucent: false,
     hideWithTopBar: false,
     backgroundColor: theme.surface,

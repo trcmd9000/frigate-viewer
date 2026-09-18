@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.11] - 2026-09-18
+
+- Corrected Pixel portrait system-bar and safe-area handling for playback and
+  app screens.
+
 ## [18.0.10] - 2026-09-18
 
 - Reworked Problem Reporting as a manual, privacy-safe GitHub Issue draft

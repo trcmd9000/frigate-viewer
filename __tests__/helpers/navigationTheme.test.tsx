@@ -48,7 +48,7 @@ jest.mock('../../helpers/colors', () => ({
     },
     statusBar: {
       visible: surface === 'app' || orientation === 'portrait',
-      drawBehind: surface === 'app' || orientation === 'landscape',
+      drawBehind: surface !== 'app' && orientation === 'landscape',
     },
     navigationBar: {
       backgroundColor:
@@ -190,7 +190,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'settings',
       expect.objectContaining({
-        statusBar: expect.objectContaining({visible: true}),
+        statusBar: expect.objectContaining({visible: true, drawBehind: false}),
         navigationBar: {backgroundColor: '#fff', visible: true},
       }),
     );

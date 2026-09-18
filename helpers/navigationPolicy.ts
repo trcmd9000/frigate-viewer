@@ -1,24 +1,6 @@
 import {Platform} from 'react-native';
-import {Navigation} from 'react-native-navigation';
 import type {LayoutOrientation} from 'react-native-navigation';
-import {SecureLogger} from './secureLogger';
 import type {ScreenOrientation} from './screen';
-
-const statusBarHeight = (): number => {
-  if (Platform.OS !== 'android' || !Navigation.constantsSync) {
-    return 0;
-  }
-  try {
-    const value = Navigation.constantsSync().statusBarHeight;
-    return typeof value === 'number' && value > 0 ? value : 0;
-  } catch (error) {
-    SecureLogger.logError(
-      error instanceof Error ? error : new Error(String(error)),
-      'navigation-policy.status-bar',
-    );
-    return 0;
-  }
-};
 
 /**
  * Options shared by media modals and the navigation-theme bridge.
@@ -33,7 +15,6 @@ export const mediaNavigationOptions = (
 ) => {
   const portrait = orientation === 'portrait';
   const android = Platform.OS === 'android';
-  const insetTop = android && portrait ? statusBarHeight() : 0;
 
   return {
     layout: {
@@ -41,14 +22,15 @@ export const mediaNavigationOptions = (
         (lockLandscape ? 'sensorLandscape' : 'sensor') as LayoutOrientation,
       ],
       backgroundColor: '#000000',
+      componentBackgroundColor: '#000000',
       fitSystemWindows: portrait,
-      insets: {top: insetTop},
     },
     topBar: {visible: false},
     statusBar: {
       visible: !android || portrait,
       drawBehind: !android || !portrait,
       backgroundColor: '#000000',
+      style: 'light' as const,
       translucent: false,
     },
     navigationBar: {

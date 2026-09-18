@@ -26,6 +26,11 @@ const contrastRatio = (foreground: string, background: string) => {
     (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
   );
 };
+const initialPlatform = Platform.OS;
+
+afterEach(() => {
+  (Platform as {OS: string}).OS = initialPlatform;
+});
 
 describe('adaptive color scheme', () => {
   it.each([
@@ -59,13 +64,14 @@ describe('adaptive color scheme', () => {
   });
 
   it('maps theme colors to navigation chrome', () => {
+    (Platform as {OS: string}).OS = 'android';
     const options = navigationThemeOptions(darkTheme, 'dark');
     expect(options.layout.backgroundColor).toBe(darkTheme.background);
     expect(options.statusBar.backgroundColor).toBe(darkTheme.surface);
     expect(options.statusBar.style).toBe('light');
     expect(options.statusBar.drawBehind).toBe(false);
     expect(options.layout.fitSystemWindows).toBe(true);
-    expect(options.layout.insets).toBeUndefined();
+    expect(options.layout).not.toHaveProperty('insets');
     expect(options.topBar.background.color).toBe(darkTheme.surface);
     expect(options.topBar.title.color).toBe(darkTheme.text);
     expect(options.navigationBar.backgroundColor).toBe(darkTheme.background);
@@ -106,8 +112,31 @@ describe('adaptive color scheme', () => {
     ).toBe(false);
   });
 
+  it('keeps portrait media below a dark, system-owned status bar', () => {
+    (Platform as {OS: string}).OS = 'android';
+    const options = navigationThemeOptions(
+      lightTheme,
+      'light',
+      'media',
+      'portrait',
+    );
+
+    expect(options.layout.backgroundColor).toBe(lightTheme.mediaBackground);
+    expect(options.layout.componentBackgroundColor).toBe(
+      lightTheme.mediaBackground,
+    );
+    expect(options.layout).not.toHaveProperty('insets');
+    expect(options.statusBar).toEqual(
+      expect.objectContaining({
+        backgroundColor: lightTheme.mediaBackground,
+        style: 'light',
+        visible: true,
+        drawBehind: false,
+      }),
+    );
+  });
+
   it('keeps portrait playback below the status bar while hiding navigation', () => {
-    const originalPlatform = Platform.OS;
     (Platform as {OS: string}).OS = 'android';
 
     expect(
@@ -136,8 +165,6 @@ describe('adaptive color scheme', () => {
     );
     expect(
       navigationThemeOptions(lightTheme, 'light').statusBar.drawBehind,
-    ).toBe(true);
-
-    (Platform as {OS: string}).OS = originalPlatform;
+    ).toBe(false);
   });
 });

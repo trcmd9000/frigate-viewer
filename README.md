@@ -37,7 +37,7 @@ transport and camera preview fallback.
 
 ## Releases
 
-Version `18.0.10` is the next Android release candidate. It requires the
+Version `18.0.11` is the next Android release candidate. It requires the
 documented worker build, physical-device, and Play Internal Testing checks
 before public production promotion. See the
 [GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases) for
