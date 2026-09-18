@@ -187,13 +187,12 @@ export default {
   'menu.item.report.label': 'Report problem',
   'report.topBar.title': 'Report problem',
   'report.introduction.info':
-    'The report will contain some logs of how you used the application. It will not contain your authentication info.',
+    'Describe the problem below. The app will open a prefilled new issue on GitHub in your browser; it does not upload diagnostics automatically. Review the issue before submitting. Do not include credentials, server URLs, logs, or other sensitive data.',
   'report.issue.header': 'Issue',
   'report.issue.description.label': 'Describe the problem',
-  'report.action.send': 'Send',
-  'report.toast.success': 'The issue was reported successfully',
-  'report.error.crash-report-disabled':
-    'Reporting crashes is disabled. Go to settings and enable it to report an issue. It will help me to better understand the matter of the issue. You can also report it on GitHub.',
+  'report.action.send': 'Open GitHub',
+  'report.toast.error':
+    'GitHub could not be opened. Check your browser and try again.',
   'settings.topBar.title': 'Settings',
   'settings.error.required': 'This field is required.',
   'settings.error.min': 'Minimum value is {min}.',

@@ -2,19 +2,20 @@ import {useCallback, useEffect, useState} from 'react';
 import {Dimensions} from 'react-native';
 import {EventSubscription, Navigation} from 'react-native-navigation';
 
-const getOrientation = (): 'portrait' | 'landscape' => {
+export type ScreenOrientation = 'portrait' | 'landscape';
+
+export const getScreenOrientation = (): ScreenOrientation => {
   const screen = Dimensions.get('screen');
   return screen.width > screen.height ? 'landscape' : 'portrait';
 };
 
 export const useOrientation = () => {
   const [componentId, setComponentId] = useState<string>();
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
-    getOrientation,
-  );
+  const [orientation, setOrientation] =
+    useState<ScreenOrientation>(getScreenOrientation);
 
   const checkOrientation = useCallback(() => {
-    const newOrientation = getOrientation();
+    const newOrientation = getScreenOrientation();
     setOrientation(currentOrientation =>
       currentOrientation === newOrientation
         ? currentOrientation

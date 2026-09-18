@@ -16,8 +16,8 @@ decisions that future maintainers and coding agents must preserve.
   is present, but iOS mTLS and release builds are not currently supported or
   validated.
 - Current production release: `18.0.7` with Android `versionCode 30`.
-- Current Internal Testing release: `18.0.8` with Android `versionCode 33`.
-- The next release candidate is `18.0.9` with Android `versionCode 34`.
+- Current Internal Testing release: `18.0.9` with Android `versionCode 34`.
+- The next release candidate is `18.0.10` with Android `versionCode 35`.
 
 ## Public repository rules
 

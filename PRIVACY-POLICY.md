@@ -54,10 +54,13 @@ are then subject to that app's privacy practices.
 
 ## Support and external services
 
-The "Report a Problem" action opens GitHub rather than uploading diagnostics.
-Submitting an issue is optional and is governed by GitHub's privacy policy.
+The "Report a Problem" action opens a prefilled GitHub issue in the device
+browser rather than uploading diagnostics. The user can review or discard the
+draft before submitting; submitting an issue is optional and is governed by
+GitHub's privacy policy.
 Public issues must not contain credentials, tokens, certificates, private keys,
-private server addresses, camera images, or other sensitive information.
+private server URLs or addresses, logs, camera images, or other sensitive
+information.
 
 Links opened from the app or documentation are governed by the destination
 website's privacy policy.

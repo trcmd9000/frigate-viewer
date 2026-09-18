@@ -1,7 +1,7 @@
 import React from 'react';
 import {act, fireEvent, render} from '@testing-library/react-native';
 import {Navigation} from 'react-native-navigation';
-import {Pressable} from 'react-native';
+import {Platform, Pressable} from 'react-native';
 import {CameraTile} from '../../../views/cameras-list/CameraTile';
 
 const state = {
@@ -88,13 +88,21 @@ jest.mock('../../../helpers/secureLogger', () => ({
 }));
 
 describe('CameraTile native navigation', () => {
+  const originalPlatform = Platform.OS;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    (Platform as {OS: string}).OS = 'android';
     state.scopeGeneration = 0;
     state.actionWhenPressed = 'preview';
+    state.lockLandscape = false;
     (Navigation.showModal as jest.Mock).mockReturnValue(
       new Promise<void>(() => undefined),
     );
+  });
+
+  afterEach(() => {
+    (Platform as {OS: string}).OS = originalPlatform;
   });
 
   it('navigates from the card container and ignores duplicate presses in flight', async () => {
@@ -132,9 +140,15 @@ describe('CameraTile native navigation', () => {
           name: 'CameraPreview',
           passProps: {cameraName: 'lumus_pro', ownerScopeGeneration: 0},
           options: expect.objectContaining({
-            layout: expect.objectContaining({backgroundColor: '#000000'}),
+            layout: expect.objectContaining({
+              backgroundColor: '#000000',
+              fitSystemWindows: true,
+            }),
             topBar: {visible: false},
-            statusBar: {visible: false},
+            statusBar: expect.objectContaining({
+              visible: true,
+              drawBehind: false,
+            }),
             navigationBar: {visible: false, backgroundColor: '#000000'},
           }),
         }),
@@ -158,6 +172,35 @@ describe('CameraTile native navigation', () => {
 
     expect(Navigation.showModal).toHaveBeenCalledTimes(1);
     expect(Navigation.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the landscape lock immersive during the portrait-to-landscape request', async () => {
+    state.lockLandscape = true;
+    const {getByTestId} = render(
+      <CameraTile cameraName="locked-camera" active={false} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('camera-card-locked-camera'));
+    });
+
+    expect(Navigation.showModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        component: expect.objectContaining({
+          options: expect.objectContaining({
+            layout: expect.objectContaining({
+              orientation: ['sensorLandscape'],
+              fitSystemWindows: true,
+            }),
+            statusBar: expect.objectContaining({
+              visible: true,
+              drawBehind: false,
+            }),
+            navigationBar: {visible: false, backgroundColor: '#000000'},
+          }),
+        }),
+      }),
+    );
   });
 
   it('rejects old presses and queued navigation using the live generation', async () => {

@@ -202,13 +202,12 @@ export default {
   'menu.item.report.label': 'Problem melden',
   'report.topBar.title': 'Problem melden',
   'report.introduction.info':
-    'Der Bericht wird einige Protokolle darüber enthalten, wie Sie die Anwendung genutzt haben. Er wird keine Authentifizierungsinformationen enthalten.',
+    'Beschreiben Sie das Problem unten. Die App öffnet in Ihrem Browser ein vorausgefülltes neues GitHub-Issue; Diagnosedaten werden nicht automatisch hochgeladen. Prüfen Sie das Issue vor dem Absenden. Fügen Sie keine Anmeldedaten, Server-URLs, Protokolle oder andere vertrauliche Daten ein.',
   'report.issue.header': 'Problem',
   'report.issue.description.label': 'Beschreiben Sie das Problem',
-  'report.action.send': 'Senden',
-  'report.toast.success': 'Das Problem wurde erfolgreich gemeldet',
-  'report.error.crash-report-disabled':
-    'Das Melden von Abstürzen ist deaktiviert. Gehen Sie zu den Einstellungen und aktivieren Sie es, um ein Problem zu melden. Es wird mir helfen, das Problem besser zu verstehen. Sie können es auch auf GitHub melden.',
+  'report.action.send': 'GitHub öffnen',
+  'report.toast.error':
+    'GitHub konnte nicht geöffnet werden. Überprüfen Sie Ihren Browser und versuchen Sie es erneut.',
   'settings.topBar.title': 'Einstellungen',
   'settings.error.required': 'Dieses Feld muss ausgefüllt sein.',
   'settings.error.min': 'Der Mindestwert ist {min}.',

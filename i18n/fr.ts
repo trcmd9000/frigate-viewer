@@ -39,13 +39,12 @@ export default {
   'menu.item.report.label': 'Signaler un problème',
   'report.topBar.title': 'Signaler un problème',
   'report.introduction.info':
-    "Le rapport contiendra certains journaux de la manière dont vous avez utilisé l'application. Il ne contiendra pas vos informations d'authentification.",
+    'Décrivez le problème ci-dessous. L’application ouvrira dans votre navigateur une nouvelle issue GitHub préremplie ; aucun diagnostic n’est téléversé automatiquement. Vérifiez l’issue avant de l’envoyer. N’incluez pas d’identifiants, d’URL de serveur, de journaux ni d’autres données sensibles.',
   'report.issue.header': 'Problème',
   'report.issue.description.label': 'Décrire le problème',
-  'report.action.send': 'Envoyer',
-  'report.toast.success': 'Le problème a été signalé avec succès',
-  'report.error.crash-report-disabled':
-    "Le rapport d’erreurs est désactivé. Allez dans les paramètres et activez-le pour signaler un problème. Cela m'aidera à mieux comprendre la nature du problème. Vous pouvez également le signaler sur GitHub.",
+  'report.action.send': 'Ouvrir GitHub',
+  'report.toast.error':
+    'GitHub n’a pas pu être ouvert. Vérifiez votre navigateur et réessayez.',
   'settings.topBar.title': 'Paramètres',
   'settings.error.required': 'Ce champ est obligatoire.',
   'settings.error.min': 'La valeur minimale est {min}.',

@@ -39,13 +39,12 @@ export default {
   'menu.item.report.label': 'Zgłoś problem',
   'report.topBar.title': 'Zgłoś problem',
   'report.introduction.info':
-    'Zgłoszenie będzie zawierało pewne logi dotyczące tego, jak korzystałeś z aplikacji. Nie będzie zawierał informacji uwierzytelniających.',
+    'Opisz problem poniżej. Aplikacja otworzy w przeglądarce wstępnie wypełnione nowe zgłoszenie GitHub; dane diagnostyczne nie są automatycznie przesyłane. Sprawdź zgłoszenie przed wysłaniem. Nie dodawaj danych logowania, adresów URL serwera, dzienników ani innych poufnych danych.',
   'report.issue.header': 'Problem',
   'report.issue.description.label': 'Opisz problem',
-  'report.action.send': 'Wyślij',
-  'report.toast.success': 'Problem został zgłoszony pomyślnie',
-  'report.error.crash-report-disabled':
-    'Zgłaszanie awarii jest wyłączone. Przejdź do ustawień i włącz to, aby zgłosić problem. Pomoże mi to lepiej zrozumieć naturę problemu. Możesz również zgłosić to na GitHubie.',
+  'report.action.send': 'Otwórz GitHub',
+  'report.toast.error':
+    'Nie można otworzyć GitHub. Sprawdź przeglądarkę i spróbuj ponownie.',
   'settings.topBar.title': 'Ustawienia',
   'settings.error.required': 'To pole jest wymagane.',
   'settings.error.min': 'Minimalną wartością jest {min}.',

@@ -42,6 +42,8 @@ import {
   gridCellGutters,
   gridCellWidth,
 } from '../../helpers/gridLayout';
+import {getScreenOrientation} from '../../helpers/screen';
+import {mediaNavigationOptions} from '../../helpers/navigationPolicy';
 
 type CameraTileProps = PropsWithChildren<{
   /** Retained for callers while card navigation is modal-only. */
@@ -264,17 +266,10 @@ export const CameraTile: FC<CameraTileProps> = ({
         component: {
           name: 'CameraPreview',
           passProps: {cameraName, ownerScopeGeneration: generation},
-          options: {
-            layout: {
-              orientation: [
-                lockLandscapePlaybackOrientation ? 'sensorLandscape' : 'sensor',
-              ],
-              backgroundColor: '#000000',
-            },
-            topBar: {visible: false},
-            statusBar: {visible: false},
-            navigationBar: {visible: false, backgroundColor: '#000000'},
-          },
+          options: mediaNavigationOptions(
+            getScreenOrientation(),
+            lockLandscapePlaybackOrientation,
+          ),
         },
       });
     })

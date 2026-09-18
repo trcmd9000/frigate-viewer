@@ -2,6 +2,8 @@ import {Platform, StyleSheet, useColorScheme} from 'react-native';
 import {selectAppColorScheme} from '../store/settings';
 import {useAppSelector} from '../store/store';
 import {useMemo} from 'react';
+import {getScreenOrientation, ScreenOrientation} from './screen';
+import {mediaNavigationOptions} from './navigationPolicy';
 
 export type ColorScheme = 'light' | 'dark';
 export type NavigationSurface = 'app' | 'media' | 'event';
@@ -139,51 +141,62 @@ export const navigationThemeOptions = (
   theme: Theme,
   scheme: ColorScheme,
   surface: NavigationSurface = 'app',
-) => ({
-  layout: {
-    backgroundColor: theme.background,
-    componentBackgroundColor: theme.background,
-    fitSystemWindows: surface === 'app',
-  },
-  statusBar: {
-    backgroundColor:
-      surface === 'app' ? theme.surface : 'transparent',
-    style: scheme === 'dark' ? ('light' as const) : ('dark' as const),
-    visible: Platform.OS !== 'android' || surface === 'app',
-    drawBehind: Platform.OS === 'android',
-    animate: true,
-  },
-  navigationBar: {
-    backgroundColor:
-      surface === 'app' ? theme.background : theme.mediaBackground,
-    visible: surface === 'app',
-  },
-  bottomTabs: {
-    backgroundColor: theme.surface,
-    borderColor: theme.divider,
-    titleDisplayMode: 'alwaysShow' as const,
-  },
-  bottomTab: {
-    textColor: theme.textSecondary,
-    selectedTextColor: theme.link,
-    iconColor: theme.textSecondary,
-    selectedIconColor: theme.link,
-    fontSize: 12,
-    selectedFontSize: 12,
-    fontWeight: '600' as const,
-  },
-  topBar: {
-    background: {
-      color: theme.surface,
+  orientation: ScreenOrientation = getScreenOrientation(),
+) => {
+  const mediaOptions =
+    surface === 'app' ? undefined : mediaNavigationOptions(orientation);
+
+  return {
+    layout: {
+      backgroundColor: theme.background,
+      componentBackgroundColor: theme.background,
+      fitSystemWindows: mediaOptions?.layout.fitSystemWindows ?? true,
+      ...(mediaOptions ? {insets: mediaOptions.layout.insets} : {}),
     },
-    title: {
-      color: theme.text,
+    statusBar: {
+      backgroundColor:
+        surface === 'app' ? theme.surface : theme.mediaBackground,
+      style: scheme === 'dark' ? ('light' as const) : ('dark' as const),
+      visible: mediaOptions?.statusBar.visible ?? true,
+      drawBehind:
+        mediaOptions?.statusBar.drawBehind ?? Platform.OS === 'android',
+      ...(mediaOptions
+        ? {translucent: mediaOptions.statusBar.translucent}
+        : {}),
+      animate: true,
     },
-    backButton: {
-      color: theme.text,
+    navigationBar: {
+      backgroundColor:
+        surface === 'app' ? theme.background : theme.mediaBackground,
+      visible: surface === 'app',
     },
-  },
-});
+    bottomTabs: {
+      backgroundColor: theme.surface,
+      borderColor: theme.divider,
+      titleDisplayMode: 'alwaysShow' as const,
+    },
+    bottomTab: {
+      textColor: theme.textSecondary,
+      selectedTextColor: theme.link,
+      iconColor: theme.textSecondary,
+      selectedIconColor: theme.link,
+      fontSize: 12,
+      selectedFontSize: 12,
+      fontWeight: '600' as const,
+    },
+    topBar: {
+      background: {
+        color: theme.surface,
+      },
+      title: {
+        color: theme.text,
+      },
+      backButton: {
+        color: theme.text,
+      },
+    },
+  };
+};
 
 export const useStyles = <T>(
   styles: (helpers: {theme: Theme}) => StyleSheet.NamedStyles<T>,

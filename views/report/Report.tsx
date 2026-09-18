@@ -24,10 +24,32 @@ interface Problem {
   };
 }
 
-const initialValues = {
+const initialValues: Problem = {
   issue: {
     description: '',
   },
+};
+
+const GITHUB_NEW_ISSUE_URL =
+  'https://github.com/trcmd9000/frigate-viewer/issues/new';
+
+export const buildGitHubIssueUrl = (description: string) =>
+  `${GITHUB_NEW_ISSUE_URL}?body=${encodeURIComponent(description)}`;
+
+export const openGitHubIssue = async (
+  description: string,
+  onSuccess: () => void,
+  onFailure: () => void,
+) => {
+  try {
+    await Linking.openURL(buildGitHubIssueUrl(description));
+  } catch (error) {
+    await handleError(error, 'Report.openGitHub');
+    onFailure();
+    return;
+  }
+
+  onSuccess();
 };
 
 export const Report: NavigationFunctionComponent = ({componentId}) => {
@@ -44,12 +66,6 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
       backgroundColor: theme.background,
     },
     p: {
-      color: theme.text,
-    },
-    demoServerButton: {
-      color: theme.link,
-    },
-    tip: {
       color: theme.text,
     },
   }));
@@ -91,19 +107,15 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
 
   const send = async (problem: Problem) => {
     Keyboard.dismiss();
-    const body = encodeURIComponent(problem.issue.description);
-    try {
-      await Linking.openURL(
-        `https://github.com/trcmd9000/frigate-viewer/issues/new?body=${body}`,
-      );
-      formRef.current?.resetForm();
-    } catch (error) {
-      await handleError(error, 'Report.openGitHub');
-      ToastAndroid.show(
-        intl.formatMessage(messages['toast.error']),
-        ToastAndroid.LONG,
-      );
-    }
+    await openGitHubIssue(
+      problem.issue.description,
+      () => formRef.current?.resetForm(),
+      () =>
+        ToastAndroid.show(
+          intl.formatMessage(messages['toast.error']),
+          ToastAndroid.LONG,
+        ),
+    );
   };
 
   const actions = useMemo(() => {

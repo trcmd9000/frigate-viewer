@@ -167,8 +167,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     const screen = Dimensions.get('screen');
     const verticalSystemInset = Math.max(0, screen.height - windowHeight);
     const horizontalSystemInset = Math.max(0, screen.width - windowWidth);
+    const landscape = screen.width > screen.height;
     return {
-      top: Math.max(0, statusBarHeight),
+      top: landscape ? Math.max(0, statusBarHeight) : 0,
       bottom: Math.max(0, verticalSystemInset - statusBarHeight),
       left: horizontalSystemInset,
       right: horizontalSystemInset,

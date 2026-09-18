@@ -7,6 +7,7 @@ import {
   useTheme,
   navigationThemeOptions,
 } from './colors';
+import {useOrientation} from './screen';
 
 const MEDIA_COMPONENT_NAMES = new Set(['CameraEventClip', 'CameraPreview']);
 const activeMediaComponentIds = new Set<string>();
@@ -34,12 +35,15 @@ export const withNavigationTheme =
     const theme = useTheme();
     const scheme = useAppColorScheme();
     const surface = navigationSurfaceForComponent(props.componentName);
+    const {orientation} = useOrientation();
     const [screenVisible, setScreenVisible] = useState(false);
     const screenVisibleRef = useRef(false);
     const themeRef = useRef(theme);
     const schemeRef = useRef(scheme);
+    const orientationRef = useRef(orientation);
     themeRef.current = theme;
     schemeRef.current = scheme;
+    orientationRef.current = orientation;
 
     const mergeOptions = useCallback(
       (
@@ -52,6 +56,7 @@ export const withNavigationTheme =
             themeRef.current,
             schemeRef.current,
             surfaceToApply,
+            orientationRef.current,
           ),
         );
       },
@@ -162,6 +167,7 @@ export const withNavigationTheme =
       surface,
       screenVisible,
       theme,
+      orientation,
     ]);
 
     return React.createElement(component, props);

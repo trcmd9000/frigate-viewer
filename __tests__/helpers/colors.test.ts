@@ -65,6 +65,7 @@ describe('adaptive color scheme', () => {
     expect(options.statusBar.style).toBe('light');
     expect(options.statusBar.drawBehind).toBe(false);
     expect(options.layout.fitSystemWindows).toBe(true);
+    expect(options.layout.insets).toBeUndefined();
     expect(options.topBar.background.color).toBe(darkTheme.surface);
     expect(options.topBar.title.color).toBe(darkTheme.text);
     expect(options.navigationBar.backgroundColor).toBe(darkTheme.background);
@@ -96,31 +97,45 @@ describe('adaptive color scheme', () => {
     theme,
   ) => {
     expect(
-      navigationThemeOptions(theme, scheme, 'media').navigationBar.backgroundColor,
+      navigationThemeOptions(theme, scheme, 'media', 'landscape').navigationBar
+        .backgroundColor,
     ).toBe(theme.mediaBackground);
     expect(
-      navigationThemeOptions(theme, scheme, 'media').navigationBar.visible,
+      navigationThemeOptions(theme, scheme, 'media', 'landscape').navigationBar
+        .visible,
     ).toBe(false);
   });
 
-  it('hides status and navigation bars for playback surfaces on Android', () => {
+  it('keeps portrait playback below the status bar while hiding navigation', () => {
     const originalPlatform = Platform.OS;
     (Platform as {OS: string}).OS = 'android';
 
     expect(
-      navigationThemeOptions(lightTheme, 'light', 'event').statusBar.visible,
-    ).toBe(false);
+      navigationThemeOptions(lightTheme, 'light', 'event', 'portrait'),
+    ).toEqual(
+      expect.objectContaining({
+        layout: expect.objectContaining({fitSystemWindows: true}),
+        statusBar: expect.objectContaining({
+          visible: true,
+          drawBehind: false,
+        }),
+        navigationBar: {backgroundColor: lightTheme.mediaBackground, visible: false},
+      }),
+    );
     expect(
-      navigationThemeOptions(lightTheme, 'light', 'event').navigationBar.visible,
-    ).toBe(false);
-    expect(
-      navigationThemeOptions(lightTheme, 'light', 'media').statusBar.visible,
-    ).toBe(false);
+      navigationThemeOptions(lightTheme, 'light', 'event', 'landscape'),
+    ).toEqual(
+      expect.objectContaining({
+        layout: expect.objectContaining({fitSystemWindows: false}),
+        statusBar: expect.objectContaining({
+          visible: false,
+          drawBehind: true,
+        }),
+        navigationBar: {backgroundColor: lightTheme.mediaBackground, visible: false},
+      }),
+    );
     expect(
       navigationThemeOptions(lightTheme, 'light').statusBar.drawBehind,
-    ).toBe(true);
-    expect(
-      navigationThemeOptions(lightTheme, 'light', 'media').statusBar.drawBehind,
     ).toBe(true);
 
     (Platform as {OS: string}).OS = originalPlatform;

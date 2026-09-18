@@ -1,5 +1,6 @@
 import React from 'react';
 import {act, cleanup, fireEvent, render} from '@testing-library/react-native';
+import {Platform} from 'react-native';
 import {configureStore} from '@reduxjs/toolkit';
 import {Provider} from 'react-redux';
 import {Navigation} from 'react-native-navigation';
@@ -23,6 +24,7 @@ const mockGet = jest.fn();
 const mockSetComponentId = jest.fn();
 const mockTileMount = jest.fn();
 const mockTileUnmount = jest.fn();
+let mockOrientation: 'portrait' | 'landscape' = 'portrait';
 const mockHandleSecondaryButton = jest.fn().mockResolvedValue(true);
 let mockNavigationButtonListener:
   | ((event: {componentId: string; buttonId: string}) => void)
@@ -75,7 +77,7 @@ jest.mock('../../../components/RetryState', () => ({
   },
 }));
 jest.mock('../../../helpers/screen', () => ({
-  useOrientation: () => ({orientation: 'portrait', setComponentId: mockSetComponentId}),
+  useOrientation: () => ({orientation: mockOrientation, setComponentId: mockSetComponentId}),
 }));
 jest.mock('../../../helpers/designTokens', () => ({useDesignTokens: () => ({
   colors: {surfaceElevated: '#eee', mediaBackground: '#000', outline: '#ccc'},
@@ -156,8 +158,12 @@ const refresh = (view: Screen) => act(() => list(view).props.refreshControl.prop
 const loadMore = (view: Screen) => act(() => list(view).props.onEndReached());
 
 describe('CameraEvents server-scope requests', () => {
+  const originalPlatform = Platform.OS;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    (Platform as {OS: string}).OS = originalPlatform;
+    mockOrientation = 'portrait';
     mockNavigationButtonListener = undefined;
     requests = [];
     frames = [];
@@ -172,6 +178,40 @@ describe('CameraEvents server-scope requests', () => {
     });
   });
   afterEach(() => { cleanup(); jest.restoreAllMocks(); });
+
+  it.each([
+    ['portrait', true, false],
+    ['landscape', false, true],
+  ] as const)(
+    'seeds %s media chrome before the clip first frame',
+    async (orientation, statusBarVisible, statusBarDrawBehind) => {
+      (Platform as {OS: string}).OS = 'android';
+      mockOrientation = orientation;
+      const view = mount(makeStore());
+      const modal = deferred<string>();
+      jest.mocked(Navigation.showModal).mockReturnValue(modal.promise);
+      await settle(() => requests[0].resolve([event()]));
+      fireEvent.press(view.getByTestId('clip-shared'));
+      act(() => { frames[0](0); });
+
+      expect(Navigation.showModal).toHaveBeenCalledWith(expect.objectContaining({
+        component: expect.objectContaining({
+          options: expect.objectContaining({
+            layout: expect.objectContaining({
+              fitSystemWindows: orientation === 'portrait',
+            }),
+            statusBar: expect.objectContaining({
+              visible: statusBarVisible,
+              drawBehind: statusBarDrawBehind,
+            }),
+            navigationBar: {visible: false, backgroundColor: '#000000'},
+          }),
+        }),
+      }));
+      modal.resolve('clip-modal');
+      view.unmount();
+    },
+  );
 
   it('keeps the Events-tab Burger but gives retained secondary roots Back', () => {
     const primary = mount(makeStore());

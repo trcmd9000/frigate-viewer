@@ -37,7 +37,7 @@ transport and camera preview fallback.
 
 ## Releases
 
-Version `18.0.9` is the next Android release candidate. It requires the
+Version `18.0.10` is the next Android release candidate. It requires the
 documented worker build, physical-device, and Play Internal Testing checks
 before public production promotion. See the
 [GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases) for
@@ -49,8 +49,14 @@ The app does not include analytics, advertising, Firebase, or automatic crash
 reporting. It communicates directly with the servers configured by the user.
 See the [Privacy Policy](./PRIVACY-POLICY.md) for details.
 
-Never include credentials, access tokens, certificates, private keys, server
-addresses, or diagnostic data in a public issue.
+## Reporting problems
+
+The **Report problem** screen only opens a prefilled GitHub issue in the
+device's browser after you choose **Open GitHub**. The app does not upload the
+description, diagnostics, logs, or server data to a maintainer-operated
+service. Review the issue before submitting it and remove credentials, access
+tokens, certificates, private keys, server URLs or addresses, logs, camera
+images, and other sensitive data.
 
 ## Platform status
 
@@ -67,6 +73,7 @@ addresses, or diagnostic data in a public issue.
 
 Report reproducible problems through
 [GitHub Issues](https://github.com/trcmd9000/frigate-viewer/issues), after
-removing all sensitive data.
+removing all sensitive data. GitHub applies its own privacy policy when an
+issue is submitted.
 
 This project is not affiliated with the official Frigate NVR project.

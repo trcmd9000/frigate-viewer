@@ -38,13 +38,12 @@ export default {
   'menu.item.report.label': 'Reportar problema',
   'report.topBar.title': 'Reportar problema',
   'report.introduction.info':
-    'O relatório conterá alguns logs de como você utilizou o aplicativo. Ele não conterá suas informações de autenticação.',
+    'Descreva o problema abaixo. A aplicação abrirá no navegador uma nova issue do GitHub preenchida previamente; nenhum diagnóstico é carregado automaticamente. Reveja a issue antes de a enviar. Não inclua credenciais, URLs de servidores, registos ou outros dados sensíveis.',
   'report.issue.header': 'Problema',
   'report.issue.description.label': 'Descreva o problema',
-  'report.action.send': 'Enviar',
-  'report.toast.success': 'O problema foi reportado com sucesso',
-  'report.error.crash-report-disabled':
-    'O relatório de falhas está desativado. Vá para as configurações e ative-o para reportar um problema. Isso me ajudará a entender melhor a questão. Você também pode reportá-lo no GitHub.',
+  'report.action.send': 'Abrir GitHub',
+  'report.toast.error':
+    'Não foi possível abrir o GitHub. Verifique o navegador e tente novamente.',
   'settings.topBar.title': 'Configurações',
   'settings.error.required': 'Este campo é obrigatório.',
   'settings.error.min': 'O valor mínimo é {min}.',

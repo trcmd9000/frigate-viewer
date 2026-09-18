@@ -52,6 +52,7 @@ import {
   handleSecondaryStackNavigationButton,
   SECONDARY_ROOT_COMPONENT_ID,
 } from '../../helpers/secondaryNavigation';
+import {mediaNavigationOptions} from '../../helpers/navigationPolicy';
 
 const EventListSkeleton: FC<{
   label: string;
@@ -554,19 +555,10 @@ const CameraEventsContent: NavigationFunctionComponent<
               onRetainedChange: (nextRetained: boolean) =>
                 onRetainedChange(event.id, nextRetained),
             },
-            options: {
-              layout: {
-                orientation: [
-                  lockLandscapePlaybackOrientation
-                    ? 'sensorLandscape'
-                    : 'sensor',
-                ],
-                backgroundColor: '#000000',
-              },
-              topBar: {visible: false},
-              statusBar: {visible: false},
-              navigationBar: {visible: false, backgroundColor: '#000000'},
-            },
+            options: mediaNavigationOptions(
+              orientation,
+              lockLandscapePlaybackOrientation,
+            ),
           },
         })
           .then(componentId => {

@@ -118,4 +118,6 @@ KeyChain.
 For support, open a
 [GitHub issue](https://github.com/trcmd9000/frigate-viewer/issues) containing
 only sanitized reproduction steps, Android/app versions, and non-sensitive
-error text.
+error text. Do not include credentials, private server URLs or addresses,
+certificates, private keys, logs, or camera data. The app's Report problem
+screen opens a prefilled draft in the browser; review it before submitting.

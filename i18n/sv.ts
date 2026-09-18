@@ -38,13 +38,12 @@ export default {
   'menu.item.report.label': 'Rapportera problem',
   'report.topBar.title': 'Rapportera problem',
   'report.introduction.info':
-    'Rapporten kommer att innehålla vissa loggar om hur du använde applikationen. Den kommer inte att innehålla din autentiseringsinformation.',
+    'Beskriv problemet nedan. Appen öppnar ett förifyllt nytt GitHub-ärende i webbläsaren; inga diagnostikuppgifter laddas upp automatiskt. Granska ärendet innan du skickar det. Ta inte med inloggningsuppgifter, server-URL:er, loggar eller andra känsliga uppgifter.',
   'report.issue.header': 'Problem',
   'report.issue.description.label': 'Beskriv problemet',
-  'report.action.send': 'Skicka',
-  'report.toast.success': 'Problemet har rapporterats framgångsrikt',
-  'report.error.crash-report-disabled':
-    'Rapportering av krascher är inaktiverat. Gå till inställningarna och aktivera det för att rapportera ett problem. Det hjälper mig att bättre förstå problemet. Du kan också rapportera det på GitHub.',
+  'report.action.send': 'Öppna GitHub',
+  'report.toast.error':
+    'GitHub kunde inte öppnas. Kontrollera webbläsaren och försök igen.',
   'settings.topBar.title': 'Inställningar',
   'settings.error.required': 'Det här fältet är obligatoriskt.',
   'settings.error.min': 'Minimivärdet är {min}.',

@@ -324,7 +324,7 @@ describe('CameraEventClip protected playback state', () => {
     );
     expect(close.props.accessibilityLabel).toBe('Close player');
     expect(view.getByTestId('event-player-tools').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({top: 24})]),
+      expect.arrayContaining([expect.objectContaining({top: 0})]),
     );
     fireEvent.press(close);
     expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');

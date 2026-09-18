@@ -17,6 +17,7 @@ const mockMergeOptions = jest.fn();
 const mockRemoveListener = jest.fn();
 let mockCurrentTheme = {background: '#fff', mediaBackground: '#000'};
 let mockCurrentScheme: 'light' | 'dark' = 'light';
+let mockOrientation: 'portrait' | 'landscape' = 'landscape';
 
 jest.mock('react-native-navigation', () => ({
   Navigation: {
@@ -40,9 +41,14 @@ jest.mock('../../helpers/colors', () => ({
     theme: typeof mockCurrentTheme,
     _scheme: typeof mockCurrentScheme,
     surface: 'app' | 'media' | 'event' = 'app',
+    orientation: 'portrait' | 'landscape' = 'landscape',
   ) => ({
+    layout: {
+      fitSystemWindows: surface === 'app' || orientation === 'portrait',
+    },
     statusBar: {
-      visible: surface === 'app',
+      visible: surface === 'app' || orientation === 'portrait',
+      drawBehind: surface === 'app' || orientation === 'landscape',
     },
     navigationBar: {
       backgroundColor:
@@ -50,6 +56,9 @@ jest.mock('../../helpers/colors', () => ({
       visible: surface === 'app',
     },
   }),
+}));
+jest.mock('../../helpers/screen', () => ({
+  useOrientation: () => ({orientation: mockOrientation}),
 }));
 
 const {navigationSurfaceForComponent, withNavigationTheme} =
@@ -65,12 +74,66 @@ describe('withNavigationTheme', () => {
     delete mockCallbacks.componentDidDisappear;
     mockCurrentTheme = {background: '#fff', mediaBackground: '#000'};
     mockCurrentScheme = 'light';
+    mockOrientation = 'landscape';
   });
 
   it('uses immersive chrome for both playback surfaces', () => {
     expect(navigationSurfaceForComponent('CameraEventClip')).toBe('event');
     expect(navigationSurfaceForComponent('CameraPreview')).toBe('media');
     expect(navigationSurfaceForComponent('Settings')).toBe('app');
+  });
+
+  it('merges portrait insets and restores immersive chrome after rotation', () => {
+    const view = render(
+      <Screen componentId="rotating-player" componentName="CameraPreview" />,
+    );
+
+    act(() => mockCallbacks.componentDidAppear?.());
+    expect(mockMergeOptions).toHaveBeenLastCalledWith(
+      'rotating-player',
+      expect.objectContaining({
+        layout: {fitSystemWindows: false},
+        statusBar: {visible: false, drawBehind: true},
+        navigationBar: {backgroundColor: '#000', visible: false},
+      }),
+    );
+
+    act(() => {
+      mockOrientation = 'portrait';
+      view.rerender(
+        <Screen
+          componentId="rotating-player"
+          componentName="CameraPreview"
+        />,
+      );
+    });
+    expect(mockMergeOptions).toHaveBeenLastCalledWith(
+      'rotating-player',
+      expect.objectContaining({
+        layout: {fitSystemWindows: true},
+        statusBar: {visible: true, drawBehind: false},
+        navigationBar: {backgroundColor: '#000', visible: false},
+      }),
+    );
+
+    act(() => {
+      mockOrientation = 'landscape';
+      view.rerender(
+        <Screen
+          componentId="rotating-player"
+          componentName="CameraPreview"
+        />,
+      );
+    });
+    expect(mockMergeOptions).toHaveBeenLastCalledWith(
+      'rotating-player',
+      expect.objectContaining({
+        layout: {fitSystemWindows: false},
+        statusBar: {visible: false, drawBehind: true},
+        navigationBar: {backgroundColor: '#000', visible: false},
+      }),
+    );
+    view.unmount();
   });
 
   it('applies media chrome while visible and restores the app surface on dismiss', () => {
@@ -82,7 +145,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'event-player',
       expect.objectContaining({
-        statusBar: {visible: false},
+        statusBar: expect.objectContaining({visible: false}),
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -97,7 +160,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'event-player',
       expect.objectContaining({
-        statusBar: {visible: false},
+        statusBar: expect.objectContaining({visible: false}),
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -106,7 +169,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'event-player',
       expect.objectContaining({
-        statusBar: {visible: true},
+        statusBar: expect.objectContaining({visible: true}),
         navigationBar: {backgroundColor: '#121212', visible: true},
       }),
     );
@@ -127,7 +190,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'settings',
       expect.objectContaining({
-        statusBar: {visible: true},
+        statusBar: expect.objectContaining({visible: true}),
         navigationBar: {backgroundColor: '#fff', visible: true},
       }),
     );
@@ -145,7 +208,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'repeated-player',
       expect.objectContaining({
-        statusBar: {visible: false},
+        statusBar: expect.objectContaining({visible: false}),
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -154,7 +217,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'repeated-player',
       expect.objectContaining({
-        statusBar: {visible: true},
+        statusBar: expect.objectContaining({visible: true}),
         navigationBar: {backgroundColor: '#fff', visible: true},
       }),
     );
@@ -180,7 +243,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'unmounted-player',
       expect.objectContaining({
-        statusBar: {visible: false},
+        statusBar: expect.objectContaining({visible: false}),
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -189,7 +252,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'unmounted-player',
       expect.objectContaining({
-        statusBar: {visible: true},
+        statusBar: expect.objectContaining({visible: true}),
         navigationBar: {backgroundColor: '#121212', visible: true},
       }),
     );
@@ -204,7 +267,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'foreground-event',
       expect.objectContaining({
-        statusBar: {visible: true},
+        statusBar: expect.objectContaining({visible: true}),
         navigationBar: {backgroundColor: '#fff', visible: true},
       }),
     );
@@ -213,7 +276,7 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'foreground-event',
       expect.objectContaining({
-        statusBar: {visible: false},
+        statusBar: expect.objectContaining({visible: false}),
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );

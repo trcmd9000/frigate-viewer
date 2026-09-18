@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.10] - 2026-09-18
+
+- Reworked Problem Reporting as a manual, privacy-safe GitHub Issue draft
+  without automatic diagnostics, credentials, server URLs, or logs.
+- Kept the Android status bar visible and respected in portrait media playback
+  while preserving immersive camera and event playback in landscape.
+
 ## [18.0.9] - 2026-09-17
 
 - Simplified the app shell to keep Cameras and Events as the permanent
