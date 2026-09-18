@@ -14,6 +14,7 @@ const mockCallbacks: {
   componentDidDisappear?: () => void;
 } = {};
 const mockMergeOptions = jest.fn();
+const mockApplyAndroidSystemBarSurface = jest.fn();
 const mockRemoveListener = jest.fn();
 let mockCurrentTheme = {background: '#fff', mediaBackground: '#000'};
 let mockCurrentScheme: 'light' | 'dark' = 'light';
@@ -60,6 +61,9 @@ jest.mock('../../helpers/colors', () => ({
 jest.mock('../../helpers/screen', () => ({
   useOrientation: () => ({orientation: mockOrientation}),
 }));
+jest.mock('../../helpers/systemBars', () => ({
+  applyAndroidSystemBarSurface: mockApplyAndroidSystemBarSurface,
+}));
 
 const {navigationSurfaceForComponent, withNavigationTheme} =
   require('../../helpers/navigationTheme') as typeof import('../../helpers/navigationTheme');
@@ -83,7 +87,7 @@ describe('withNavigationTheme', () => {
     expect(navigationSurfaceForComponent('Settings')).toBe('app');
   });
 
-  it('merges portrait insets and restores immersive chrome after rotation', () => {
+  it('merges portrait safe-area behavior and restores immersive chrome after rotation', () => {
     const view = render(
       <Screen componentId="rotating-player" componentName="CameraPreview" />,
     );
@@ -107,6 +111,7 @@ describe('withNavigationTheme', () => {
         />,
       );
     });
+
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'rotating-player',
       expect.objectContaining({
@@ -130,6 +135,62 @@ describe('withNavigationTheme', () => {
       expect.objectContaining({
         layout: {fitSystemWindows: false},
         statusBar: {visible: false, drawBehind: true},
+        navigationBar: {backgroundColor: '#000', visible: false},
+      }),
+    );
+    view.unmount();
+  });
+
+  it('syncs light and dark app surfaces through the Android bridge', () => {
+    const view = render(
+      <Screen componentId="themed-app" componentName="Settings" />,
+    );
+
+    act(() => mockCallbacks.componentDidAppear?.());
+    expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
+      '#fff',
+      'dark',
+    );
+    expect(
+      mockMergeOptions.mock.invocationCallOrder[
+        mockMergeOptions.mock.invocationCallOrder.length - 1
+      ],
+    ).toBeLessThan(
+      mockApplyAndroidSystemBarSurface.mock.invocationCallOrder[
+        mockApplyAndroidSystemBarSurface.mock.invocationCallOrder.length - 1
+      ],
+    );
+
+    act(() => {
+      mockCurrentTheme = {background: '#121212', mediaBackground: '#000'};
+      mockCurrentScheme = 'dark';
+      view.rerender(
+        <Screen componentId="themed-app" componentName="Settings" />,
+      );
+    });
+    expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
+      '#121212',
+      'light',
+    );
+    view.unmount();
+  });
+
+  it('uses a black surface and light icons for portrait media', () => {
+    mockOrientation = 'portrait';
+    const view = render(
+      <Screen componentId="portrait-player" componentName="CameraPreview" />,
+    );
+
+    act(() => mockCallbacks.componentDidAppear?.());
+    expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
+      '#000',
+      'light',
+    );
+    expect(mockMergeOptions).toHaveBeenLastCalledWith(
+      'portrait-player',
+      expect.objectContaining({
+        layout: {fitSystemWindows: true},
+        statusBar: {visible: true, drawBehind: false},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );

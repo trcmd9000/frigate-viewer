@@ -91,7 +91,7 @@ export const createSecondaryNavigationOptions = (
     drawBehind: false,
     translucent: false,
     hideWithTopBar: false,
-    backgroundColor: theme.surface,
+    backgroundColor: theme.background,
     style: scheme === 'dark' ? 'light' : 'dark',
   },
   navigationBar: {

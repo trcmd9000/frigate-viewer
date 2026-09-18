@@ -28,6 +28,7 @@ import {
   lightTheme,
   navigationThemeOptions,
 } from './helpers/colors';
+import {applyAndroidSystemBarSurface} from './helpers/systemBars';
 
 const registerComponent = (name, component, decorators = []) => {
   Navigation.registerComponent(
@@ -93,4 +94,8 @@ Navigation.setDefaultOptions(
     initialDarkMode ? darkTheme : lightTheme,
     initialDarkMode ? 'dark' : 'light',
   ),
+);
+applyAndroidSystemBarSurface(
+  initialDarkMode ? darkTheme.background : lightTheme.background,
+  initialDarkMode ? 'light' : 'dark',
 );

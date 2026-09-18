@@ -37,6 +37,7 @@ describe('media navigation policy', () => {
     const options = mediaNavigationOptions('landscape');
 
     expect(options.layout.fitSystemWindows).toBe(false);
+    expect(options.layout).not.toHaveProperty('insets');
     expect(options.statusBar).toEqual({
       visible: false,
       drawBehind: true,

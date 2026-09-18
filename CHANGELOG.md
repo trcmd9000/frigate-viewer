@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.12] - 2026-09-18
+
+- Kept Android status-bar surfaces and icon contrast synchronized with light,
+  dark, and media themes under enforced edge-to-edge rendering.
+- Applied native system-bar styling after React Native Navigation updates to
+  prevent API 37 from restoring unreadable status-bar icons.
+
 ## [18.0.11] - 2026-09-18
 
 - Corrected Pixel portrait system-bar and safe-area handling for playback and

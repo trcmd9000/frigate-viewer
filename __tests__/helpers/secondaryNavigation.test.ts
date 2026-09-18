@@ -133,7 +133,7 @@ describe('secondary navigation', () => {
         drawBehind: false,
         translucent: false,
         hideWithTopBar: false,
-        backgroundColor: theme.surface,
+        backgroundColor: theme.background,
         style: statusBarStyle,
       });
       expect(options.navigationBar).toEqual({

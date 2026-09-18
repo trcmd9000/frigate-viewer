@@ -28,6 +28,7 @@ public class MainApplication extends NavigationApplication {
           // Packages that cannot be autolinked yet can be added manually here, for example:
           // packages.add(new MyReactNativePackage());
           packages.add(new ClientCertPackage());
+          packages.add(new SystemBarsPackage());
           return packages;
         }
 

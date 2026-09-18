@@ -63,18 +63,26 @@ describe('adaptive color scheme', () => {
     );
   });
 
-  it('maps theme colors to navigation chrome', () => {
+  it.each([
+    ['light', lightTheme, 'dark'],
+    ['dark', darkTheme, 'light'],
+  ] as const)('maps the %s app surface to navigation chrome', (
+    scheme,
+    theme,
+    statusBarStyle,
+  ) => {
     (Platform as {OS: string}).OS = 'android';
-    const options = navigationThemeOptions(darkTheme, 'dark');
-    expect(options.layout.backgroundColor).toBe(darkTheme.background);
-    expect(options.statusBar.backgroundColor).toBe(darkTheme.surface);
-    expect(options.statusBar.style).toBe('light');
+    const options = navigationThemeOptions(theme, scheme);
+    expect(options.layout.backgroundColor).toBe(theme.background);
+    expect(options.layout.componentBackgroundColor).toBe(theme.background);
+    expect(options.statusBar.backgroundColor).toBe(theme.background);
+    expect(options.statusBar.style).toBe(statusBarStyle);
     expect(options.statusBar.drawBehind).toBe(false);
     expect(options.layout.fitSystemWindows).toBe(true);
     expect(options.layout).not.toHaveProperty('insets');
-    expect(options.topBar.background.color).toBe(darkTheme.surface);
-    expect(options.topBar.title.color).toBe(darkTheme.text);
-    expect(options.navigationBar.backgroundColor).toBe(darkTheme.background);
+    expect(options.topBar.background.color).toBe(theme.surface);
+    expect(options.topBar.title.color).toBe(theme.text);
+    expect(options.navigationBar.backgroundColor).toBe(theme.background);
     expect(options.navigationBar.visible).toBe(true);
   });
 
@@ -112,28 +120,38 @@ describe('adaptive color scheme', () => {
     ).toBe(false);
   });
 
-  it('keeps portrait media below a dark, system-owned status bar', () => {
+  it.each([
+    ['light', lightTheme],
+    ['dark', darkTheme],
+  ] as const)('keeps portrait media below a black, system-owned status bar on %s', (
+    scheme,
+    theme,
+  ) => {
     (Platform as {OS: string}).OS = 'android';
     const options = navigationThemeOptions(
-      lightTheme,
-      'light',
+      theme,
+      scheme,
       'media',
       'portrait',
     );
 
-    expect(options.layout.backgroundColor).toBe(lightTheme.mediaBackground);
+    expect(options.layout.backgroundColor).toBe(theme.mediaBackground);
     expect(options.layout.componentBackgroundColor).toBe(
-      lightTheme.mediaBackground,
+      theme.mediaBackground,
     );
     expect(options.layout).not.toHaveProperty('insets');
     expect(options.statusBar).toEqual(
       expect.objectContaining({
-        backgroundColor: lightTheme.mediaBackground,
+        backgroundColor: theme.mediaBackground,
         style: 'light',
         visible: true,
         drawBehind: false,
       }),
     );
+    expect(options.navigationBar).toEqual({
+      backgroundColor: theme.mediaBackground,
+      visible: false,
+    });
   });
 
   it('keeps portrait playback below the status bar while hiding navigation', () => {

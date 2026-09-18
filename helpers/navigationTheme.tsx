@@ -8,6 +8,7 @@ import {
   navigationThemeOptions,
 } from './colors';
 import {useOrientation} from './screen';
+import {applyAndroidSystemBarSurface} from './systemBars';
 
 const MEDIA_COMPONENT_NAMES = new Set(['CameraEventClip', 'CameraPreview']);
 const activeMediaComponentIds = new Set<string>();
@@ -58,6 +59,14 @@ export const withNavigationTheme =
             surfaceToApply,
             orientationRef.current,
           ),
+        );
+        applyAndroidSystemBarSurface(
+          surfaceToApply === 'app'
+            ? themeRef.current.background
+            : themeRef.current.mediaBackground,
+          surfaceToApply === 'app' && schemeRef.current === 'light'
+            ? 'dark'
+            : 'light',
         );
       },
       [props.componentId],

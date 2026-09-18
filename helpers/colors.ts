@@ -156,8 +156,9 @@ export const navigationThemeOptions = (
       fitSystemWindows: mediaOptions?.layout.fitSystemWindows ?? true,
     },
     statusBar: {
-      backgroundColor:
-        mediaSurface ? theme.mediaBackground : theme.surface,
+      backgroundColor: mediaSurface
+        ? theme.mediaBackground
+        : theme.background,
       style: mediaSurface
         ? ('light' as const)
         : scheme === 'dark'
