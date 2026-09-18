@@ -587,6 +587,16 @@ export const ProtectedWebRTCPlayer = ({
         return;
       }
       if (track.kind === 'audio') {
+        // Native WebRTC can start rendering an incoming track before the
+        // stream reconciliation below runs. Keep every new track silent
+        // until the explicit audio lease has routed this exact track.
+        if (
+          mutedRef.current ||
+          !audioActiveRef.current ||
+          !routedAudioTracks.has(track)
+        ) {
+          track.enabled = false;
+        }
         if (source === 'receiver') {
           receiverAudioTracks.add(track);
         } else {

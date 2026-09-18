@@ -35,7 +35,6 @@ export default {
   'menu.item.logs.label': 'Loggar',
   'menu.item.settings.label': 'Inställningar',
   'menu.item.author.label': 'Om appen',
-  'menu.item.report.label': 'Rapportera problem',
   'report.topBar.title': 'Rapportera problem',
   'report.introduction.info':
     'Beskriv problemet nedan. Appen öppnar ett förifyllt nytt GitHub-ärende i webbläsaren; inga diagnostikuppgifter laddas upp automatiskt. Granska ärendet innan du skickar det. Ta inte med inloggningsuppgifter, server-URL:er, loggar eller andra känsliga uppgifter.',

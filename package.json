@@ -1,6 +1,6 @@
 {
   "name": "FrigateViewer",
-  "version": "18.0.12",
+  "version": "18.0.14",
   "private": true,
   "scripts": {
     "android": "react-native run-android",

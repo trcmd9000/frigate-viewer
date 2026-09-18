@@ -982,6 +982,7 @@ describe('ProtectedWebRTCPlayer', () => {
         streams: [stream],
         track: audioTrack,
       });
+      expect(audioTrack.enabled).toBe(false);
       MockPeerConnection.latest.ontrack?.({
         streams: [stream],
         track: videoTrack,

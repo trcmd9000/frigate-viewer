@@ -116,7 +116,6 @@ describe('secondary overflow menu', () => {
       'storage',
       'system',
       'logs',
-      'report',
       'author',
     ]);
     expect(ids).not.toEqual(

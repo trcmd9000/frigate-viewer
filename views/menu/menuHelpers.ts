@@ -13,8 +13,7 @@ export type MenuId =
   | 'system'
   | 'logs'
   | 'settings'
-  | 'author'
-  | 'report';
+  | 'author';
 
 export const useSelectedMenuItem = (current?: MenuId) => {
   useEffect(() => {

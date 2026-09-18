@@ -85,12 +85,6 @@ export const authorMenuItem: IMenuItem = {
   view: 'Author',
 };
 
-export const reportProblemMenuItem: IMenuItem = {
-  id: 'report',
-  icon: 'send',
-  view: 'Report',
-};
-
 export const secondaryMenuSections: readonly MenuSection[] = [
   {
     id: 'app',
@@ -110,7 +104,7 @@ export const secondaryMenuSections: readonly MenuSection[] = [
   {
     id: 'support',
     label: 'section.support',
-    items: [reportProblemMenuItem, authorMenuItem],
+    items: [authorMenuItem],
   },
 ];
 

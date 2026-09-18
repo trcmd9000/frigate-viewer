@@ -199,7 +199,6 @@ export default {
   'menu.item.logs.label': 'Protokolle',
   'menu.item.settings.label': 'Einstellungen',
   'menu.item.author.label': 'Über die App',
-  'menu.item.report.label': 'Problem melden',
   'report.topBar.title': 'Problem melden',
   'report.introduction.info':
     'Beschreiben Sie das Problem unten. Die App öffnet in Ihrem Browser ein vorausgefülltes neues GitHub-Issue; Diagnosedaten werden nicht automatisch hochgeladen. Prüfen Sie das Issue vor dem Absenden. Fügen Sie keine Anmeldedaten, Server-URLs, Protokolle oder andere vertrauliche Daten ein.',

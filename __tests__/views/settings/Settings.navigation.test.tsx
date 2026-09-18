@@ -171,7 +171,6 @@ jest.mock('../../../views/menu/Menu', () => ({
   authorMenuItem: {id: 'author'},
   logsMenuItem: {id: 'logs'},
   navigateToMenuItem: () => jest.fn(),
-  reportProblemMenuItem: {id: 'report'},
   storageMenuItem: {id: 'storage'},
   systemMenuItem: {id: 'system'},
 }));

@@ -24,7 +24,11 @@ public class SystemBarsModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void setSystemBarSurface(String backgroundColor, String statusBarStyle) {
+  public void setSystemBarSurface(
+      String backgroundColor,
+      String statusBarStyle,
+      boolean immersive,
+      boolean navigationBarVisible) {
     final int color;
     try {
       color = Color.parseColor(backgroundColor);
@@ -42,6 +46,8 @@ public class SystemBarsModule extends ReactContextBaseJavaModule {
             () -> MainActivity.applySystemBarSurface(
                 activity,
                 color,
-                darkStatusBarIcons)));
+                darkStatusBarIcons,
+                immersive,
+                navigationBarVisible)));
   }
 }

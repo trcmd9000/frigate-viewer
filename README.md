@@ -37,7 +37,7 @@ transport and camera preview fallback.
 
 ## Releases
 
-Version `18.0.12` is the next Android release candidate. It requires the
+Version `18.0.14` is the next Android release candidate. It requires the
 documented worker build, physical-device, and Play Internal Testing checks
 before public production promotion. See the
 [GitHub releases](https://github.com/trcmd9000/frigate-viewer/releases) for
@@ -51,12 +51,10 @@ See the [Privacy Policy](./PRIVACY-POLICY.md) for details.
 
 ## Reporting problems
 
-The **Report problem** screen only opens a prefilled GitHub issue in the
-device's browser after you choose **Open GitHub**. The app does not upload the
-description, diagnostics, logs, or server data to a maintainer-operated
-service. Review the issue before submitting it and remove credentials, access
-tokens, certificates, private keys, server URLs or addresses, logs, camera
-images, and other sensitive data.
+To report a reproducible problem, open **More > About > Project page**. This
+opens the public GitHub repository in the device's browser. Review anything
+you submit and remove credentials, access tokens, certificates, private keys,
+server URLs or addresses, logs, camera images, and other sensitive data.
 
 ## Platform status
 

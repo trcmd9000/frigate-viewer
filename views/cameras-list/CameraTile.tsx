@@ -258,6 +258,8 @@ export const CameraTile: FC<CameraTileProps> = ({
       return;
     }
     navigationInFlight.current = true;
+    const startupStartedAt = performance.now();
+    const startupTraceId = Date.now() % 1_000_000_000;
     void Promise.resolve().then(() => {
       if (!isCurrentScope()) {
         return;
@@ -265,7 +267,12 @@ export const CameraTile: FC<CameraTileProps> = ({
       return Navigation.showModal({
         component: {
           name: 'CameraPreview',
-          passProps: {cameraName, ownerScopeGeneration: generation},
+          passProps: {
+            cameraName,
+            ownerScopeGeneration: generation,
+            startupStartedAt,
+            startupTraceId,
+          },
           options: mediaNavigationOptions(
             getScreenOrientation(),
             lockLandscapePlaybackOrientation,

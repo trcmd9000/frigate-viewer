@@ -184,7 +184,6 @@ export default {
   'menu.item.logs.label': 'Logs',
   'menu.item.settings.label': 'Settings',
   'menu.item.author.label': 'About',
-  'menu.item.report.label': 'Report problem',
   'report.topBar.title': 'Report problem',
   'report.introduction.info':
     'Describe the problem below. The app will open a prefilled new issue on GitHub in your browser; it does not upload diagnostics automatically. Review the issue before submitting. Do not include credentials, server URLs, logs, or other sensitive data.',

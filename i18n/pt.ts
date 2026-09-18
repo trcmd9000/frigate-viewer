@@ -35,7 +35,6 @@ export default {
   'menu.item.logs.label': 'Registros',
   'menu.item.settings.label': 'Configurações',
   'menu.item.author.label': 'Sobre',
-  'menu.item.report.label': 'Reportar problema',
   'report.topBar.title': 'Reportar problema',
   'report.introduction.info':
     'Descreva o problema abaixo. A aplicação abrirá no navegador uma nova issue do GitHub preenchida previamente; nenhum diagnóstico é carregado automaticamente. Reveja a issue antes de a enviar. Não inclua credenciais, URLs de servidores, registos ou outros dados sensíveis.',

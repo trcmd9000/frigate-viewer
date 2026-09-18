@@ -12,7 +12,8 @@ import {
 export const MAX_STREAM_METADATA_BYTES = 64 * 1024;
 const MAX_METADATA_DEPTH = 16;
 const MAX_METADATA_DESCRIPTORS = 128;
-const STREAM_METADATA_CACHE_TTL_MS = 30_000;
+const STREAM_METADATA_FRESH_TTL_MS = 5 * 60_000;
+const STREAM_METADATA_STALE_TTL_MS = 30 * 60_000;
 
 export type CodecFamily =
   | 'h264'
@@ -979,36 +980,78 @@ export const fetchStreamMetadata = async (
   }
   const cacheScope = serverProfileIdentity(server);
   const cacheKey = `${baseUrl}\u0000${streamName}`;
-  const cached = streamMetadataCache.get(cacheScope)?.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.request;
-  }
   const entries = streamMetadataCache.get(cacheScope) || new Map();
   streamMetadataCache.set(cacheScope, entries);
+  const cached = entries.get(cacheKey);
+  const now = Date.now();
+  if (cached?.metadata && cached.freshUntil > now) {
+    return cached.metadata;
+  }
+  if (cached?.request) {
+    return cached.metadata && cached.staleUntil > now
+      ? cached.metadata
+      : cached.request;
+  }
+
   const request = fetchStreamMetadataUncached(server, encodedStreamName, baseUrl)
     .then(metadata => {
       if (metadata.malformed) {
         entries.delete(cacheKey);
+        return metadata;
       }
+      const storedAt = Date.now();
+      entries.set(cacheKey, {
+        metadata,
+        freshUntil: storedAt + STREAM_METADATA_FRESH_TTL_MS,
+        staleUntil: storedAt + STREAM_METADATA_STALE_TTL_MS,
+      });
       return metadata;
     })
     .catch(error => {
-      entries.delete(cacheKey);
+      const current = entries.get(cacheKey);
+      if (!current?.metadata || current.staleUntil <= Date.now()) {
+        entries.delete(cacheKey);
+      } else {
+        entries.set(cacheKey, {
+          metadata: current.metadata,
+          freshUntil: current.freshUntil,
+          staleUntil: current.staleUntil,
+        });
+      }
       throw error;
     });
   entries.set(cacheKey, {
-    expiresAt: Date.now() + STREAM_METADATA_CACHE_TTL_MS,
+    metadata:
+      cached?.metadata && cached.staleUntil > now
+        ? cached.metadata
+        : undefined,
+    freshUntil: cached?.freshUntil || 0,
+    staleUntil: cached?.staleUntil || 0,
     request,
   });
+  if (cached?.metadata && cached.staleUntil > now) {
+    void request.catch(() => undefined);
+    return cached.metadata;
+  }
   return request;
 };
 
 interface StreamMetadataCacheEntry {
-  readonly expiresAt: number;
-  readonly request: Promise<StreamMetadata>;
+  readonly metadata?: StreamMetadata;
+  readonly freshUntil: number;
+  readonly staleUntil: number;
+  readonly request?: Promise<StreamMetadata>;
 }
 
 const streamMetadataCache = new Map<string, Map<string, StreamMetadataCacheEntry>>();
+
+export const invalidateStreamMetadataCache = (server?: Server): void => {
+  if (!server) {
+    streamMetadataCache.clear();
+    return;
+  }
+  streamMetadataCache.delete(serverProfileIdentity(server));
+};
 
 const fetchStreamMetadataUncached = async (
   server: Server,

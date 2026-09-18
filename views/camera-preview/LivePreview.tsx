@@ -66,22 +66,32 @@ import {LiveStreamControl} from './LiveStreamControl';
 import type {ProtectedAudioStatus} from '../../helpers/protectedAudio';
 import {
   fetchStreamMetadata,
+  invalidateStreamMetadataCache,
   planProtectedLiveStreams,
   probeDeviceCodecCapability,
   protectedMseProbeEnabled,
 } from '../../helpers/hevcTransport';
 import type {
   CodecFamily,
+  DeviceCodecCapability,
   MediaDescriptor,
+  PlannedLiveStream,
   StreamMetadata,
 } from '../../helpers/hevcTransport';
+import {
+  invalidateLiveConfigCache,
+  loadLiveConfig,
+} from '../../helpers/liveDiscovery';
 
 type LivePreviewProps = PropsWithChildren<{
   cameraName: string;
+  startupStartedAt?: number;
+  startupTraceId?: number;
 }>;
 
 const LIVE_PREVIEW_REFRESH_MS = 1000;
 const LIVE_FIRST_FRAME_TIMEOUT_MS = 15_000;
+const LIVE_HEDGE_DELAY_MS = 2_500;
 
 const formatCodec = (codec?: CodecFamily): string | undefined =>
   codec === 'h264'
@@ -126,7 +136,11 @@ const releaseDownloadedMediaSafely = (path?: string) => {
   }
 };
 
-export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
+export const LivePreview: FC<LivePreviewProps> = ({
+  cameraName,
+  startupStartedAt,
+  startupTraceId,
+}) => {
   const {width, height} = useWindowDimensions();
   const landscape = width > height;
   const styles = useStyles(({theme}) => ({
@@ -190,6 +204,9 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     },
     livePlayer: {
       ...StyleSheet.absoluteFillObject,
+    },
+    hedgedPlayer: {
+      opacity: 0,
     },
     fallbackPanel: {
       position: 'absolute',
@@ -267,6 +284,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     useState<LivePreviewPhase>('snapshot');
   const [rtspMedia, setRtspMedia] = useState<PlayableMedia>();
   const [mseMedia, setMseMedia] = useState<PlayableMedia>();
+  const [mseStreamName, setMseStreamName] = useState<string>();
+  const [webRtcStreamName, setWebRtcStreamName] = useState<string>();
   const [transport, setTransport] = useState<LivePreviewTransport>();
   const transportRef = useRef<LivePreviewTransport>();
   const [decoded, setDecoded] = useState(false);
@@ -281,8 +300,32 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const [discoveryGeneration, setDiscoveryGeneration] = useState(0);
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const hedgeTimer = useRef<ReturnType<typeof setTimeout>>();
   const firstFrameTimer = useRef<ReturnType<typeof setTimeout>>();
   const firstFrameExpired = useRef(false);
+  const winningTransport = useRef<LivePreviewTransport>();
+  const streamNamesRef = useRef<string[]>([]);
+  const [startupClock] = useState(
+    () => startupStartedAt ?? performance.now(),
+  );
+  const [traceId] = useState(
+    () => startupTraceId ?? Date.now() % 1_000_000_000,
+  );
+  const logStartup = useCallback(
+    (stage: string, details?: string) => {
+      const elapsedMs = Math.max(
+        0,
+        Math.round(performance.now() - startupClock),
+      );
+      SecureLogger.logInfo(
+        `trace=${traceId}, stage=${stage}, elapsedMs=${elapsedMs}${
+          details ? `, ${details}` : ''
+        }`,
+        'live-startup',
+      );
+    },
+    [startupClock, traceId],
+  );
   const [muted, setMuted] = useState(true);
   const mutedIntentRef = useRef(muted);
   const [webrtcAudioAvailable, setWebrtcAudioAvailable] = useState(false);
@@ -378,6 +421,11 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const handleDecodedMediaPress = useCallback(() => {
     revealTransientOverlays();
   }, [revealTransientOverlays]);
+  const retryLiveDiscovery = useCallback(() => {
+    invalidateLiveConfigCache(server);
+    invalidateStreamMetadataCache(server);
+    setDiscoveryGeneration(current => current + 1);
+  }, [server]);
   const handleStreamSelectorOpenChange = useCallback((open: boolean) => {
     setStreamSelectorOpen(open);
     if (open) {
@@ -430,6 +478,27 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       setAppActive(nextActive);
       if (!nextActive) {
         cancelTransientOverlay();
+        if (hedgeTimer.current) {
+          clearTimeout(hedgeTimer.current);
+          hedgeTimer.current = undefined;
+        }
+        if (firstFrameTimer.current) {
+          clearTimeout(firstFrameTimer.current);
+          firstFrameTimer.current = undefined;
+        }
+        firstFrameExpired.current = true;
+        const winner = winningTransport.current;
+        if (winner !== 'mse') {
+          setMseMedia(undefined);
+          setMseStreamName(undefined);
+        }
+        if (winner !== 'webrtc') {
+          setWebRtcStreamName(undefined);
+        }
+        if (winner !== 'rtsp' && rtspMedia) {
+          releaseProtectedMediaUri(rtspMedia.uri);
+          setRtspMedia(undefined);
+        }
         overlayOpacity.setValue(1);
         setTransientOverlayVisible(true);
         setMuted(true);
@@ -437,7 +506,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         setWebrtcAudioStatus({state: 'inactive'});
       } else {
         if (!wasActive) {
-          setConnectionAttempt(current => current + 1);
+          setDiscoveryGeneration(current => current + 1);
         }
         scheduleOverlayHide();
       }
@@ -446,6 +515,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   }, [
     cancelTransientOverlay,
     overlayOpacity,
+    rtspMedia,
     scheduleOverlayHide,
   ]);
   const setActiveTransport = useCallback((next: LivePreviewTransport) => {
@@ -461,9 +531,38 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setSnapshotState(state => discardSnapshotHandoff(state, pending.handoffId));
     releaseDownloadedMediaSafely(pending.path);
   }, []);
-  const livePlaying = useCallback(() => {
-    if (firstFrameExpired.current || !appActiveRef.current) {
+  const livePlaying = useCallback((source: LivePreviewTransport) => {
+    if (
+      firstFrameExpired.current ||
+      !appActiveRef.current ||
+      winningTransport.current
+    ) {
       return;
+    }
+    winningTransport.current = source;
+    logStartup('first-frame', `transport=${source}`);
+    setActiveTransport(source);
+    if (hedgeTimer.current) {
+      clearTimeout(hedgeTimer.current);
+      hedgeTimer.current = undefined;
+    }
+    if (source !== 'mse') {
+      setMseMedia(undefined);
+      setMseStreamName(undefined);
+    }
+    if (source !== 'rtsp') {
+      if (rtspMedia) {
+        releaseProtectedMediaUri(rtspMedia.uri);
+      }
+      setRtspMedia(undefined);
+    }
+    if (source !== 'webrtc') {
+      setWebRtcStreamName(undefined);
+    } else {
+      const winnerIndex = streamNamesRef.current.indexOf(webRtcStreamName || '');
+      if (winnerIndex >= 0) {
+        setStreamIndex(winnerIndex);
+      }
     }
     reconnectAttempts.current = 0;
     setFallbackReason(undefined);
@@ -473,10 +572,18 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       clearTimeout(firstFrameTimer.current);
       firstFrameTimer.current = undefined;
     }
-  }, []);
+  }, [
+    logStartup,
+    rtspMedia,
+    setActiveTransport,
+    webRtcStreamName,
+  ]);
   const handleWebRtcAudioAvailabilityChange = useCallback(
     (available: boolean) => {
       if (!mounted.current || audioScopeRef.current !== audioScope) {
+        return;
+      }
+      if (transportRef.current !== 'webrtc' && !winningTransport.current) {
         return;
       }
       if (!appActiveRef.current) {
@@ -496,7 +603,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
   const handleWebRtcAudioStatusChange = useCallback((status: ProtectedAudioStatus) => {
     if (
       !mounted.current || !appActiveRef.current || !playbackActive ||
-      audioScopeRef.current !== audioScope
+      audioScopeRef.current !== audioScope ||
+      (transportRef.current !== 'webrtc' && !winningTransport.current)
     ) {
       return;
     }
@@ -513,20 +621,48 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     }
   }, [audioScope, playbackActive]);
   const liveFailed = useCallback(
-    (reason?: ProtectedLiveFailureReason) => {
-      if (firstFrameExpired.current) {
+    (
+      source: LivePreviewTransport,
+      reason?: ProtectedLiveFailureReason,
+    ) => {
+      if (
+        firstFrameExpired.current ||
+        (winningTransport.current && winningTransport.current !== source)
+      ) {
         return;
       }
+      logStartup('transport-failed', `transport=${source}`);
+      if (!winningTransport.current) {
+        if (source === 'mse' && webRtcStreamName) {
+          setMseMedia(undefined);
+          setMseStreamName(undefined);
+          setMseAudioAvailable(false);
+          return;
+        }
+        if (source === 'rtsp' && webRtcStreamName) {
+          if (rtspMedia) {
+            releaseProtectedMediaUri(rtspMedia.uri);
+          }
+          setRtspMedia(undefined);
+          return;
+        }
+        if (source === 'webrtc' && (mseMedia || rtspMedia)) {
+          setWebRtcStreamName(undefined);
+          return;
+        }
+      }
+      winningTransport.current = undefined;
       setMuted(true);
       setWebrtcAudioAvailable(false);
       setWebrtcAudioStatus({state: 'inactive'});
-      setMseAudioAvailable(false);
-      setDecoded(false);
       setFallbackReason(reason);
-      if (transportRef.current === 'mse') {
+      if (source === 'mse') {
         setMseMedia(undefined);
+        setMseStreamName(undefined);
+        setMseAudioAvailable(false);
         if (firstCompatibleStreamIndex < streamNames.length) {
           setStreamIndex(firstCompatibleStreamIndex);
+          setWebRtcStreamName(streamNames[firstCompatibleStreamIndex]);
           setActiveTransport('webrtc');
           setConnectionAttempt(0);
           reconnectAttempts.current = 0;
@@ -540,14 +676,20 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         setLivePhase('fallback');
         return;
       }
-      if (transportRef.current === 'rtsp') {
+      if (source === 'rtsp') {
+        if (rtspMedia) {
+          releaseProtectedMediaUri(rtspMedia.uri);
+        }
         setRtspMedia(undefined);
+        setWebRtcStreamName(streamName);
         setActiveTransport('webrtc');
         setConnectionAttempt(0);
         reconnectAttempts.current = 0;
         setLivePhase('connecting');
         return;
       }
+      setWebRtcStreamName(undefined);
+      setDecoded(false);
       if (!playbackActive || !streamName) {
         if (firstFrameTimer.current) {
           clearTimeout(firstFrameTimer.current);
@@ -558,8 +700,10 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       }
       if (reason === 'codec') {
         if (streamIndex + 1 < streamNames.length) {
+          const nextStreamName = streamNames[streamIndex + 1];
           reconnectAttempts.current = 0;
           setStreamIndex(current => current + 1);
+          setWebRtcStreamName(nextStreamName);
           setConnectionAttempt(0);
           setLivePhase('connecting');
         } else {
@@ -591,6 +735,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       setLivePhase('reconnecting');
       reconnectTimer.current = setTimeout(() => {
         reconnectTimer.current = undefined;
+        setWebRtcStreamName(streamName);
         setConnectionAttempt(current => current + 1);
         setLivePhase('connecting');
       }, reconnect.delayMs);
@@ -598,11 +743,32 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     [
       playbackActive,
       firstCompatibleStreamIndex,
+      logStartup,
+      mseMedia,
+      rtspMedia,
       setActiveTransport,
       streamIndex,
       streamName,
+      streamNames,
       streamNames.length,
+      webRtcStreamName,
     ],
+  );
+  const handleMsePlaying = useCallback(
+    () => livePlaying('mse'),
+    [livePlaying],
+  );
+  const handleRtspPlaying = useCallback(
+    () => livePlaying('rtsp'),
+    [livePlaying],
+  );
+  const handleWebRtcPlaying = useCallback(
+    () => livePlaying('webrtc'),
+    [livePlaying],
+  );
+  const handleWebRtcFailure = useCallback(
+    (reason?: ProtectedLiveFailureReason) => liveFailed('webrtc', reason),
+    [liveFailed],
   );
 
   const getLastImageUrl = useCallback(
@@ -675,6 +841,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
 
   useEffect(() => {
     let active = true;
+    logStartup('discovery-start');
     invalidatePendingSnapshot();
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current);
@@ -684,7 +851,13 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       clearTimeout(firstFrameTimer.current);
       firstFrameTimer.current = undefined;
     }
+    if (hedgeTimer.current) {
+      clearTimeout(hedgeTimer.current);
+      hedgeTimer.current = undefined;
+    }
     firstFrameExpired.current = false;
+    winningTransport.current = undefined;
+    streamNamesRef.current = [];
     reconnectAttempts.current = 0;
     setConnectionAttempt(0);
     setStreamIndex(0);
@@ -696,6 +869,8 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     setDecoded(false);
     setRtspMedia(undefined);
     setMseMedia(undefined);
+    setMseStreamName(undefined);
+    setWebRtcStreamName(undefined);
     transportRef.current = undefined;
     setTransport(undefined);
     setStreamNames([]);
@@ -711,10 +886,14 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       }
       firstFrameTimer.current = setTimeout(() => {
         firstFrameExpired.current = true;
+        logStartup('first-frame-timeout');
         setMuted(true);
         setDecoded(false);
         setFallbackReason('timeout');
         setRtspMedia(undefined);
+        setMseMedia(undefined);
+        setMseStreamName(undefined);
+        setWebRtcStreamName(undefined);
         setLivePhase('fallback');
         firstFrameTimer.current = undefined;
       }, LIVE_FIRST_FRAME_TIMEOUT_MS);
@@ -730,15 +909,18 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
       ? protectedMediaProfileId(server).then(() => true).catch(() => false)
       : Promise.resolve(false);
 
-    getRef
-      .current<Parameters<typeof selectProtectedLiveStreams>[0]>(
+    loadLiveConfig(
+      server,
+      () => getRef.current<Parameters<typeof selectProtectedLiveStreams>[0]>(
         server,
         'config',
-      )
+      ),
+    )
       .then(config => {
         if (!active) {
           return;
         }
+        logStartup('config-ready');
         const configuredStreamOptions = selectProtectedLiveStreamOptions(
           config,
           cameraName,
@@ -771,138 +953,43 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         setLivePhase('preparing');
         armFirstFrameTimeout();
 
-        const mseUriRequests = new Map<string, Promise<string>>();
-        if (protectedMseProbeEnabled()) {
-          selectedStreams.forEach(selectedStream => {
-            const request = protectedMseMediaUri(server, selectedStream);
-            // The selected request is awaited below. Observe unused requests so
-            // an unavailable optional stream cannot become an unhandled rejection.
-            request.catch(() => undefined);
-            mseUriRequests.set(selectedStream, request);
-          });
-        }
+        const metadata: Array<StreamMetadata | undefined> =
+          Array(selectedStreams.length).fill(undefined);
+        const metadataRequestSettled =
+          Array(selectedStreams.length).fill(false);
+        const failedCandidates = new Set<string>();
+        let device: DeviceCodecCapability | undefined;
+        let primaryCandidate: PlannedLiveStream | undefined;
+        let metadataSettled = 0;
         let mseStartRequest: Promise<boolean> | undefined;
-        const startMse = (
-          selectedStream: string,
-          metadata?: StreamMetadata,
-        ): Promise<boolean> => {
-          if (mseStartRequest) {
-            return mseStartRequest;
-          }
-          mseStartRequest = (async () => {
-            try {
-              if (!(await profileRegistrationRequest)) {
-                throw new Error('The protected MSE profile is unavailable');
-              }
-              const uri = await (
-                mseUriRequests.get(selectedStream) ||
-                protectedMseMediaUri(server, selectedStream)
-              );
-              if (!active || firstFrameExpired.current) {
-                releaseProtectedMediaUri(uri);
-                return false;
-              }
-              armFirstFrameTimeout();
-              setMseAudioAvailable((metadata?.audio.length || 0) > 0);
-              setMseMedia({
-                uri,
-                mimeType: 'video/mp4',
-                mode: 'direct',
-              });
-              setRtspMedia(undefined);
-              setActiveTransport('mse');
-              setLivePhase('connecting');
-              return true;
-            } catch {
-              if (active) {
-                SecureLogger.logInfo(
-                  'streamIndex=0, success=false',
-                  'protected-mse-prepare',
-                );
-              }
-              return false;
-            }
-          })();
-          return mseStartRequest;
-        };
-        const metadataRequests = selectedStreams.map((selectedStream, index) =>
-          fetchStreamMetadata(server, selectedStream)
-            .then(metadata => {
-              if (!active) {
-                return undefined;
-              }
-              const audioCodecs = new Set(
-                metadata.audio.map(descriptor => descriptor.codec),
-              );
-              SecureLogger.logInfo(
-                `streamIndex=${index}, metadataAvailable=true, malformed=${metadata.malformed}, aac=${audioCodecs.has('aac')}, opus=${audioCodecs.has('opus')}, pcma=${audioCodecs.has('pcma')}, pcmu=${audioCodecs.has('pcmu')}`,
-                'protected-live-codecs',
-              );
-              if (protectedMseProbeEnabled()) {
-                void deviceCapabilityRequest.then(device => {
-                  if (!active || firstFrameExpired.current) {
-                    return;
-                  }
-                  const earlyPlan = planProtectedLiveStreams({
-                    streams: [{name: selectedStream, metadata}],
-                    device,
-                    selection: effectiveStreamPreference,
-                    mseEnabled: true,
-                  });
-                  if (earlyPlan[0]?.transport === 'mse') {
-                    void startMse(selectedStream, metadata);
-                  }
-                }).catch(() => undefined);
-              }
-              return metadata;
-            })
-            .catch(() => {
-              if (active) {
-                SecureLogger.logInfo(
-                  `streamIndex=${index}, metadataAvailable=false`,
-                  'protected-live-codecs',
-                );
-              }
-                return undefined;
-              }),
-          );
+        let webRtcStarted = false;
+        let rtspRequested = false;
 
-          (async () => {
-            const [metadata, device] = await Promise.all([
-              Promise.all(metadataRequests),
-              deviceCapabilityRequest,
-            ]);
-            if (!active || firstFrameExpired.current) {
-              return;
-            }
-            const mseEnabled = protectedMseProbeEnabled();
-            SecureLogger.logInfo(
-              `availability=${device.availability}, hardware=${device.hardware}, software=${device.software}, maxWidth=${device.maxWidth ?? 'unknown'}, maxHeight=${device.maxHeight ?? 'unknown'}, maxFrameRate=${device.maxFrameRate ?? 'unknown'}, mseEnabled=${mseEnabled}`,
-              'protected-live-capability',
-            );
-            const plan = planProtectedLiveStreams({
-              streams: selectedStreams.map((name, index) => ({
-                name,
-                metadata: metadata[index],
-              })),
-              device,
-              selection: effectiveStreamPreference,
-              mseEnabled,
-            });
-            if (!active || firstFrameExpired.current || plan.length === 0) {
-              setLivePhase('fallback');
-              return;
-            }
-            const initialCandidate = plan[0];
-            const compatibleStreamIndex = plan.findIndex(
-              candidate => candidate.transport === 'webrtc',
-            );
-            const initialMetadata = metadata[
-              selectedStreams.indexOf(initialCandidate.name)
+        const applyPlan = (nextPlan: PlannedLiveStream[]) => {
+          const plan = primaryCandidate
+            ? [
+                primaryCandidate,
+                ...nextPlan.filter(candidate =>
+                  candidate.name !== primaryCandidate?.name ||
+                  candidate.transport !== primaryCandidate.transport,
+                ),
+              ]
+            : nextPlan;
+          const names = plan.map(candidate => candidate.name);
+          streamNamesRef.current = names;
+          setStreamNames(names);
+          setStreamCodecs(plan.map(candidate => candidate.codec));
+          setStreamFrameRates(plan.map(candidate => {
+            const streamMetadata = metadata[
+              selectedStreams.indexOf(candidate.name)
             ];
-            setStreamOptions(configuredStreamOptions);
-            setStreamOptionLabels(Object.fromEntries(
-              configuredStreamOptions.map((stream, index) => {
+            return streamMetadata?.video?.find(
+              descriptor => descriptor.codec === candidate.codec,
+            )?.frameRate;
+          }));
+          setStreamOptions(configuredStreamOptions);
+          setStreamOptionLabels(Object.fromEntries(
+            configuredStreamOptions.map((stream, index) => {
               const candidate = plan.find(item => item.name === stream.name);
               const video = metadata[index]?.video || [];
               const descriptor = video.find(
@@ -913,66 +1000,256 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
                 formatStreamOptionLabel(stream, descriptor),
               ];
             }),
-            ));
-            setStreamNames(plan.map(candidate => candidate.name));
-            setStreamCodecs(plan.map(candidate => candidate.codec));
-            setStreamFrameRates(plan.map(candidate => {
-              const streamMetadata = metadata[
-                selectedStreams.indexOf(candidate.name)
-              ];
-              return streamMetadata?.video?.find(
-                descriptor => descriptor.codec === candidate.codec,
-              )?.frameRate;
-            }));
+          ));
+          const compatibleIndex = plan.findIndex(
+            candidate => candidate.transport === 'webrtc',
+          );
+          setFirstCompatibleStreamIndex(
+            compatibleIndex >= 0 ? compatibleIndex : plan.length,
+          );
+        };
+
+        const startWebRtc = (
+          candidate: PlannedLiveStream,
+          hedged: boolean,
+        ) => {
+          if (
+            webRtcStarted ||
+            !active ||
+            firstFrameExpired.current ||
+            winningTransport.current
+          ) {
+            return;
+          }
+          webRtcStarted = true;
+          setWebRtcStreamName(candidate.name);
+          logStartup(
+            hedged ? 'hedge-start' : 'transport-start',
+            'transport=webrtc',
+          );
+          if (!primaryCandidate) {
+            primaryCandidate = candidate;
+            applyPlan([candidate]);
             setStreamIndex(0);
-            setFirstCompatibleStreamIndex(
-              compatibleStreamIndex >= 0 ? compatibleStreamIndex : plan.length,
-            );
-            if (initialCandidate.transport === 'mse') {
-              if (await startMse(initialCandidate.name, initialMetadata)) {
-                return;
-              }
-              if (compatibleStreamIndex >= 0) {
-                armFirstFrameTimeout();
-                setStreamIndex(compatibleStreamIndex);
-                setActiveTransport('webrtc');
-                setConnectionAttempt(0);
-                setLivePhase('connecting');
-                return;
-              }
-              setLivePhase('fallback');
-              return;
-            }
-            if (!active || firstFrameExpired.current) {
-              return;
-            }
-            prepareLocalRtspMedia(
+            setActiveTransport('webrtc');
+          }
+          setConnectionAttempt(0);
+          setLivePhase('connecting');
+
+          if (!hedged && !rtspRequested) {
+            rtspRequested = true;
+            void prepareLocalRtspMedia(
               server,
               config,
               cameraName,
-              initialCandidate.name,
+              candidate.name,
             )
               .then(media => {
-                if (!active || firstFrameExpired.current) {
+                if (
+                  !active ||
+                  firstFrameExpired.current ||
+                  winningTransport.current
+                ) {
                   releaseProtectedMediaUri(media.uri);
                   return;
                 }
-                armFirstFrameTimeout();
+                logStartup('hedge-start', 'transport=rtsp');
                 setRtspMedia(media);
-                setActiveTransport('rtsp');
-                setLivePhase('connecting');
               })
               .catch(error => {
-                // A local route is optional. Its failure must not delay protected
-                // WebRTC, and the error is intentionally not exposed to the UI.
                 SecureLogger.logError(error as Error, 'preparing-local-live');
-                if (active && !firstFrameExpired.current) {
-                  armFirstFrameTimeout();
-                  setActiveTransport('webrtc');
-                  setLivePhase('connecting');
-                }
               });
+          }
+        };
+
+        const startMse = (
+          candidate: PlannedLiveStream,
+          streamMetadata?: StreamMetadata,
+          hedged = false,
+        ): Promise<boolean> => {
+          if (mseStartRequest) {
+            return mseStartRequest;
+          }
+          mseStartRequest = (async () => {
+            try {
+              if (!(await profileRegistrationRequest)) {
+                throw new Error('The protected MSE profile is unavailable');
+              }
+              const uri = await protectedMseMediaUri(server, candidate.name);
+              if (
+                !active ||
+                firstFrameExpired.current ||
+                winningTransport.current
+              ) {
+                releaseProtectedMediaUri(uri);
+                return false;
+              }
+              if (!primaryCandidate) {
+                primaryCandidate = candidate;
+                applyPlan([candidate]);
+                setStreamIndex(0);
+                setActiveTransport('mse');
+              }
+              logStartup(
+                hedged ? 'hedge-start' : 'transport-start',
+                'transport=mse',
+              );
+              setMseAudioAvailable((streamMetadata?.audio.length || 0) > 0);
+              setMseStreamName(candidate.name);
+              setMseMedia({
+                uri,
+                mimeType: 'video/mp4',
+                mode: 'direct',
+              });
+              setLivePhase('connecting');
+              return true;
+            } catch (error) {
+              failedCandidates.add(`mse:${candidate.name}`);
+              mseStartRequest = undefined;
+              SecureLogger.logError(error as Error, 'protected-mse-prepare');
+              return false;
+            }
           })();
+          return mseStartRequest;
+        };
+
+        const attemptPlan = () => {
+          if (
+            !active ||
+            !device ||
+            firstFrameExpired.current
+          ) {
+            return;
+          }
+          if (
+            effectiveStreamPreference.mode === 'manual' &&
+            !metadataRequestSettled[selectedStreams.indexOf(
+              effectiveStreamPreference.streamName,
+            )]
+          ) {
+            return;
+          }
+          const mseEnabled = protectedMseProbeEnabled();
+          const plan = planProtectedLiveStreams({
+            streams: selectedStreams.map((name, index) => ({
+              name,
+              metadata: metadata[index],
+            })),
+            device,
+            selection: effectiveStreamPreference,
+            mseEnabled,
+          }).filter(candidate =>
+            !failedCandidates.has(`${candidate.transport}:${candidate.name}`),
+          );
+          if (plan.length === 0) {
+            if (metadataSettled === selectedStreams.length) {
+              logStartup('plan-unavailable');
+              setLivePhase('fallback');
+            }
+            return;
+          }
+          applyPlan(plan);
+          if (winningTransport.current) {
+            return;
+          }
+          if (!primaryCandidate) {
+            const candidate = plan[0];
+            if (candidate.transport === 'mse') {
+              void startMse(
+                candidate,
+                metadata[selectedStreams.indexOf(candidate.name)],
+              ).then(started => {
+                if (!started) {
+                  primaryCandidate = undefined;
+                }
+                attemptPlan();
+              });
+            } else {
+              startWebRtc(candidate, false);
+              attemptPlan();
+            }
+            return;
+          }
+
+          const alternative = plan.find(candidate =>
+            candidate.transport !== primaryCandidate?.transport,
+          );
+          if (!alternative || hedgeTimer.current) {
+            return;
+          }
+          hedgeTimer.current = setTimeout(() => {
+            hedgeTimer.current = undefined;
+            if (
+              !active ||
+              firstFrameExpired.current ||
+              winningTransport.current
+            ) {
+              return;
+            }
+            if (alternative.transport === 'webrtc') {
+              startWebRtc(alternative, true);
+            } else {
+              void startMse(
+                alternative,
+                metadata[selectedStreams.indexOf(alternative.name)],
+                true,
+              );
+            }
+          }, LIVE_HEDGE_DELAY_MS);
+        };
+
+        void deviceCapabilityRequest
+          .then(capability => {
+            if (!active) {
+              return;
+            }
+            device = capability;
+            logStartup('capability-ready');
+            SecureLogger.logInfo(
+              `availability=${capability.availability}, hardware=${capability.hardware}, software=${capability.software}, maxWidth=${capability.maxWidth ?? 'unknown'}, maxHeight=${capability.maxHeight ?? 'unknown'}, maxFrameRate=${capability.maxFrameRate ?? 'unknown'}, mseEnabled=${protectedMseProbeEnabled()}`,
+              'protected-live-capability',
+            );
+            attemptPlan();
+          })
+          .catch(error => {
+            SecureLogger.logError(error as Error, 'probing-live-codecs');
+            if (active) {
+              setLivePhase('fallback');
+            }
+          });
+
+        selectedStreams.forEach((selectedStream, index) => {
+          void fetchStreamMetadata(server, selectedStream)
+            .then(value => {
+              if (!active) {
+                return;
+              }
+              metadata[index] = value;
+              const audioCodecs = new Set(
+                value.audio.map(descriptor => descriptor.codec),
+              );
+              logStartup('metadata-ready', `streamIndex=${index}`);
+              SecureLogger.logInfo(
+                `streamIndex=${index}, metadataAvailable=true, malformed=${value.malformed}, aac=${audioCodecs.has('aac')}, opus=${audioCodecs.has('opus')}, pcma=${audioCodecs.has('pcma')}, pcmu=${audioCodecs.has('pcmu')}`,
+                'protected-live-codecs',
+              );
+              metadataSettled += 1;
+              metadataRequestSettled[index] = true;
+              attemptPlan();
+            })
+            .catch(error => {
+              if (active) {
+                SecureLogger.logError(error as Error, 'loading-live-metadata');
+                SecureLogger.logInfo(
+                  `streamIndex=${index}, metadataAvailable=false`,
+                  'protected-live-codecs',
+                );
+              }
+              metadataSettled += 1;
+              metadataRequestSettled[index] = true;
+              attemptPlan();
+            });
+        });
       })
       .catch(error => {
         SecureLogger.logError(error as Error, 'loading-live-stream-config');
@@ -980,6 +1257,10 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
           if (firstFrameTimer.current) {
             clearTimeout(firstFrameTimer.current);
             firstFrameTimer.current = undefined;
+          }
+          if (hedgeTimer.current) {
+            clearTimeout(hedgeTimer.current);
+            hedgeTimer.current = undefined;
           }
           setLivePhase('fallback');
         }
@@ -1001,6 +1282,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
     cameraName,
     discoveryGeneration,
     invalidatePendingSnapshot,
+    logStartup,
     playbackActive,
     setActiveTransport,
     server,
@@ -1116,23 +1398,25 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
         />
       )}
       {playbackActive &&
-        transport === 'mse' &&
         mseMedia &&
         (livePhase === 'connecting' || livePhase === 'live') && (
           <Media3MediaPlayer
-            key={`${activationId}:mse:${streamName}`}
+            key={`${activationId}:mse:${mseStreamName}`}
             media={mseMedia}
             paused={false}
             muted={muted}
-            style={[styles.livePlayer, !decoded && styles.snapshotPending]}
+            style={[
+              styles.livePlayer,
+              transport !== 'mse' && styles.hedgedPlayer,
+              !decoded && transport === 'mse' && styles.snapshotPending,
+            ]}
             onProgress={() => undefined}
-            onEnd={() => liveFailed('timeout')}
-            onError={() => liveFailed('codec')}
-            onFirstFrame={livePlaying}
+            onEnd={() => liveFailed('mse', 'timeout')}
+            onError={() => liveFailed('mse', 'codec')}
+            onFirstFrame={handleMsePlaying}
           />
         )}
       {playbackActive &&
-        transport === 'rtsp' &&
         rtspMedia &&
         (livePhase === 'connecting' || livePhase === 'live') && (
           <LocalRtspPlayer
@@ -1140,25 +1424,29 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
             media={rtspMedia}
             active
             muted={muted}
-            style={[styles.livePlayer, !decoded && styles.snapshotPending]}
-            onPlaying={livePlaying}
-            onError={reason =>
-              liveFailed(reason === 'native' ? 'timeout' : 'timeout')
-            }
+            style={[
+              styles.livePlayer,
+              transport !== 'rtsp' && styles.hedgedPlayer,
+              !decoded && transport === 'rtsp' && styles.snapshotPending,
+            ]}
+            onPlaying={handleRtspPlaying}
+            onError={() => liveFailed('rtsp', 'timeout')}
           />
         )}
       {playbackActive &&
-        transport === 'webrtc' &&
-        streamName &&
+        webRtcStreamName &&
         (livePhase === 'connecting' || livePhase === 'live') && (
           <ProtectedWebRTCPlayer
-            key={`${activationId}:${streamName}:${connectionAttempt}`}
+            key={`${activationId}:${webRtcStreamName}:${connectionAttempt}`}
             server={server}
-            streamName={streamName}
+            streamName={webRtcStreamName}
             muted={muted}
-            style={styles.livePlayer}
-            onPlaying={livePlaying}
-            onError={liveFailed}
+            style={[
+              styles.livePlayer,
+              transport !== 'webrtc' && styles.hedgedPlayer,
+            ]}
+            onPlaying={handleWebRtcPlaying}
+            onError={handleWebRtcFailure}
             onAudioAvailabilityChange={handleWebRtcAudioAvailabilityChange}
             onAudioStatusChange={handleWebRtcAudioStatusChange}
           />
@@ -1212,7 +1500,7 @@ export const LivePreview: FC<LivePreviewProps> = ({cameraName}) => {
               accessibilityLabel={intl.formatMessage({
                 id: 'cameraPreview.retry',
               })}
-              onPress={() => setDiscoveryGeneration(current => current + 1)}
+              onPress={retryLiveDiscovery}
             >
               <Text style={styles.retryText}>
                 {intl.formatMessage({id: 'cameraPreview.retry'})}

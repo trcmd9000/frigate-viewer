@@ -101,6 +101,12 @@ describe('withNavigationTheme', () => {
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
+    expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
+      '#000',
+      'light',
+      true,
+      false,
+    );
 
     act(() => {
       mockOrientation = 'portrait';
@@ -150,6 +156,8 @@ describe('withNavigationTheme', () => {
     expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
       '#fff',
       'dark',
+      false,
+      true,
     );
     expect(
       mockMergeOptions.mock.invocationCallOrder[
@@ -171,6 +179,8 @@ describe('withNavigationTheme', () => {
     expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
       '#121212',
       'light',
+      false,
+      true,
     );
     view.unmount();
   });
@@ -185,6 +195,8 @@ describe('withNavigationTheme', () => {
     expect(mockApplyAndroidSystemBarSurface).toHaveBeenLastCalledWith(
       '#000',
       'light',
+      false,
+      false,
     );
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'portrait-player',

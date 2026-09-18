@@ -36,7 +36,6 @@ export default {
   'menu.item.logs.label': 'Dzienniki',
   'menu.item.settings.label': 'Ustawienia',
   'menu.item.author.label': 'O aplikacji',
-  'menu.item.report.label': 'Zgłoś problem',
   'report.topBar.title': 'Zgłoś problem',
   'report.introduction.info':
     'Opisz problem poniżej. Aplikacja otworzy w przeglądarce wstępnie wypełnione nowe zgłoszenie GitHub; dane diagnostyczne nie są automatycznie przesyłane. Sprawdź zgłoszenie przed wysłaniem. Nie dodawaj danych logowania, adresów URL serwera, dzienników ani innych poufnych danych.',

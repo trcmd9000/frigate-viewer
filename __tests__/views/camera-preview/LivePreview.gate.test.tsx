@@ -14,6 +14,7 @@ const mockPlanProtectedLiveStreams = jest.fn();
 const mockProtectedMseMediaUri = jest.fn();
 const mockDispatch = jest.fn();
 const mockLogInfo = jest.fn();
+const mockLogError = jest.fn();
 const mockServer = {profileId: 'profile-id'};
 const mockSelectProtectedLiveStreams = jest.fn(() => ['front']);
 const mockSelectProtectedLiveStreamOptions = jest.fn(
@@ -22,12 +23,17 @@ const mockSelectProtectedLiveStreamOptions = jest.fn(
 let mockPlaybackActive = true;
 let mockActivationId = 1;
 let mockPlayerShouldReportPlaying = true;
+let mockMseShouldReportPlaying = true;
+let mockMseMounts = 0;
+let mockWebRtcMounts = 0;
 let mockMseProbeEnabled = false;
 let mockLiveStreamPreferences: Record<string, Record<string, unknown>> = {};
 let mockPlayerProps:
   | {
       muted?: boolean;
+      streamName?: string;
       onPlaying: () => void;
+      onError?: (reason?: 'codec' | 'network' | 'timeout') => void;
       onAudioAvailabilityChange?: (available: boolean) => void;
       onAudioActivationChange?: (active: boolean) => void;
       onAudioStatusChange?: (status: ProtectedAudioStatus) => void;
@@ -72,6 +78,10 @@ jest.mock('../../../helpers/rest', () => ({
   useRest: () => ({get: mockGet}),
 }));
 
+jest.mock('../../../helpers/liveDiscovery', () => ({
+  loadLiveConfig: (_server: unknown, loader: () => Promise<unknown>) => loader(),
+}));
+
 jest.mock('../../../helpers/protectedLive', () => ({
   prepareLocalRtspMedia: mockPrepareLocalRtspMedia,
   selectProtectedLiveStreams: () => mockSelectProtectedLiveStreams(),
@@ -86,7 +96,7 @@ jest.mock('../../../helpers/playbackLifecycle', () => ({
 }));
 
 jest.mock('../../../helpers/secureLogger', () => ({
-  SecureLogger: {logError: jest.fn(), logInfo: mockLogInfo},
+  SecureLogger: {logError: mockLogError, logInfo: mockLogInfo},
 }));
 
 jest.mock('../../../helpers/hevcTransport', () => ({
@@ -104,12 +114,17 @@ jest.mock('../../../components/media/ProtectedWebRTCPlayer', () => {
   return {
     ['ProtectedWebRTCPlayer']: (props: {
       muted?: boolean;
+      streamName?: string;
       onPlaying: () => void;
+      onError?: (reason?: 'codec' | 'network' | 'timeout') => void;
       onAudioAvailabilityChange?: (available: boolean) => void;
       onAudioActivationChange?: (active: boolean) => void;
       onAudioStatusChange?: (status: ProtectedAudioStatus) => void;
     }) => {
       mockPlayerProps = props;
+      ReactModule.useEffect(() => {
+        mockWebRtcMounts += 1;
+      }, []);
       ReactModule.useEffect(() => {
         props.onAudioAvailabilityChange?.(true);
         props.onAudioActivationChange?.(false);
@@ -138,7 +153,14 @@ jest.mock('../../../components/media/Media3MediaPlayer', () => {
   const {View} = require('react-native');
   return {
     ['Media3MediaPlayer']: (props: {onFirstFrame: () => void}) => {
-      ReactModule.useEffect(() => props.onFirstFrame(), [props.onFirstFrame]);
+      ReactModule.useEffect(() => {
+        mockMseMounts += 1;
+      }, []);
+      ReactModule.useEffect(() => {
+        if (mockMseShouldReportPlaying) {
+          props.onFirstFrame();
+        }
+      }, [props.onFirstFrame]);
       return ReactModule.createElement(View, {testID: 'mse-player'});
     },
   };
@@ -273,6 +295,9 @@ describe('LivePreview audio render gate', () => {
     mockPlaybackActive = true;
     mockActivationId = 1;
     mockPlayerShouldReportPlaying = true;
+    mockMseShouldReportPlaying = true;
+    mockMseMounts = 0;
+    mockWebRtcMounts = 0;
     mockMseProbeEnabled = false;
     mockLiveStreamPreferences = {};
     mockPlayerProps = undefined;
@@ -288,6 +313,9 @@ describe('LivePreview audio render gate', () => {
     mockPlanProtectedLiveStreams.mockReset();
     mockPlanProtectedLiveStreams.mockImplementation(({streams, mseEnabled}) => {
       const first = streams[0];
+      if (!first?.metadata) {
+        return [];
+      }
       const hevc = first?.metadata?.video?.some(
         (descriptor: {codec: string}) => descriptor.codec === 'h265',
       );
@@ -306,6 +334,7 @@ describe('LivePreview audio render gate', () => {
     mockProtectedMseMediaUri.mockReset();
     mockProtectedMseMediaUri.mockResolvedValue('frigate-media://profile/mse/front');
     mockLogInfo.mockReset();
+    mockLogError.mockReset();
     mockFetchStreamMetadata.mockResolvedValue({
       audio: [{kind: 'audio', codec: 'opus'}],
       malformed: false,
@@ -324,12 +353,12 @@ describe('LivePreview audio render gate', () => {
     );
 
     await waitFor(() =>
-      expect(mockLogInfo).toHaveBeenCalledWith(
-        'streamIndex=0, metadataAvailable=true, malformed=false, aac=false, opus=true, pcma=false, pcmu=false',
-        'protected-live-codecs',
-      ),
+      expect(mockFetchStreamMetadata).toHaveBeenCalledWith(mockServer, 'front'),
     );
-    expect(mockFetchStreamMetadata).toHaveBeenCalledWith(mockServer, 'front');
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      'streamIndex=0, metadataAvailable=true, malformed=false, aac=false, opus=true, pcma=false, pcmu=false',
+      'protected-live-codecs',
+    );
     expect(mockLogInfo.mock.calls.flat().join(' ')).not.toContain('front');
     view.unmount();
   });
@@ -364,7 +393,7 @@ describe('LivePreview audio render gate', () => {
     view.unmount();
   });
 
-  it('prewarms the opaque MSE URI while stream metadata is loading', async () => {
+  it('creates the opaque MSE URI only after metadata selects the stream', async () => {
     mockMseProbeEnabled = true;
     let resolveMetadata!: (value: unknown) => void;
     mockFetchStreamMetadata.mockReturnValue(new Promise(resolve => {
@@ -377,10 +406,7 @@ describe('LivePreview audio render gate', () => {
       </IntlProvider>,
     );
 
-    await waitFor(() => expect(mockProtectedMseMediaUri).toHaveBeenCalledWith(
-      mockServer,
-      'front',
-    ));
+    expect(mockProtectedMseMediaUri).not.toHaveBeenCalled();
     expect(view.queryByTestId('mse-player')).toBeNull();
 
     resolveMetadata({
@@ -388,6 +414,10 @@ describe('LivePreview audio render gate', () => {
       audio: [],
       malformed: false,
     });
+    await waitFor(() => expect(mockProtectedMseMediaUri).toHaveBeenCalledWith(
+      mockServer,
+      'front',
+    ));
     await waitFor(() => expect(view.getByTestId('mse-player')).toBeTruthy());
     view.unmount();
   });
@@ -434,6 +464,7 @@ describe('LivePreview audio render gate', () => {
           }),
     );
     mockPlanProtectedLiveStreams.mockImplementation(({streams}) => streams
+      .filter((stream: {metadata?: unknown}) => stream.metadata)
       .map((stream: {name: string; metadata?: {video?: Array<{codec: string}>}}) => ({
         name: stream.name,
         codec: stream.metadata?.video?.some(
@@ -456,6 +487,115 @@ describe('LivePreview audio render gate', () => {
       audio: [],
       malformed: false,
     });
+    await waitFor(() => expect(mockFetchStreamMetadata).toHaveBeenCalledTimes(2));
+    expect(mockMseMounts).toBe(1);
+    view.unmount();
+  });
+
+  it('starts a bounded WebRTC hedge and keeps the first real frame', async () => {
+    jest.useFakeTimers();
+    mockMseProbeEnabled = true;
+    mockMseShouldReportPlaying = false;
+    mockPlayerShouldReportPlaying = false;
+    mockSelectProtectedLiveStreams.mockReturnValue(['original', 'compatible']);
+    mockFetchStreamMetadata.mockImplementation((_: unknown, streamName: string) =>
+      Promise.resolve({
+        video: [{
+          kind: 'video',
+          codec: streamName === 'original' ? 'h265' : 'h264',
+        }],
+        audio: [],
+        malformed: false,
+      }),
+    );
+    mockPlanProtectedLiveStreams.mockImplementation(({streams}) => {
+      const available = streams.filter(
+        (stream: {metadata?: unknown}) => stream.metadata,
+      );
+      return available.map((stream: {name: string}) => ({
+        name: stream.name,
+        codec: stream.name === 'original' ? 'h265' : 'h264',
+        transport: stream.name === 'original' ? 'mse' : 'webrtc',
+      }));
+    });
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.getByTestId('mse-player')).toBeTruthy();
+    expect(view.queryByTestId('protected-player')).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2500);
+      await Promise.resolve();
+    });
+    expect(view.getByTestId('protected-player')).toBeTruthy();
+    await act(async () => mockPlayerProps?.onPlaying());
+    expect(view.getByTestId('mock-live-status').props.transport).toBe('webrtc');
+    expect(view.queryByTestId('mse-player')).toBeNull();
+    view.unmount();
+    jest.useRealTimers();
+  });
+
+  it('remounts the selected WebRTC stream after a connection error', async () => {
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+    await waitFor(() => expect(mockWebRtcMounts).toBe(1));
+    mockPlayerShouldReportPlaying = false;
+    await act(async () => mockPlayerProps?.onError?.('network'));
+    await waitFor(() => expect(mockWebRtcMounts).toBe(2));
+    expect(mockPlayerProps?.streamName).toBe('front');
+    view.unmount();
+  });
+
+  it('falls back after failed metadata for a manual stream settles', async () => {
+    mockLiveStreamPreferences = {
+      'profile-id': {
+        front: {mode: 'manual', streamName: 'original'},
+      },
+    };
+    mockSelectProtectedLiveStreams.mockReturnValue(['compatible', 'original']);
+    mockFetchStreamMetadata.mockImplementation((_: unknown, streamName: string) =>
+      streamName === 'original'
+        ? Promise.reject(new Error('metadata unavailable'))
+        : Promise.resolve({
+            video: [{kind: 'video', codec: 'h264'}],
+            audio: [],
+            malformed: false,
+          }),
+    );
+    mockPlanProtectedLiveStreams.mockImplementation(({streams, selection}) => {
+      const selected = streams.find(
+        (stream: {name: string; metadata?: unknown}) =>
+          selection.mode === 'manual' &&
+          stream.name === selection.streamName &&
+          stream.metadata,
+      );
+      const fallback = streams.find(
+        (stream: {metadata?: unknown}) => stream.metadata,
+      );
+      const candidate = selected || fallback;
+      return candidate
+        ? [{name: candidate.name, codec: 'h264', transport: 'webrtc'}]
+        : [];
+    });
+
+    const view = render(
+      <IntlProvider locale="en" messages={en}>
+        <LivePreview cameraName="front" />
+      </IntlProvider>,
+    );
+    await waitFor(() => expect(view.getByTestId('protected-player')).toBeTruthy());
+    expect(mockPlayerProps?.streamName).toBe('compatible');
     view.unmount();
   });
 

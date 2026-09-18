@@ -14,6 +14,7 @@ import {
   decideTransportEligibility,
   deviceCodecCapabilityFromNative,
   fetchStreamMetadata,
+  invalidateStreamMetadataCache,
   parseStreamMetadata,
   parseStreamMetadataJson,
   planProtectedLiveStreams,
@@ -41,6 +42,7 @@ const device = (
 
 describe('HEVC transport observation model', () => {
   beforeEach(() => {
+    invalidateStreamMetadataCache();
     request.mockReset();
     mockProtectedMediaProfileId.mockReset();
     NativeModules.ClientCertModule = NativeModules.ClientCertModule || {};
@@ -426,6 +428,48 @@ describe('HEVC transport observation model', () => {
     expect(first.video[0].codec).toBe('h265');
     expect(second).toBe(first);
     expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves stale metadata immediately while one refresh is in flight', async () => {
+    const now = jest.spyOn(Date, 'now');
+    now.mockReturnValue(1_000);
+    request.mockResolvedValueOnce({
+      status: 200,
+      text: async () => '{"producers":[{"medias":"video, H265"}]}',
+    });
+    const server = {
+      profileId: 'metadata-stale-test',
+      protocol: 'https' as const,
+      host: 'server.invalid',
+      port: 443,
+      path: '',
+      auth: 'none' as const,
+      credentials: {username: '', password: ''},
+    };
+    const first = await fetchStreamMetadata(server, 'camera');
+    let resolveRefresh!: (response: unknown) => void;
+    request.mockReturnValueOnce(new Promise(resolve => {
+      resolveRefresh = resolve;
+    }));
+    now.mockReturnValue(6 * 60_000);
+
+    const stale = await fetchStreamMetadata(server, 'camera');
+    const duplicate = await fetchStreamMetadata(server, 'camera');
+
+    expect(stale).toBe(first);
+    expect(duplicate).toBe(first);
+    expect(request).toHaveBeenCalledTimes(2);
+
+    resolveRefresh({
+      status: 200,
+      text: async () => '{"producers":[{"medias":"video, H264"}]}',
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    const refreshed = await fetchStreamMetadata(server, 'camera');
+    expect(refreshed.video[0].codec).toBe('h264');
+    now.mockRestore();
   });
 
   it('treats an unexpected response content type as unknown without retaining it', async () => {

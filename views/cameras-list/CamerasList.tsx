@@ -41,9 +41,22 @@ import {
   gridCellWidth,
   responsiveGridColumns,
 } from '../../helpers/gridLayout';
+import {
+  invalidateLiveConfigCache,
+  prewarmLiveDiscovery,
+  rememberLiveConfig,
+} from '../../helpers/liveDiscovery';
+import type {FrigateLiveConfig} from '../../helpers/protectedLive';
+import {invalidateStreamMetadataCache} from '../../helpers/hevcTransport';
 
-interface IConfigResponse {
-  cameras: Record<string, {zones: Record<string, unknown>}>;
+interface IConfigResponse extends FrigateLiveConfig {
+  cameras: Record<
+    string,
+    {
+      zones: Record<string, unknown>;
+      live?: {streams?: Record<string, string>};
+    }
+  >;
   objects: {track: string[]};
 }
 
@@ -184,6 +197,8 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
       return;
     }
     const currentRequest = ++refreshRequestId.current;
+    invalidateLiveConfigCache(server);
+    invalidateStreamMetadataCache(server);
     setLoading(true);
     setError(false);
     getRef
@@ -213,6 +228,17 @@ const CamerasListContent: NavigationFunctionComponent<{generation: number}> = ({
             },
           }),
         );
+        rememberLiveConfig(server, config);
+        void prewarmLiveDiscovery(
+          server,
+          config,
+          availableCameras,
+          () => isCurrentRequest(currentRequest),
+        ).catch(requestError => {
+          if (isCurrentRequest(currentRequest)) {
+            void handleError(requestError, 'CamerasList.prewarm');
+          }
+        });
       })
       .catch(async requestError => {
         if (!isCurrentRequest(currentRequest)) {

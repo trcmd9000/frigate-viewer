@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.14] - 2026-09-18
+
+- Prevented a muted WebRTC live stream from emitting a brief audio burst
+  before the explicit audio activation lease is granted.
+- Kept landscape media playback edge-to-edge so the hidden Android system bars
+  do not leave a black inset while portrait playback retains its safe area.
+- Removed the broken direct **Report problem** menu entry; the About page
+  remains the supported path to the project repository and support resources.
+
+## [18.0.13] - 2026-09-18
+
+- Prewarmed only live-stream configuration and codec metadata from the camera
+  overview without opening background live connections.
+- Removed metadata head-of-line blocking and unnecessary Media3 restarts during
+  progressive live-stream discovery.
+- Added bounded foreground transport hedging so MSE, WebRTC, and local RTSP
+  failures no longer serialize the complete camera startup path.
+- Added privacy-safe end-to-end first-frame timing for physical-device
+  performance verification.
+
 ## [18.0.12] - 2026-09-18
 
 - Kept Android status-bar surfaces and icon contrast synchronized with light,

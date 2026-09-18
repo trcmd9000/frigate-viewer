@@ -10,10 +10,14 @@ import {LivePreview} from './LivePreview';
 
 interface CameraPreviewProps extends ServerScopeScreenProps {
   cameraName: string;
+  startupStartedAt?: number;
+  startupTraceId?: number;
 }
 
 const CameraPreviewContent: NavigationFunctionComponent<CameraPreviewProps> = ({
   cameraName,
+  startupStartedAt,
+  startupTraceId,
 }) => {
   const styles = useStyles(({theme}) => ({
     wrapper: {
@@ -24,7 +28,11 @@ const CameraPreviewContent: NavigationFunctionComponent<CameraPreviewProps> = ({
 
   return (
     <View testID="camera-preview-screen" style={styles.wrapper}>
-      <LivePreview cameraName={cameraName} />
+      <LivePreview
+        cameraName={cameraName}
+        startupStartedAt={startupStartedAt}
+        startupTraceId={startupTraceId}
+      />
     </View>
   );
 };

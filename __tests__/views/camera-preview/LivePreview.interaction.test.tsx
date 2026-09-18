@@ -58,7 +58,7 @@ jest.mock('../../../helpers/colors', () => ({
     }),
 }));
 jest.mock('../../../helpers/secureLogger', () => ({
-  SecureLogger: {logError: jest.fn()},
+  SecureLogger: {logError: jest.fn(), logInfo: jest.fn()},
 }));
 jest.mock('../../../components/ZoomableImage', () => ({
   ZoomableImage: (props: Record<string, unknown>) => {

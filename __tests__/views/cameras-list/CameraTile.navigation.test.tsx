@@ -138,7 +138,12 @@ describe('CameraTile native navigation', () => {
       expect.objectContaining({
         component: expect.objectContaining({
           name: 'CameraPreview',
-          passProps: {cameraName: 'lumus_pro', ownerScopeGeneration: 0},
+          passProps: expect.objectContaining({
+            cameraName: 'lumus_pro',
+            ownerScopeGeneration: 0,
+            startupStartedAt: expect.any(Number),
+            startupTraceId: expect.any(Number),
+          }),
           options: expect.objectContaining({
             layout: expect.objectContaining({
               backgroundColor: '#000000',

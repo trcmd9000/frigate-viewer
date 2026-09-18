@@ -17,7 +17,12 @@ describe('Android system-bar surface bridge', () => {
 
     applyAndroidSystemBarSurface('#ffffff', 'dark');
 
-    expect(setSystemBarSurface).toHaveBeenCalledWith('#ffffff', 'dark');
+    expect(setSystemBarSurface).toHaveBeenCalledWith(
+      '#ffffff',
+      'dark',
+      false,
+      true,
+    );
   });
 
   it('does not call the native bridge on other platforms', () => {

@@ -75,7 +75,7 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
   const intl = useIntl();
   const isSecondaryRoot = componentId === SECONDARY_ROOT_COMPONENT_ID;
 
-  useMenu(componentId, 'report');
+  useMenu(componentId);
 
   useEffect(() => {
     Navigation.mergeOptions(componentId, {

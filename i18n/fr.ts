@@ -36,7 +36,6 @@ export default {
   'menu.item.logs.label': 'Journaux',
   'menu.item.settings.label': 'Paramètres',
   'menu.item.author.label': 'À propos',
-  'menu.item.report.label': 'Signaler un problème',
   'report.topBar.title': 'Signaler un problème',
   'report.introduction.info':
     'Décrivez le problème ci-dessous. L’application ouvrira dans votre navigateur une nouvelle issue GitHub préremplie ; aucun diagnostic n’est téléversé automatiquement. Vérifiez l’issue avant de l’envoyer. N’incluez pas d’identifiants, d’URL de serveur, de journaux ni d’autres données sensibles.',
