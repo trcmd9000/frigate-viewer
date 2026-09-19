@@ -23,7 +23,7 @@ public class MainActivity extends NavigationActivity {
 			@Nullable Activity activity,
 			int backgroundColor,
 			boolean darkStatusBarIcons) {
-		applySystemBarSurface(activity, backgroundColor, darkStatusBarIcons, false, true);
+		applySystemBarSurface(activity, backgroundColor, darkStatusBarIcons, false, true, false);
 	}
 
 	static void applySystemBarSurface(
@@ -31,7 +31,8 @@ public class MainActivity extends NavigationActivity {
 			int backgroundColor,
 			boolean darkStatusBarIcons,
 			boolean immersive,
-			boolean navigationBarVisible) {
+			boolean navigationBarVisible,
+			boolean edgeToEdge) {
 		if (activity == null) {
 			return;
 		}
@@ -39,7 +40,7 @@ public class MainActivity extends NavigationActivity {
 		window.setBackgroundDrawable(new ColorDrawable(backgroundColor));
 		View decorView = window.getDecorView();
 		decorView.setBackgroundColor(backgroundColor);
-		WindowCompat.setDecorFitsSystemWindows(window, !immersive);
+		WindowCompat.setDecorFitsSystemWindows(window, !edgeToEdge);
 		WindowInsetsControllerCompat controller =
 				WindowCompat.getInsetsController(window, decorView);
 		if (immersive) {

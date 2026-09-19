@@ -39,6 +39,7 @@ jest.mock('../../../helpers/screen', () => ({
   useOrientation: () => ({orientation: 'portrait', setComponentId: jest.fn()}),
 }));
 jest.mock('../../../helpers/colors', () => ({
+  useTheme: () => ({text: '#000'}),
   useStyles: (fn: (value: unknown) => unknown) =>
     fn({theme: {background: '#fff', surfaceElevated: '#eee', border: '#ccc'}}),
 }));

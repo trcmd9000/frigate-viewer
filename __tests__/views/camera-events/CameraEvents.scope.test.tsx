@@ -180,7 +180,7 @@ describe('CameraEvents server-scope requests', () => {
   afterEach(() => { cleanup(); jest.restoreAllMocks(); });
 
   it.each([
-    ['portrait', true, false],
+    ['portrait', true, true],
     ['landscape', false, true],
   ] as const)(
     'seeds %s media chrome before the clip first frame',
@@ -198,7 +198,7 @@ describe('CameraEvents server-scope requests', () => {
         component: expect.objectContaining({
           options: expect.objectContaining({
             layout: expect.objectContaining({
-              fitSystemWindows: orientation === 'portrait',
+              fitSystemWindows: false,
             }),
             statusBar: expect.objectContaining({
               visible: statusBarVisible,

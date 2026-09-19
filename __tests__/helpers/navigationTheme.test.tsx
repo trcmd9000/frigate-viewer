@@ -45,11 +45,11 @@ jest.mock('../../helpers/colors', () => ({
     orientation: 'portrait' | 'landscape' = 'landscape',
   ) => ({
     layout: {
-      fitSystemWindows: surface === 'app' || orientation === 'portrait',
+      fitSystemWindows: surface === 'app',
     },
     statusBar: {
       visible: surface === 'app' || orientation === 'portrait',
-      drawBehind: surface !== 'app' && orientation === 'landscape',
+      drawBehind: surface !== 'app',
     },
     navigationBar: {
       backgroundColor:
@@ -106,6 +106,7 @@ describe('withNavigationTheme', () => {
       'light',
       true,
       false,
+      true,
     );
 
     act(() => {
@@ -121,8 +122,8 @@ describe('withNavigationTheme', () => {
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'rotating-player',
       expect.objectContaining({
-        layout: {fitSystemWindows: true},
-        statusBar: {visible: true, drawBehind: false},
+        layout: {fitSystemWindows: false},
+        statusBar: {visible: true, drawBehind: true},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );
@@ -158,6 +159,7 @@ describe('withNavigationTheme', () => {
       'dark',
       false,
       true,
+      false,
     );
     expect(
       mockMergeOptions.mock.invocationCallOrder[
@@ -181,6 +183,7 @@ describe('withNavigationTheme', () => {
       'light',
       false,
       true,
+      false,
     );
     view.unmount();
   });
@@ -197,12 +200,13 @@ describe('withNavigationTheme', () => {
       'light',
       false,
       false,
+      true,
     );
     expect(mockMergeOptions).toHaveBeenLastCalledWith(
       'portrait-player',
       expect.objectContaining({
-        layout: {fitSystemWindows: true},
-        statusBar: {visible: true, drawBehind: false},
+        layout: {fitSystemWindows: false},
+        statusBar: {visible: true, drawBehind: true},
         navigationBar: {backgroundColor: '#000', visible: false},
       }),
     );

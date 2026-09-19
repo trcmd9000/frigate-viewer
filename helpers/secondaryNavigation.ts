@@ -458,9 +458,11 @@ export const dismissSecondaryStackRoot = (
 
 export const createSecondaryStackDismissButton = (
   text: string,
+  color: string = currentSecondaryTheme().theme.text,
 ): OptionsTopBarButton => ({
   id: SECONDARY_ROOT_DISMISS_BUTTON_ID,
   text,
+  color,
 });
 
 /** Handles the shared root top-bar button without intercepting nested Back. */

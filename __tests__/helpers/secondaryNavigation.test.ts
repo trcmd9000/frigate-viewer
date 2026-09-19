@@ -5,6 +5,7 @@ import {
 import {SecureLogger} from '../../helpers/secureLogger';
 import {
   createSecondaryNavigationOptions,
+  createSecondaryStackDismissButton,
   dismissSecondaryStack,
   dismissSecondaryStackRoot,
   presentSecondaryStack,
@@ -126,6 +127,8 @@ describe('secondary navigation', () => {
           visible: true,
           drawBehind: false,
           background: {color: theme.surface},
+          title: {color: theme.text},
+          backButton: {color: theme.text},
         }),
       );
       expect(options.statusBar).toEqual({
@@ -142,6 +145,17 @@ describe('secondary navigation', () => {
       });
     },
   );
+
+  it.each([
+    ['light', lightTheme],
+    ['dark', darkTheme],
+  ] as const)('sets the dismiss button text color for the %s theme', (_scheme, theme) => {
+    expect(createSecondaryStackDismissButton('Back', theme.text)).toEqual({
+      id: 'dismissSecondaryStack',
+      text: 'Back',
+      color: theme.text,
+    });
+  });
 
   it('uses short decelerating show/push animations and reverse dismiss/pop animations', () => {
     const animations = createSecondaryNavigationOptions(

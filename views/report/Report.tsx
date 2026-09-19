@@ -87,12 +87,13 @@ export const Report: NavigationFunctionComponent = ({componentId}) => {
           isSecondaryRoot
             ? createSecondaryStackDismissButton(
                 intl.formatMessage(messages['topBar.back']),
+                theme.text,
               )
             : menuButton,
         ],
       },
     });
-  }, [componentId, intl, isSecondaryRoot]);
+  }, [componentId, intl, isSecondaryRoot, theme.text]);
 
   useEffect(() => {
     if (!isSecondaryRoot) {

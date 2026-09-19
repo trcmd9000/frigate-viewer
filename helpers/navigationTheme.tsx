@@ -69,6 +69,7 @@ export const withNavigationTheme =
             : 'light',
           surfaceToApply !== 'app' && orientationRef.current === 'landscape',
           surfaceToApply === 'app',
+          surfaceToApply !== 'app',
         );
       },
       [props.componentId],

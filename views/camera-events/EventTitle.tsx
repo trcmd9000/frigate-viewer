@@ -83,7 +83,7 @@ export const EventTitle: FC<IEventTitleProps> = ({
         <Text
           accessible
           accessibilityLabel="Retained event"
-          style={{fontSize: 18}}
+          style={{fontSize: 18, color: tokens.colors.warning}}
         >
           ★
         </Text>

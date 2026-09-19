@@ -165,6 +165,7 @@ export const navigationThemeOptions = (
         ? ('light' as const)
         : ('dark' as const),
       visible: mediaOptions?.statusBar.visible ?? true,
+      hideWithTopBar: mediaOptions?.statusBar.hideWithTopBar ?? false,
       drawBehind:
         mediaOptions?.statusBar.drawBehind ?? false,
       ...(mediaOptions

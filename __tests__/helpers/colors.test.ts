@@ -145,7 +145,8 @@ describe('adaptive color scheme', () => {
         backgroundColor: theme.mediaBackground,
         style: 'light',
         visible: true,
-        drawBehind: false,
+        hideWithTopBar: false,
+        drawBehind: true,
       }),
     );
     expect(options.navigationBar).toEqual({
@@ -154,17 +155,18 @@ describe('adaptive color scheme', () => {
     });
   });
 
-  it('keeps portrait playback below the status bar while hiding navigation', () => {
+  it('keeps media edge-to-edge while hiding navigation', () => {
     (Platform as {OS: string}).OS = 'android';
 
     expect(
       navigationThemeOptions(lightTheme, 'light', 'event', 'portrait'),
     ).toEqual(
       expect.objectContaining({
-        layout: expect.objectContaining({fitSystemWindows: true}),
+        layout: expect.objectContaining({fitSystemWindows: false}),
         statusBar: expect.objectContaining({
           visible: true,
-          drawBehind: false,
+          hideWithTopBar: false,
+          drawBehind: true,
         }),
         navigationBar: {backgroundColor: lightTheme.mediaBackground, visible: false},
       }),
@@ -176,6 +178,7 @@ describe('adaptive color scheme', () => {
         layout: expect.objectContaining({fitSystemWindows: false}),
         statusBar: expect.objectContaining({
           visible: false,
+          hideWithTopBar: false,
           drawBehind: true,
         }),
         navigationBar: {backgroundColor: lightTheme.mediaBackground, visible: false},

@@ -6,9 +6,9 @@ This fork continues the upstream Android version sequence. Every published build
 must increment both values in `android/app/build.gradle`:
 
 - `versionName`: user-visible semantic version, next release candidate
-  `18.0.14`
+  `18.0.15`
 - `versionCode`: monotonically increasing Play Store build number, next
-  release candidate `39`
+  release candidate `40`
 
 ## Local prerequisites
 

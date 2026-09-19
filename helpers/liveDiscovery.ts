@@ -39,8 +39,7 @@ export const loadLiveConfig = (
   if (cached?.request) {
     return cached.request;
   }
-  let request: Promise<FrigateLiveConfig>;
-  request = loader()
+  const request = loader()
     .then(config => {
       rememberLiveConfig(server, config);
       return config;

@@ -8,6 +8,7 @@ interface SystemBarsModule {
     statusBarStyle: StatusBarStyle,
     immersive: boolean,
     navigationBarVisible: boolean,
+    edgeToEdge: boolean,
   ) => void;
 }
 
@@ -16,6 +17,7 @@ export const applyAndroidSystemBarSurface = (
   statusBarStyle: StatusBarStyle,
   immersive = false,
   navigationBarVisible = true,
+  edgeToEdge = false,
 ): void => {
   if (Platform.OS !== 'android') {
     return;
@@ -29,5 +31,6 @@ export const applyAndroidSystemBarSurface = (
     statusBarStyle,
     immersive,
     navigationBarVisible,
+    edgeToEdge,
   );
 };

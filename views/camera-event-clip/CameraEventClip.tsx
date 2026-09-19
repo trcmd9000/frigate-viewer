@@ -77,6 +77,7 @@ import {
   withServerScopeScreen,
 } from '../../helpers/serverScopeScreen';
 import {SecureLogger} from '../../helpers/secureLogger';
+import {usePortraitMediaTopInset} from '../../helpers/mediaSafeArea';
 import {useEventRetention} from '../camera-events/useEventRetention';
 
 interface ICameraEventClipProps extends ServerScopeScreenProps {
@@ -154,27 +155,18 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
     [isCurrentScope],
   );
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const portraitTopInset = usePortraitMediaTopInset();
   const systemInsets = useMemo(() => {
-    let statusBarHeight = 0;
-    try {
-      statusBarHeight = Navigation.constantsSync?.().statusBarHeight ?? 0;
-    } catch (error) {
-      SecureLogger.logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CameraEventClip.system-insets',
-      );
-    }
     const screen = Dimensions.get('screen');
     const verticalSystemInset = Math.max(0, screen.height - windowHeight);
     const horizontalSystemInset = Math.max(0, screen.width - windowWidth);
-    const landscape = screen.width > screen.height;
     return {
-      top: landscape ? Math.max(0, statusBarHeight) : 0,
-      bottom: Math.max(0, verticalSystemInset - statusBarHeight),
+      top: portraitTopInset,
+      bottom: Math.max(0, verticalSystemInset - portraitTopInset),
       left: horizontalSystemInset,
       right: horizontalSystemInset,
     };
-  }, [windowHeight, windowWidth]);
+  }, [portraitTopInset, windowHeight, windowWidth]);
   const overflowMenuMargin = 8;
   const overflowMenuAnchorLeft = systemInsets.left + 96;
   const overflowMenuWidth = Math.max(
@@ -842,7 +834,10 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       defaultMessage: 'Retry media',
     });
     return (
-      <View accessibilityLiveRegion="assertive" style={styles.overlayWrapper}>
+      <View
+        accessibilityLiveRegion="assertive"
+        style={[styles.overlayWrapper, {paddingTop: systemInsets.top}]}
+      >
         {closeOnlyTools}
         <Text accessibilityRole="alert" style={styles.errorText}>
           {errorMessage}
@@ -870,7 +865,9 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
       defaultMessage: 'Preparing media',
     });
     return (
-      <View style={styles.overlayWrapper}>
+      <View
+        style={[styles.overlayWrapper, {paddingTop: systemInsets.top}]}
+      >
         {closeOnlyTools}
         <View
           accessible
@@ -891,7 +888,11 @@ const VideoPlayer: FC<IVideoPlayerProps> = ({
   }
 
   return (
-    <View onTouchStart={scheduleAutoHide} style={styles.wrapper}>
+    <View
+      testID="event-player-root"
+      onTouchStart={scheduleAutoHide}
+      style={[styles.wrapper, {paddingTop: systemInsets.top}]}
+    >
       <Media3MediaPlayer
         ref={player}
         paused={paused || !active}

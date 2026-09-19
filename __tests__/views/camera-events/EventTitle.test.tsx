@@ -28,7 +28,7 @@ jest.mock('../../../helpers/designTokens', () => ({
   useDesignTokens: () => ({
     spacing: {sm: 8},
     typography: {timestamp: {}},
-    colors: {textSecondary: '#555'},
+    colors: {textSecondary: '#555', warning: '#fc0'},
   }),
 }));
 
@@ -39,13 +39,14 @@ const renderTitle = (
   end = start + 12.862,
   locale = 'de',
   messages: Record<string, string> = de,
+  retained = false,
 ) =>
   render(
     <IntlProvider locale={locale} messages={messages}>
       <EventTitle
         startTime={start}
         endTime={end}
-        retained={false}
+        retained={retained}
       />
     </IntlProvider>,
   );
@@ -96,5 +97,20 @@ describe('EventTitle duration formatting', () => {
     const {queryByText} = renderTitle(Number.NaN, startTime + 10);
 
     expect(queryByText(/\(\d+:\d{2}\)/)).toBeNull();
+  });
+
+  it('renders retained status with the warning token and an accessible label', () => {
+    const {getByLabelText, getByText} = renderTitle(
+      startTime,
+      startTime + 10,
+      'de',
+      de,
+      true,
+    );
+
+    expect(getByLabelText('Retained event')).toBeTruthy();
+    expect(getByText('★').props.style).toEqual(
+      expect.objectContaining({fontSize: 18, color: '#fc0'}),
+    );
   });
 });

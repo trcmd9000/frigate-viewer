@@ -147,12 +147,12 @@ describe('CameraTile native navigation', () => {
           options: expect.objectContaining({
             layout: expect.objectContaining({
               backgroundColor: '#000000',
-              fitSystemWindows: true,
+              fitSystemWindows: false,
             }),
             topBar: {visible: false},
             statusBar: expect.objectContaining({
               visible: true,
-              drawBehind: false,
+              drawBehind: true,
             }),
             navigationBar: {visible: false, backgroundColor: '#000000'},
           }),
@@ -195,11 +195,11 @@ describe('CameraTile native navigation', () => {
           options: expect.objectContaining({
             layout: expect.objectContaining({
               orientation: ['sensorLandscape'],
-              fitSystemWindows: true,
+              fitSystemWindows: false,
             }),
             statusBar: expect.objectContaining({
               visible: true,
-              drawBehind: false,
+              drawBehind: true,
             }),
             navigationBar: {visible: false, backgroundColor: '#000000'},
           }),

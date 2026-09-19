@@ -144,6 +144,7 @@ const AboutRow = ({
 export const Author: NavigationFunctionComponent = ({componentId}) => {
   const intl = useIntl();
   const openLink = useOpenLink();
+  const theme = useTheme();
 
   const styles = useAboutStyles();
 
@@ -156,6 +157,7 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
         leftButtons: [
           createSecondaryStackDismissButton(
             intl.formatMessage(messages['topBar.back']),
+            theme.text,
           ),
         ],
       },
@@ -170,7 +172,7 @@ export const Author: NavigationFunctionComponent = ({componentId}) => {
         });
       });
     return () => subscription.remove();
-  }, [componentId, intl]);
+  }, [componentId, intl, theme.text]);
 
   return (
     <ScrollView style={styles.wrapper}>

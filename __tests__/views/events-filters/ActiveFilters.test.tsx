@@ -93,4 +93,21 @@ describe('active event filters', () => {
     mockSelectorValues.labels = ['person'];
     mockSelectorValues.retained = true;
   });
+
+  it('uses the German event-filter translations for screen and active controls', () => {
+    expect(de['eventsFilters.screen.title']).toBe('Ereignisse filtern');
+    expect(de['eventsFilters.screen.label']).toBe('Ereignisfilter');
+
+    const view = render(
+      <IntlProvider locale="de" messages={de}>
+        <ActiveFilters />
+      </IntlProvider>,
+    );
+
+    expect(view.getByLabelText('Filter front-door entfernen')).toBeTruthy();
+    expect(
+      view.getByLabelText('Filter Nur gespeicherte Ereignisse entfernen'),
+    ).toBeTruthy();
+    expect(view.getByLabelText('Filter löschen')).toBeTruthy();
+  });
 });

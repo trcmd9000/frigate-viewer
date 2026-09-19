@@ -2,6 +2,8 @@ import React from 'react';
 import {render} from '@testing-library/react-native';
 import {CameraPreview} from '../../../views/camera-preview/CameraPreview';
 
+let mockTopInset = 24;
+
 jest.mock('react-native-navigation', () => ({}));
 
 jest.mock('../../../store/store', () => ({
@@ -30,6 +32,9 @@ jest.mock('../../../helpers/colors', () => ({
       },
     }),
 }));
+jest.mock('../../../helpers/mediaSafeArea', () => ({
+  usePortraitMediaTopInset: () => mockTopInset,
+}));
 
 describe('CameraPreview overlay ownership', () => {
   it('delegates the camera name to the live preview overlay', () => {
@@ -46,5 +51,24 @@ describe('CameraPreview overlay ownership', () => {
       cameraName,
     );
     expect(view.queryByTestId('camera-preview-title')).toBeNull();
+    expect(view.getByTestId('camera-preview-screen').props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({paddingTop: 24}),
+      ]),
+    );
+
+    mockTopInset = 0;
+    view.rerender(
+      <CameraPreview
+        cameraName={cameraName}
+        componentId="camera-preview"
+        componentName="CameraPreview"
+      />,
+    );
+    expect(view.getByTestId('camera-preview-screen').props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({paddingTop: 0}),
+      ]),
+    );
   });
 });

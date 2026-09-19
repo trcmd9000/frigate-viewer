@@ -2,6 +2,7 @@ import React from 'react';
 import {View} from 'react-native';
 import {NavigationFunctionComponent} from 'react-native-navigation';
 import {useStyles} from '../../helpers/colors';
+import {usePortraitMediaTopInset} from '../../helpers/mediaSafeArea';
 import {
   ServerScopeScreenProps,
   withServerScopeScreen,
@@ -19,6 +20,7 @@ const CameraPreviewContent: NavigationFunctionComponent<CameraPreviewProps> = ({
   startupStartedAt,
   startupTraceId,
 }) => {
+  const portraitTopInset = usePortraitMediaTopInset();
   const styles = useStyles(({theme}) => ({
     wrapper: {
       flex: 1,
@@ -27,7 +29,10 @@ const CameraPreviewContent: NavigationFunctionComponent<CameraPreviewProps> = ({
   }));
 
   return (
-    <View testID="camera-preview-screen" style={styles.wrapper}>
+    <View
+      testID="camera-preview-screen"
+      style={[styles.wrapper, {paddingTop: portraitTopInset}]}
+    >
       <LivePreview
         cameraName={cameraName}
         startupStartedAt={startupStartedAt}

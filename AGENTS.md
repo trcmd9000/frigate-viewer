@@ -17,7 +17,7 @@ decisions that future maintainers and coding agents must preserve.
   validated.
 - Current production release: `18.0.7` with Android `versionCode 30`.
 - Current Internal Testing release: `18.0.12` with Android `versionCode 37`.
-- The next release candidate is `18.0.14` with Android `versionCode 39`.
+- The next release candidate is `18.0.15` with Android `versionCode 40`.
 
 ## Public repository rules
 

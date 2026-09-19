@@ -12,23 +12,24 @@ describe('media navigation policy', () => {
     (Platform as {OS: string}).OS = originalPlatform;
   });
 
-  it('keeps portrait playback below one dark, system-owned status bar', () => {
+  it('keeps portrait media edge-to-edge for app-managed safe spacing', () => {
     const options = mediaNavigationOptions('portrait');
 
     expect(options.layout).toEqual(
       expect.objectContaining({
         backgroundColor: '#000000',
         componentBackgroundColor: '#000000',
-        fitSystemWindows: true,
+        fitSystemWindows: false,
       }),
     );
     expect(options.layout).not.toHaveProperty('insets');
     expect(options.statusBar).toEqual({
       visible: true,
-      drawBehind: false,
+      hideWithTopBar: false,
+      drawBehind: true,
       backgroundColor: '#000000',
       style: 'light',
-      translucent: false,
+      translucent: true,
     });
     expect(options.navigationBar.visible).toBe(false);
   });
@@ -40,10 +41,11 @@ describe('media navigation policy', () => {
     expect(options.layout).not.toHaveProperty('insets');
     expect(options.statusBar).toEqual({
       visible: false,
+      hideWithTopBar: false,
       drawBehind: true,
       backgroundColor: '#000000',
       style: 'light',
-      translucent: false,
+      translucent: true,
     });
     expect(options.navigationBar.visible).toBe(false);
   });

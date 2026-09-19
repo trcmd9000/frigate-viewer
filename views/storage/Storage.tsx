@@ -99,13 +99,14 @@ export const Storage: NavigationFunctionComponent = ({componentId}) => {
           isSecondaryRoot
             ? createSecondaryStackDismissButton(
                 intl.formatMessage(messages['topBar.back']),
+                theme.text,
               )
             : menuButton,
         ],
         rightButtons: [refreshButton(refresh)],
       },
     });
-  }, [componentId, intl, isSecondaryRoot, refresh]);
+  }, [componentId, intl, isSecondaryRoot, refresh, theme.text]);
 
   useEffect(() => {
     if (!isSecondaryRoot) {

@@ -28,7 +28,8 @@ public class SystemBarsModule extends ReactContextBaseJavaModule {
       String backgroundColor,
       String statusBarStyle,
       boolean immersive,
-      boolean navigationBarVisible) {
+      boolean navigationBarVisible,
+      boolean edgeToEdge) {
     final int color;
     try {
       color = Color.parseColor(backgroundColor);
@@ -48,6 +49,7 @@ public class SystemBarsModule extends ReactContextBaseJavaModule {
                 color,
                 darkStatusBarIcons,
                 immersive,
-                navigationBarVisible)));
+                navigationBarVisible,
+                edgeToEdge)));
   }
 }

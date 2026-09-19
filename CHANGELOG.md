@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.15] - 2026-09-18
+
+- Removed the retained Android status-bar layout offset when live cameras or
+  event clips rotate from portrait to immersive landscape.
+- Preserved device-derived portrait safe-area spacing without changing media
+  aspect ratio, cropping, or `contain` scaling.
+- Improved contrast for secondary navigation actions and retained-event
+  indicators across light and dark themes.
+- Completed German localization for the event-filter screen.
+
 ## [18.0.14] - 2026-09-18
 
 - Prevented a muted WebRTC live stream from emitting a brief audio burst

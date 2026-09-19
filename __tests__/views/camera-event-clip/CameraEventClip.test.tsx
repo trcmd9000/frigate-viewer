@@ -8,6 +8,7 @@ import {
   AccessibilityInfo,
   Platform,
   Pressable,
+  StatusBar,
   StyleSheet,
 } from 'react-native';
 import * as ReactNative from 'react-native';
@@ -323,8 +324,16 @@ describe('CameraEventClip protected playback state', () => {
       expect.objectContaining({minWidth: 48, minHeight: 48}),
     );
     expect(close.props.accessibilityLabel).toBe('Close player');
+    const expectedTopInset = Math.max(24, StatusBar.currentHeight ?? 0);
     expect(view.getByTestId('event-player-tools').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({top: 0})]),
+      expect.arrayContaining([
+        expect.objectContaining({top: expectedTopInset}),
+      ]),
+    );
+    expect(view.getByTestId('event-player-root').props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({paddingTop: expectedTopInset}),
+      ]),
     );
     fireEvent.press(close);
     expect(Navigation.dismissModal).toHaveBeenCalledWith('camera-event-clip');

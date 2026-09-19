@@ -168,6 +168,8 @@ export default {
   'eventsFilters.zones.title': 'Zonen',
   'eventsFilters.miscellaneous.title': 'Sonstiges',
   'eventsFilters.miscellaneous.retained.label': 'Nur gespeicherte Ereignisse',
+  'eventsFilters.screen.title': 'Ereignisse filtern',
+  'eventsFilters.screen.label': 'Ereignisfilter',
   'eventsFilters.active.none': 'Alle Ereignisse',
   'eventsFilters.active.count':
     '{count, plural, one {# aktiver Filter} other {# aktive Filter}}',

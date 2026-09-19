@@ -22,6 +22,7 @@ describe('Android system-bar surface bridge', () => {
       'dark',
       false,
       true,
+      false,
     );
   });
 

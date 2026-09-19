@@ -42,6 +42,7 @@ import {RetryState} from '../../components/RetryState';
 import {SecureLogger} from '../../helpers/secureLogger';
 import {ActiveFilters} from '../events-filters/ActiveFilters';
 import {useDesignTokens} from '../../helpers/designTokens';
+import {useTheme} from '../../helpers/colors';
 import {
   gridCellGutters,
   gridCellWidth,
@@ -144,6 +145,7 @@ export const CameraEvents: NavigationFunctionComponent<
 const CameraEventsContent: NavigationFunctionComponent<
   ICameraEventsProps & {generation: number}
 > = ({cameraNames, retained, componentId, generation}) => {
+  const theme = useTheme();
   const store = useStore<RootState>();
   const isSpecificCamera = useMemo(
     () => cameraNames && cameraNames.length === 1,
@@ -269,6 +271,7 @@ const CameraEventsContent: NavigationFunctionComponent<
               isSecondaryRoot
                 ? createSecondaryStackDismissButton(
                     intl.formatMessage(messages['topBar.back']),
+                    theme.text,
                   )
                 : menuButton,
             ],
@@ -292,6 +295,7 @@ const CameraEventsContent: NavigationFunctionComponent<
               isSecondaryRoot
                 ? createSecondaryStackDismissButton(
                     intl.formatMessage(messages['topBar.back']),
+                    theme.text,
                   )
                 : menuButton,
             ],
@@ -306,6 +310,7 @@ const CameraEventsContent: NavigationFunctionComponent<
     isSpecificCamera,
     isSecondaryRoot,
     retained,
+    theme.text,
   ]);
 
   useEffect(() => {

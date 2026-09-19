@@ -156,6 +156,7 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
         leftButtons: [
           createSecondaryStackDismissButton(
             intl.formatMessage(messages['topBar.back']),
+            theme.text,
           ),
         ],
       },
@@ -170,7 +171,7 @@ export const Settings: NavigationFunctionComponent = ({componentId}) => {
         });
       });
     return () => subscription.remove();
-  }, [componentId, intl]);
+  }, [componentId, intl, theme.text]);
 
   const persist = useCallback(
     (nextSettings: ISettings, operation: string) => {
