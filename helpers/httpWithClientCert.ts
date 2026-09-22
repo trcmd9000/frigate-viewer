@@ -1,7 +1,11 @@
 import {NativeModules, Platform} from 'react-native';
 import {clientCertManager} from './clientCertificates';
 import type {Server} from '../store/settings';
-import {canonicalServerEndpoint, serverRouteIdentity} from './serverIdentity';
+import {
+  canonicalServerEndpoint,
+  nativeRouteCertificatePin,
+  serverRouteIdentity,
+} from './serverIdentity';
 
 export interface HttpRequestOptions extends RequestInit {
   clientCertAlias?: string;
@@ -11,7 +15,7 @@ export interface HttpRequestOptions extends RequestInit {
   profilePassword?: string;
   maxBytes?: number;
   mediaReservationId?: number;
-  allowSelfSignedServer?: boolean;
+  serverCertificatePin?: string;
 }
 
 export interface HttpResponse {
@@ -40,6 +44,11 @@ interface NativeClientCertDownloadResponse {
 }
 
 interface NativeClientCertModule {
+  probeServerCertificate?: (
+    url: string,
+    clientCertAlias: string,
+    localRoute: boolean,
+  ) => Promise<{sha256Fingerprint: string}>;
   scopeServerIdentity?: (
     serverIdentity: string,
     auth: string,
@@ -79,6 +88,7 @@ interface NativeClientCertModule {
     method: string,
     headers: Array<{key: string; value: string}>,
     body: string | undefined,
+    serverCertificatePin: string,
   ) => Promise<NativeClientCertResponse>;
   performHttpRequestWithClientCert?: (
     url: string,
@@ -87,14 +97,14 @@ interface NativeClientCertModule {
     method: string,
     headers: Array<{key: string; value: string}>,
     body: string | undefined,
-    allowSelfSignedServer: boolean,
+    serverCertificatePin: string,
   ) => Promise<NativeClientCertResponse>;
   downloadFileWithClientCert?: (
     url: string,
     certIdentifier: string,
     serverIdentity: string,
     headers: Array<{key: string; value: string}>,
-    allowSelfSignedServer: boolean,
+    serverCertificatePin: string,
     maxBytes: number,
     mediaReservationId: number,
   ) => Promise<NativeClientCertDownloadResponse>;
@@ -102,6 +112,7 @@ interface NativeClientCertModule {
     url: string,
     serverIdentity: string,
     headers: Array<{key: string; value: string}>,
+    serverCertificatePin: string,
     maxBytes: number,
     mediaReservationId: number,
   ) => Promise<NativeClientCertDownloadResponse>;
@@ -156,7 +167,7 @@ interface NativeRouteConfig {
   password: string;
   localMtlsEnabled: boolean;
   localClientCertAlias: string;
-  localAllowSelfSignedServer: boolean;
+  localServerCertificatePin: string;
 }
 
 export interface NativeRouteResponse {
@@ -195,6 +206,34 @@ class HttpClientWithClientCert {
     this.clientCertModule = NativeModules.ClientCertModule as
       | NativeClientCertModule
       | undefined;
+  }
+
+  async probeServerCertificate(
+    url: string,
+    clientCertAlias = '',
+    localRoute = false,
+  ): Promise<{sha256Fingerprint: string}> {
+    if (
+      Platform.OS !== 'android' ||
+      !this.clientCertModule?.probeServerCertificate
+    ) {
+      throw new Error('Android certificate registration is unavailable');
+    }
+    if (!/^https:\/\//i.test(url)) {
+      throw new Error('Certificate registration requires HTTPS');
+    }
+    const result = await this.clientCertModule.probeServerCertificate(
+      url,
+      clientCertAlias,
+      localRoute,
+    );
+    const fingerprint = result?.sha256Fingerprint?.toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(fingerprint || '')) {
+      throw new Error(
+        'The TLS probe returned an invalid certificate fingerprint',
+      );
+    }
+    return {sha256Fingerprint: fingerprint};
   }
 
   scopeServerIdentity(
@@ -298,10 +337,13 @@ class HttpClientWithClientCert {
     url: string,
     options: HttpRequestOptions = {},
   ): Promise<HttpResponse> {
+    if (!/^https:\/\//i.test(url)) {
+      throw new Error('Secure transport requires HTTPS');
+    }
     const {
       clientCertAlias,
       clientCertServerIdentity,
-      allowSelfSignedServer = false,
+      serverCertificatePin = '',
       profileAuth,
       profileUsername,
       profilePassword,
@@ -315,15 +357,15 @@ class HttpClientWithClientCert {
     if (clientCertAlias === undefined) {
       if (Platform.OS === 'ios' && profileIdentityProvided) {
         if (!clientCertServerIdentity) {
-          throw new Error('A server identity is required for profile transport');
+          throw new Error(
+            'A server identity is required for profile transport',
+          );
         }
         if (
           !this.clientCertModule?.performIsolatedHttpRequest ||
           profileAuth === undefined
         ) {
-          throw new Error(
-            'Profile-isolated iOS networking is unavailable',
-          );
+          throw new Error('Profile-isolated iOS networking is unavailable');
         }
         return this.requestWithIOSProfile(
           url,
@@ -336,7 +378,9 @@ class HttpClientWithClientCert {
       }
       if (Platform.OS === 'android' && profileIdentityProvided) {
         if (!clientCertServerIdentity) {
-          throw new Error('A server identity is required for profile transport');
+          throw new Error(
+            'A server identity is required for profile transport',
+          );
         }
         this.requireAndroidScopedIdentity(
           clientCertServerIdentity,
@@ -350,10 +394,11 @@ class HttpClientWithClientCert {
         return this.requestWithoutClientCert(
           url,
           clientCertServerIdentity,
+          serverCertificatePin,
           fetchOptions as RequestInit,
         );
       }
-      return this.performFetch(url, fetchOptions as RequestInit);
+      throw new Error('A server identity is required for profile transport');
     }
 
     if (typeof clientCertAlias !== 'string' || !clientCertAlias.trim()) {
@@ -392,7 +437,7 @@ class HttpClientWithClientCert {
       url,
       clientCertAlias,
       clientCertServerIdentity,
-      allowSelfSignedServer,
+      serverCertificatePin,
       fetchOptions as RequestInit,
     );
   }
@@ -425,14 +470,16 @@ class HttpClientWithClientCert {
         localPort: localEndpoint?.port || 0,
         localBasePath: localEndpoint?.basePath || '',
         auth: server.auth,
-        username: server.auth === 'none' ? '' : server.credentials.username || '',
-        password: server.auth === 'none' ? '' : server.credentials.password || '',
+        username:
+          server.auth === 'none' ? '' : server.credentials.username || '',
+        password:
+          server.auth === 'none' ? '' : server.credentials.password || '',
         localMtlsEnabled: localTls.mtlsEnabled === true,
         localClientCertAlias:
           localTls.mtlsEnabled === true
             ? localTls.clientCertConfig?.alias || ''
             : '',
-        localAllowSelfSignedServer: localTls.allowSelfSignedServer === true,
+        localServerCertificatePin: nativeRouteCertificatePin(server, 'local'),
       },
       method || 'GET',
     );
@@ -456,7 +503,7 @@ class HttpClientWithClientCert {
       clientCertServerIdentity,
       maxBytes,
       mediaReservationId,
-      allowSelfSignedServer = false,
+      serverCertificatePin = '',
       headers = {},
     } = options;
     if (clientCertAlias === undefined) {
@@ -505,7 +552,7 @@ class HttpClientWithClientCert {
       clientCertAlias,
       clientCertServerIdentity,
       this.objectToHeaders(headers),
-      allowSelfSignedServer,
+      serverCertificatePin,
       byteBudget,
       mediaReservationId,
     );
@@ -525,6 +572,9 @@ class HttpClientWithClientCert {
     url: string,
     options: HttpRequestOptions,
   ): Promise<NativeClientCertDownloadResponse> {
+    if (!/^https:\/\//i.test(url)) {
+      throw new Error('Secure transport requires HTTPS');
+    }
     const {
       clientCertServerIdentity,
       profileAuth,
@@ -533,6 +583,7 @@ class HttpClientWithClientCert {
       maxBytes,
       mediaReservationId,
       headers = {},
+      serverCertificatePin = '',
     } = options;
     const profileDownload = this.clientCertModule?.downloadFileWithProfile;
     const fallbackDownload =
@@ -541,16 +592,12 @@ class HttpClientWithClientCert {
       Platform.OS !== 'android' &&
       !(Platform.OS === 'ios' && profileDownload)
     ) {
-      throw new Error(
-        'Profile-isolated native media download is unavailable',
-      );
+      throw new Error('Profile-isolated native media download is unavailable');
     }
     if (
       !clientCertServerIdentity ||
-      (Platform.OS === 'android' &&
-        !fallbackDownload) ||
-      (Platform.OS === 'ios' &&
-        (!profileDownload || profileAuth === undefined))
+      (Platform.OS === 'android' && !fallbackDownload) ||
+      (Platform.OS === 'ios' && (!profileDownload || profileAuth === undefined))
     ) {
       throw new Error(
         'Native media download without client certificate is unavailable',
@@ -581,18 +628,19 @@ class HttpClientWithClientCert {
             mediaReservationId,
           )
         : fallbackDownload
-          ? await fallbackDownload(
-              url,
-              clientCertServerIdentity,
-              this.objectToHeaders(headers),
-              byteBudget,
-              mediaReservationId,
-            )
-          : (() => {
-              throw new Error(
-                'Native media download without client certificate is unavailable',
-              );
-            })();
+        ? await fallbackDownload(
+            url,
+            clientCertServerIdentity,
+            this.objectToHeaders(headers),
+            serverCertificatePin,
+            byteBudget,
+            mediaReservationId,
+          )
+        : (() => {
+            throw new Error(
+              'Native media download without client certificate is unavailable',
+            );
+          })();
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw new HttpStatusError(
         response.statusCode,
@@ -605,22 +653,6 @@ class HttpClientWithClientCert {
     return response;
   }
 
-  private async performFetch(
-    url: string,
-    options: RequestInit = {},
-  ): Promise<HttpResponse> {
-    const response = await fetch(url, options);
-    const body = await response.text();
-
-    return {
-      status: response.status,
-      headers: this.headersToObject(response.headers),
-      body,
-      json: async () => JSON.parse(body) as unknown,
-      text: async () => body,
-    };
-  }
-
   private serverBaseUrl(server: Server): string {
     return canonicalServerEndpoint(server)?.requestBaseUrl || '';
   }
@@ -629,7 +661,7 @@ class HttpClientWithClientCert {
     url: string,
     certAlias: string,
     serverIdentity: string | undefined,
-    allowSelfSignedServer: boolean,
+    serverCertificatePin: string,
     options: RequestInit,
   ): Promise<HttpResponse> {
     if (!this.clientCertModule?.performHttpRequestWithClientCert) {
@@ -649,7 +681,7 @@ class HttpClientWithClientCert {
       options.method || 'GET',
       this.objectToHeaders(options.headers),
       options.body as string | undefined,
-      allowSelfSignedServer,
+      serverCertificatePin,
     );
 
     return {
@@ -692,6 +724,7 @@ class HttpClientWithClientCert {
   private async requestWithoutClientCert(
     url: string,
     serverIdentity: string,
+    serverCertificatePin: string,
     options: RequestInit,
   ): Promise<HttpResponse> {
     const result = await this.clientCertModule!.performHttpRequest!(
@@ -700,6 +733,7 @@ class HttpClientWithClientCert {
       options.method || 'GET',
       this.objectToHeaders(options.headers),
       options.body as string | undefined,
+      serverCertificatePin,
     );
 
     return {
@@ -709,14 +743,6 @@ class HttpClientWithClientCert {
       json: async () => JSON.parse(result.body || '{}') as unknown,
       text: async () => result.body || '',
     };
-  }
-
-  private headersToObject(headers: Headers): Record<string, string> {
-    const result: Record<string, string> = {};
-    headers.forEach((value: string, key: string) => {
-      result[key] = value;
-    });
-    return result;
   }
 
   private objectToHeaders(

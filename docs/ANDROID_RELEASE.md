@@ -6,9 +6,9 @@ This fork continues the upstream Android version sequence. Every published build
 must increment both values in `android/app/build.gradle`:
 
 - `versionName`: user-visible semantic version, next release candidate
-  `18.0.15`
+  `18.0.17`
 - `versionCode`: monotonically increasing Play Store build number, next
-  release candidate `40`
+  release candidate `42`
 
 ## Local prerequisites
 
@@ -39,9 +39,24 @@ keyPassword=...
 ```
 
 CI can provide the equivalent `MYAPP_UPLOAD_*` Gradle properties instead.
-Back up the upload key and its credentials in a secure, independent location.
-The build fails rather than producing an unsigned release when signing is not
-configured.
+Keep the keystore, signing properties, exported secrets, and backups outside
+the repository worktree. Back up the upload key and its credentials in a
+secure, independent credential store. The build fails rather than producing an
+unsigned release when signing is not configured.
+
+## Internal Play workflow security
+
+The `play-internal` GitHub environment must require approval from the intended
+release maintainers before the publish job can access its secrets. Store the
+upload-keystore material, its passwords, and the Google Play service-account
+JSON as environment-scoped secrets rather than repository files or
+repository-wide variables.
+
+Keep the workflow's default token at the minimum `contents: read` permission.
+The upload uses the dedicated Google Play service account; grant that account
+only the Play Console permissions needed to upload and manage releases on the
+internal testing track. Do not grant production-release or unrelated
+administrative permissions.
 
 ## Validation and artifacts
 
@@ -85,7 +100,8 @@ Do not commit APKs, AABs, signing properties, keystores, or credentials.
 Install and exercise the debug APK on a physical Android device before
 publishing. In particular, verify the Android system certificate chooser, a
 successful mTLS request, cancellation, certificate removal, strict server TLS,
-and the explicit self-signed-server option.
+certificate enrollment and replacement, remote HTTP rejection, and local-route
+protections.
 
 Review `PRIVACY-POLICY.md` before each public release and ensure its statements
 still match the shipped dependencies and runtime behavior.
@@ -97,13 +113,12 @@ missing. CI runs `npm run licenses:check` to prevent stale notices. The Android
 release build uses Google's OSS Licenses plugin to generate the native library
 catalog.
 
-## Pending network policy decision
+## Network and server-trust policy
 
-`AndroidManifest.xml` currently permits cleartext traffic because the product
-still exposes explicitly configured HTTP servers. This means the release does
-not have a strict global cleartext default. Before production approval, decide
-whether to retain that compatibility exception with its risk accepted, or
-remove HTTP support and set both the manifest and network-security cleartext
-policy to deny it. Normal HTTPS uses the Android system trust store; user-added
-CA certificates are not globally trusted by this configuration, and the
-per-server self-signed option remains a separate native mTLS override.
+Remote profiles require HTTPS, and both the release and debug Android manifests
+deny cleartext traffic globally. Local HTTP is not used for authenticated API
+routes; local RTSP remains subject to private-address and connected-peer
+validation. Normal HTTPS uses the Android system trust store. A server that is
+not system-trusted requires explicit per-route SHA-256 leaf-certificate
+enrollment and out-of-band fingerprint confirmation; there is no trust-all
+fallback.

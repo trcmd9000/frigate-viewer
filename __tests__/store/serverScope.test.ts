@@ -37,7 +37,7 @@ const profileA = {
   auth: 'basic',
   credentials: {username: 'synthetic-user', password: 'synthetic-password'},
   mtlsEnabled: true,
-  clientCertConfig: {alias: 'test-identity-a', allowSelfSignedServer: false},
+  clientCertConfig: {alias: 'test-identity-a', serverCertificatePinRequired: false},
   localRoutingEnabled: true,
   localEndpoint: {
     protocol: 'https',
@@ -47,7 +47,7 @@ const profileA = {
   },
   localTls: {
     mtlsEnabled: true,
-    allowSelfSignedServer: false,
+    serverCertificatePinRequired: false,
     clientCertConfig: {alias: 'test-local-identity-a'},
   },
   rtsp: {enabled: true, port: 8554, allowInsecureCredentials: false},
@@ -213,7 +213,7 @@ describe('server scope root coordinator', () => {
     })],
     ['remote TLS trust', server => ({
       ...server,
-      clientCertConfig: {...profileA.clientCertConfig, allowSelfSignedServer: true},
+      clientCertConfig: {...profileA.clientCertConfig, serverCertificatePinRequired: true},
     })],
     ['local routing toggle', server => ({...server, localRoutingEnabled: false})],
     ['local protocol', server => ({
@@ -237,14 +237,14 @@ describe('server scope root coordinator', () => {
       localTls: {...server.localTls, clientCertConfig: {alias: 'test-local-identity-b'}},
     })],
     ['local TLS trust', server => ({
-      ...server, localTls: {...server.localTls, allowSelfSignedServer: true},
+      ...server, localTls: {...server.localTls, serverCertificatePinRequired: true},
     })],
     ['local nested TLS trust', server => ({
       ...server,
       localTls: {
         ...server.localTls,
         clientCertConfig: {
-          ...profileA.localTls.clientCertConfig, allowSelfSignedServer: true,
+          ...profileA.localTls.clientCertConfig, serverCertificatePinRequired: true,
         },
       },
     })],
@@ -286,17 +286,19 @@ describe('server scope root coordinator', () => {
     expectReset(store, generation + 1);
   });
 
-  it.each([true, false])('resets on remote HTTP consent changing from %s', consent => {
+  it.each([true, false])('resets on certificate enrollment state changing from %s', required => {
     const store = makeStore({
       ...settings,
-      servers: [{...profileA, protocol: 'http', allowInsecureRemoteHttp: consent}],
+      servers: [{...profileA, serverCertificatePinRequired: required}],
     });
     populate(store);
     const generation = selectServerScopeGeneration(store.getState());
     editProfile(store, profileA.profileId, server => ({
-      ...server, allowInsecureRemoteHttp: !consent,
+      ...server, serverCertificatePinRequired: !required,
     }));
-    expect(store.getState().settings.v1.servers[0].allowInsecureRemoteHttp).toBe(!consent);
+    expect(
+      store.getState().settings.v1.servers[0].serverCertificatePinRequired,
+    ).toBe(!required);
     expectReset(store, generation + 1);
   });
 
@@ -304,7 +306,7 @@ describe('server scope root coordinator', () => {
     const store = makeStore(settings);
     populate(store);
     const before = store.getState().events;
-    const clientCertConfig = {alias: 'test-rotated-identity', allowSelfSignedServer: true};
+    const clientCertConfig = {alias: 'test-rotated-identity', serverCertificatePinRequired: true};
     store.dispatch(setServerClientCertConfig({serverIndex: 1, clientCertConfig}));
     store.dispatch(setServerClientCertConfig({serverIndex: 99, clientCertConfig}));
     expect(store.getState().events).toBe(before);

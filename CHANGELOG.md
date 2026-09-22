@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [18.0.16] - 2026-09-22
+
+- Replaced permissive self-signed TLS handling with explicit per-route
+  certificate enrollment and SHA-256 leaf pinning.
+- Rejected remote HTTP and Android cleartext traffic, while retaining
+  private-peer validation for local RTSP routes.
+- Pinned the Play publishing workflow to immutable action commits.
+- Removed legacy iOS trust-bypass code and an unused insecure storage provider.
+
 ## [18.0.15] - 2026-09-18
 
 - Removed the retained Android status-bar layout offset when live cameras or

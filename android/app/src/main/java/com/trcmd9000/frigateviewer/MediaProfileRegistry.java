@@ -757,8 +757,7 @@ final class MediaProfileRegistry {
     final String username;
     final String password;
     final String alias;
-    final boolean allowSelfSignedServer;
-    final boolean allowInsecureRemoteHttp;
+    final String serverCertificatePin;
     final boolean localRoutingEnabled;
     final String localProtocol;
     final String localHost;
@@ -766,7 +765,7 @@ final class MediaProfileRegistry {
     final String localBasePath;
     final boolean localMtlsEnabled;
     final String localClientCertAlias;
-    final boolean localAllowSelfSignedServer;
+    final String localServerCertificatePin;
     final boolean rtspEnabled;
     final int rtspPort;
     final boolean allowInsecureCredentials;
@@ -782,12 +781,12 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer
+      String serverCertificatePin
     ) {
       this(
         logicalProfileId, profileKey, protocol, host, port, basePath, auth,
         username, password,
-        alias, allowSelfSignedServer, false, false, "", "", 0, "", false, "", false,
+        alias, serverCertificatePin, false, false, "", "", 0, "", false, "", "",
         false, RtspMediaPolicy.DEFAULT_PORT, false
       );
     }
@@ -803,13 +802,13 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer,
-      boolean allowInsecureRemoteHttp
+      String serverCertificatePin,
+      boolean legacyRemoteHttpValue
     ) {
       this(
         logicalProfileId, profileKey, protocol, host, port, basePath, auth,
-        username, password, alias, allowSelfSignedServer,
-        allowInsecureRemoteHttp, false, "", "", 0, "", false, "", false,
+        username, password, alias, serverCertificatePin,
+        legacyRemoteHttpValue, false, "", "", 0, "", false, "", "",
         false, RtspMediaPolicy.DEFAULT_PORT, false
       );
     }
@@ -824,11 +823,98 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer
+      String serverCertificatePin
     ) {
       this(
         profileKey, profileKey, protocol, host, port, basePath, auth, username,
-        password, alias, allowSelfSignedServer
+        password, alias, serverCertificatePin
+      );
+    }
+
+    /*
+     * Source-compatible migration constructors. A legacy true value means
+     * "pin required" and can never re-enable trust-all behavior.
+     */
+    MediaProfileConfig(
+      String profileKey, String protocol, String host, int port,
+      String basePath, String auth, String username, String password,
+      String alias, boolean legacyPinRequired
+    ) {
+      this(
+        profileKey, protocol, host, port, basePath, auth, username, password,
+        alias, legacyPinRequired ? "required" : ""
+      );
+    }
+
+    MediaProfileConfig(
+      String profileKey, String protocol, String host, int port,
+      String basePath, String auth, String username, String password,
+      String alias, boolean legacyPinRequired, boolean legacyRemoteConsent
+    ) {
+      this(
+        profileKey, protocol, host, port, basePath, auth, username, password,
+        alias, legacyPinRequired ? "required" : "", legacyRemoteConsent
+      );
+    }
+
+    MediaProfileConfig(
+      String logicalProfileId, String profileKey, String protocol, String host,
+      int port, String basePath, String auth, String username, String password,
+      String alias, boolean legacyPinRequired
+    ) {
+      this(
+        logicalProfileId, profileKey, protocol, host, port, basePath, auth,
+        username, password, alias, legacyPinRequired ? "required" : ""
+      );
+    }
+
+    MediaProfileConfig(
+      String logicalProfileId, String profileKey, String protocol, String host,
+      int port, String basePath, String auth, String username, String password,
+      String alias, boolean legacyPinRequired, boolean legacyRemoteConsent
+    ) {
+      this(
+        logicalProfileId, profileKey, protocol, host, port, basePath, auth,
+        username, password, alias, legacyPinRequired ? "required" : "",
+        legacyRemoteConsent
+      );
+    }
+
+    MediaProfileConfig(
+      String logicalProfileId, String profileKey, String protocol, String host,
+      int port, String basePath, String auth, String username, String password,
+      String alias, boolean legacyPinRequired, boolean legacyRemoteConsent,
+      boolean localRoutingEnabled, String localProtocol, String localHost,
+      int localPort, String localBasePath, boolean localMtlsEnabled,
+      String localClientCertAlias, boolean legacyLocalPinRequired,
+      boolean rtspEnabled, int rtspPort, boolean allowInsecureCredentials
+    ) {
+      this(
+        logicalProfileId, profileKey, protocol, host, port, basePath, auth,
+        username, password, alias, legacyPinRequired ? "required" : "",
+        legacyRemoteConsent, localRoutingEnabled, localProtocol, localHost,
+        localPort, localBasePath, localMtlsEnabled, localClientCertAlias,
+        legacyLocalPinRequired ? "required" : "", rtspEnabled, rtspPort,
+        allowInsecureCredentials
+      );
+    }
+
+    MediaProfileConfig(
+      String profileKey, String protocol, String host, int port,
+      String basePath, String auth, String username, String password,
+      String alias, boolean legacyPinRequired, boolean localRoutingEnabled,
+      String localProtocol, String localHost, int localPort,
+      String localBasePath, boolean localMtlsEnabled,
+      String localClientCertAlias, boolean legacyLocalPinRequired,
+      boolean rtspEnabled, int rtspPort, boolean allowInsecureCredentials
+    ) {
+      this(
+        profileKey, profileKey, protocol, host, port, basePath, auth, username,
+        password, alias, legacyPinRequired ? "required" : "", false,
+        localRoutingEnabled, localProtocol, localHost, localPort, localBasePath,
+        localMtlsEnabled, localClientCertAlias,
+        legacyLocalPinRequired ? "required" : "", rtspEnabled, rtspPort,
+        allowInsecureCredentials
       );
     }
 
@@ -842,12 +928,12 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer,
-      boolean allowInsecureRemoteHttp
+      String serverCertificatePin,
+      boolean legacyRemoteHttpValue
     ) {
       this(
         profileKey, profileKey, protocol, host, port, basePath, auth, username,
-        password, alias, allowSelfSignedServer, allowInsecureRemoteHttp
+        password, alias, serverCertificatePin, legacyRemoteHttpValue
       );
     }
 
@@ -862,8 +948,8 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer,
-      boolean allowInsecureRemoteHttp,
+      String serverCertificatePin,
+      boolean legacyRemoteHttpValue,
       boolean localRoutingEnabled,
       String localProtocol,
       String localHost,
@@ -871,7 +957,7 @@ final class MediaProfileRegistry {
       String localBasePath,
       boolean localMtlsEnabled,
       String localClientCertAlias,
-      boolean localAllowSelfSignedServer,
+      String localServerCertificatePin,
       boolean rtspEnabled,
       int rtspPort,
       boolean allowInsecureCredentials
@@ -888,8 +974,7 @@ final class MediaProfileRegistry {
       this.username = username;
       this.password = password;
       this.alias = alias;
-      this.allowSelfSignedServer = allowSelfSignedServer;
-      this.allowInsecureRemoteHttp = allowInsecureRemoteHttp;
+      this.serverCertificatePin = serverCertificatePin;
       this.localRoutingEnabled = localRoutingEnabled;
       this.localProtocol = localProtocol;
       this.localHost = localHost;
@@ -897,7 +982,7 @@ final class MediaProfileRegistry {
       this.localBasePath = localBasePath;
       this.localMtlsEnabled = localMtlsEnabled;
       this.localClientCertAlias = localClientCertAlias;
-      this.localAllowSelfSignedServer = localAllowSelfSignedServer;
+      this.localServerCertificatePin = localServerCertificatePin;
       this.rtspEnabled = rtspEnabled;
       this.rtspPort = rtspPort;
       this.allowInsecureCredentials = allowInsecureCredentials;
@@ -914,7 +999,7 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer,
+      String serverCertificatePin,
       boolean localRoutingEnabled,
       String localProtocol,
       String localHost,
@@ -922,16 +1007,16 @@ final class MediaProfileRegistry {
       String localBasePath,
       boolean localMtlsEnabled,
       String localClientCertAlias,
-      boolean localAllowSelfSignedServer,
+      String localServerCertificatePin,
       boolean rtspEnabled,
       int rtspPort,
       boolean allowInsecureCredentials
     ) {
       this(
         logicalProfileId, profileKey, protocol, host, port, basePath, auth,
-        username, password, alias, allowSelfSignedServer, false,
+        username, password, alias, serverCertificatePin, false,
         localRoutingEnabled, localProtocol, localHost, localPort, localBasePath,
-        localMtlsEnabled, localClientCertAlias, localAllowSelfSignedServer,
+        localMtlsEnabled, localClientCertAlias, localServerCertificatePin,
         rtspEnabled, rtspPort, allowInsecureCredentials
       );
     }
@@ -946,7 +1031,7 @@ final class MediaProfileRegistry {
       String username,
       String password,
       String alias,
-      boolean allowSelfSignedServer,
+      String serverCertificatePin,
       boolean localRoutingEnabled,
       String localProtocol,
       String localHost,
@@ -954,16 +1039,16 @@ final class MediaProfileRegistry {
       String localBasePath,
       boolean localMtlsEnabled,
       String localClientCertAlias,
-      boolean localAllowSelfSignedServer,
+      String localServerCertificatePin,
       boolean rtspEnabled,
       int rtspPort,
       boolean allowInsecureCredentials
     ) {
       this(
         profileKey, profileKey, protocol, host, port, basePath, auth, username,
-        password, alias, allowSelfSignedServer, false, localRoutingEnabled,
+        password, alias, serverCertificatePin, false, localRoutingEnabled,
         localProtocol, localHost, localPort, localBasePath, localMtlsEnabled,
-        localClientCertAlias, localAllowSelfSignedServer, rtspEnabled, rtspPort,
+        localClientCertAlias, localServerCertificatePin, rtspEnabled, rtspPort,
         allowInsecureCredentials
       );
     }
@@ -1030,8 +1115,7 @@ final class MediaProfileRegistry {
     String username;
     String password;
     String alias;
-    boolean allowSelfSignedServer;
-    boolean allowInsecureRemoteHttp;
+    String serverCertificatePin;
     boolean localRoutingEnabled;
     String localProtocol;
     String localHost;
@@ -1039,7 +1123,7 @@ final class MediaProfileRegistry {
     String localBasePath;
     boolean localMtlsEnabled;
     String localClientCertAlias;
-    boolean localAllowSelfSignedServer;
+    String localServerCertificatePin;
     boolean rtspEnabled;
     int rtspPort;
     boolean allowInsecureCredentials;
@@ -1055,7 +1139,7 @@ final class MediaProfileRegistry {
         context,
         emptyToNull(config.alias),
         sessionIdentity,
-        config.allowSelfSignedServer
+        config.serverCertificatePin
       );
       update(config);
     }
@@ -1080,7 +1164,7 @@ final class MediaProfileRegistry {
       if (alias != null && !alias.equals(nextAlias)) {
         throw new IOException("The protected media profile identity cannot change");
       }
-      if (protocol != null && allowSelfSignedServer != config.allowSelfSignedServer) {
+      if (protocol != null && !normalizedPin(serverCertificatePin).equals(normalizedPin(config.serverCertificatePin))) {
         throw new IOException("The protected media trust policy cannot change");
       }
       protocol = nextProtocol;
@@ -1089,8 +1173,7 @@ final class MediaProfileRegistry {
       username = config.username == null ? "" : config.username;
       password = config.password == null ? "" : config.password;
       alias = nextAlias;
-      allowSelfSignedServer = config.allowSelfSignedServer;
-      allowInsecureRemoteHttp = config.allowInsecureRemoteHttp;
+      serverCertificatePin = config.serverCertificatePin;
       localRoutingEnabled = config.localRoutingEnabled;
       localProtocol = config.localProtocol == null ? "" : config.localProtocol;
       localHost = config.localHost == null ? "" : config.localHost;
@@ -1099,7 +1182,7 @@ final class MediaProfileRegistry {
       localMtlsEnabled = config.localMtlsEnabled;
       localClientCertAlias =
         config.localClientCertAlias == null ? "" : config.localClientCertAlias;
-      localAllowSelfSignedServer = config.localAllowSelfSignedServer;
+      localServerCertificatePin = config.localServerCertificatePin;
       rtspEnabled = config.rtspEnabled;
       rtspPort = config.rtspPort == 0
         ? RtspMediaPolicy.DEFAULT_PORT
@@ -1134,8 +1217,7 @@ final class MediaProfileRegistry {
         protocol.equals(nextProtocol) &&
         basePath.equals(nextBasePath) &&
         alias.equals(nextAlias) &&
-        allowSelfSignedServer == config.allowSelfSignedServer &&
-        allowInsecureRemoteHttp == config.allowInsecureRemoteHttp &&
+        normalizedPin(serverCertificatePin).equals(normalizedPin(config.serverCertificatePin)) &&
         auth.equals(nextAuth) &&
         username.equals(nextUsername) &&
         password.equals(nextPassword) &&
@@ -1146,7 +1228,7 @@ final class MediaProfileRegistry {
         localBasePath.equals(nextLocalBasePath) &&
         localMtlsEnabled == config.localMtlsEnabled &&
         localClientCertAlias.equals(nextLocalClientCertAlias) &&
-        localAllowSelfSignedServer == config.localAllowSelfSignedServer &&
+        normalizedPin(localServerCertificatePin).equals(normalizedPin(config.localServerCertificatePin)) &&
         rtspEnabled == config.rtspEnabled &&
         rtspPort == nextRtspPort &&
         allowInsecureCredentials == config.allowInsecureCredentials;
@@ -1156,7 +1238,7 @@ final class MediaProfileRegistry {
       ClientCertModule.removeSharedClientSession(
         emptyToNull(alias),
         sessionIdentity,
-        allowSelfSignedServer
+        serverCertificatePin
       );
     }
 
@@ -1170,10 +1252,8 @@ final class MediaProfileRegistry {
       if (!"https".equals(protocol) && !"http".equals(protocol)) {
         throw new IOException("The protected media profile protocol is invalid");
       }
-      if ("http".equals(protocol) &&
-        !config.allowInsecureRemoteHttp &&
-        !(config.localRoutingEnabled && config.rtspEnabled)) {
-        throw new IOException("Remote HTTP requires explicit consent");
+      if ("http".equals(protocol)) {
+        throw new IOException("Remote HTTP is not supported");
       }
       String host = normalizeHost(config.host);
       if (host.isEmpty()) {
@@ -1267,8 +1347,8 @@ final class MediaProfileRegistry {
     }
 
     void requireRemoteHttpConsent() throws IOException {
-      if ("http".equalsIgnoreCase(protocol) && !allowInsecureRemoteHttp) {
-        throw new IOException("Remote HTTP requires explicit consent");
+      if ("http".equalsIgnoreCase(protocol)) {
+        throw new IOException("Remote HTTP is not supported");
       }
     }
 
@@ -1290,7 +1370,7 @@ final class MediaProfileRegistry {
         password,
         localMtlsEnabled,
         localClientCertAlias,
-        localAllowSelfSignedServer
+        localServerCertificatePin
       );
     }
 
@@ -1414,6 +1494,10 @@ final class MediaProfileRegistry {
 
     private static String emptyToNull(String value) {
       return value == null || value.trim().isEmpty() ? null : value;
+    }
+
+    private static String normalizedPin(String value) {
+      return value == null ? "" : value.trim().toLowerCase(Locale.US);
     }
   }
 }

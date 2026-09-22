@@ -277,7 +277,7 @@ describe('Settings Store Reducer', () => {
       const certConfig = {
         alias: 'my-cert',
         password: 'cert-password',
-        allowSelfSignedServer: false,
+        serverCertificatePinRequired: false,
       };
 
       const newState = settingsStore.reducer(
@@ -291,7 +291,7 @@ describe('Settings Store Reducer', () => {
       expect(newState.v1.servers[0].clientCertConfig).toEqual(certConfig);
     });
 
-    it('should update allowSelfSignedServer flag', () => {
+    it('should update serverCertificatePinRequired flag', () => {
       const stateWithServer = settingsStore.reducer(
         initialState,
         settingsStore.actions.saveSettings({
@@ -312,7 +312,7 @@ describe('Settings Store Reducer', () => {
 
       const updatedConfig = {
         alias: 'cert-1',
-        allowSelfSignedServer: true,
+        serverCertificatePinRequired: true,
       };
 
       const newState = settingsStore.reducer(
@@ -324,7 +324,7 @@ describe('Settings Store Reducer', () => {
       );
 
       expect(
-        newState.v1.servers[0].clientCertConfig?.allowSelfSignedServer,
+        newState.v1.servers[0].clientCertConfig?.serverCertificatePinRequired,
       ).toBe(true);
     });
 
@@ -561,6 +561,28 @@ describe('Settings Store Reducer', () => {
   });
 
   describe('Migrations', () => {
+    it('blocks legacy trust-all profiles until certificate enrollment', () => {
+      const migrated = settingsMigrations({
+        ...initialSettings,
+        servers: [
+          Object.assign(
+            {
+              ...emptyServer(),
+              mtlsEnabled: true,
+              clientCertConfig: {alias: 'legacy-identity'},
+            },
+            {allowSelfSignedServer: true},
+          ),
+        ],
+      });
+
+      expect(migrated.servers[0].serverCertificatePin).toBeUndefined();
+      expect(migrated.servers[0].serverCertificatePinRequired).toBe(true);
+      expect(migrated.servers[0].clientCertConfig).toEqual({
+        alias: 'legacy-identity',
+      });
+    });
+
     it('defaults local routing, RTSP, and insecure credential consent off', () => {
       const migrated = settingsMigrations({
         ...initialSettings,
@@ -580,7 +602,6 @@ describe('Settings Store Reducer', () => {
       expect(migrated.servers[0].localEndpoint).toBeUndefined();
       expect(migrated.servers[0].localTls).toEqual({
         mtlsEnabled: false,
-        allowSelfSignedServer: false,
       });
       expect(migrated.servers[0].rtsp).toEqual({
         enabled: false,
@@ -604,7 +625,7 @@ describe('Settings Store Reducer', () => {
             },
             localTls: {
               mtlsEnabled: true,
-              allowSelfSignedServer: true,
+              serverCertificatePinRequired: true,
               clientCertConfig: {alias: 'local-identity'},
             },
             rtsp: {
@@ -693,7 +714,7 @@ describe('Settings Store Reducer', () => {
         ...first,
         localTls: {
           mtlsEnabled: true,
-          allowSelfSignedServer: false,
+          serverCertificatePinRequired: false,
           clientCertConfig: {alias: 'second-identity'},
         },
       };
@@ -883,7 +904,7 @@ describe('Settings Store Reducer', () => {
             credentials: {username: 'admin', password: 'secret'},
             clientCertConfig: {
               alias: 'production-cert',
-              allowSelfSignedServer: true,
+              serverCertificatePinRequired: true,
             },
           },
         ],

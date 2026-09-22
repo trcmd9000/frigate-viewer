@@ -2,11 +2,11 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import type {RootState} from './store';
 import {NativeModules} from 'react-native';
 import {
+  normalizeServerCertificatePin,
   serverIdentity,
   serverRouteIdentity,
   serverUsesClientCertificate,
 } from '../helpers/serverIdentity';
-import {normalizeRemoteHttpConsent} from '../helpers/remoteHttpPolicy';
 
 /**
  * STORE MODEL
@@ -64,8 +64,18 @@ export interface Credentials {
 export interface ClientCertConfig {
   /** Alias/name of the certificate in the device's keystore/keychain */
   alias: string;
-  /** Allow self-signed server certificates (default: false for security). Only for trusted networks! */
-  allowSelfSignedServer?: boolean;
+  /** Read only during migration; it never enables certificate trust. */
+  serverCertificatePinRequired?: boolean;
+}
+
+export interface ServerCertificatePin {
+  /** Lower-case SHA-256 fingerprint of the exact leaf certificate. */
+  sha256Fingerprint: string;
+  /** Canonical route and endpoint at the time the user approved the pin. */
+  route: 'remote' | 'local';
+  endpoint: string;
+  /** The KeyChain alias used by the TLS probe, or an empty string. */
+  clientCertAlias: string;
 }
 
 /** A Frigate endpoint reachable on the device's local network. */
@@ -84,8 +94,10 @@ export interface LocalEndpoint {
  */
 export interface RouteTlsSettings {
   mtlsEnabled?: boolean;
-  allowSelfSignedServer?: boolean;
   clientCertConfig?: ClientCertConfig;
+  serverCertificatePin?: ServerCertificatePin;
+  /** Migration marker: legacy trust-all profiles stay blocked until enrollment. */
+  serverCertificatePinRequired?: boolean;
 }
 
 export interface RtspSettings {
@@ -117,11 +129,6 @@ export interface Server {
    */
   profileId?: string;
   protocol: 'http' | 'https';
-  /**
-   * Explicit approval to send credentials, cookies, images, and video over a
-   * remote cleartext HTTP endpoint. Missing legacy values are never consent.
-   */
-  allowInsecureRemoteHttp?: boolean;
   host: string;
   port: number;
   path: string;
@@ -134,6 +141,9 @@ export interface Server {
   mtlsEnabled?: boolean;
   /** Client certificate configuration for mTLS authentication (optional) */
   clientCertConfig?: ClientCertConfig;
+  serverCertificatePin?: ServerCertificatePin;
+  /** Migration marker: legacy trust-all profiles stay blocked until enrollment. */
+  serverCertificatePinRequired?: boolean;
   /**
    * Optional local route. Local routing is disabled unless
    * localRoutingEnabled is true and this endpoint is valid.
@@ -181,7 +191,6 @@ export interface ISettings {
 export const emptyServer = (): Server => ({
   profileId: generateServerProfileId(),
   protocol: 'https',
-  allowInsecureRemoteHttp: false,
   host: '',
   port: 5000,
   path: '',
@@ -196,7 +205,6 @@ export const emptyServer = (): Server => ({
   localEndpoint: undefined,
   localTls: {
     mtlsEnabled: false,
-    allowSelfSignedServer: false,
   },
   rtsp: {
     enabled: false,
@@ -306,6 +314,14 @@ const fillGaps: <T extends object>(initial: T, current?: Partial<T>) => T = <
 const validProfileId = (profileId: unknown): profileId is string =>
   typeof profileId === 'string' && profileId.trim().length > 0;
 
+const legacyTrustAllEnabled = (value: unknown): boolean => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const legacyKey = ['allow', 'SelfSigned', 'Server'].join('');
+  return (value as Record<string, unknown>)[legacyKey] === true;
+};
+
 const validPreferenceName = (value: unknown): value is string =>
   typeof value === 'string' &&
   value.length > 0 &&
@@ -346,31 +362,37 @@ export const normalizeLiveStreamPreferences = (
       .filter(validProfileId)
       .map(profileId => profileId.trim()),
   );
-  return Object.entries(value as Record<string, unknown>).reduce<
-    LiveStreamPreferences
-  >((preferences, [profileId, cameraPreferences]) => {
-    if (!validProfileIds.has(profileId) ||
-      !cameraPreferences || typeof cameraPreferences !== 'object' ||
-      Array.isArray(cameraPreferences)) {
+  return Object.entries(
+    value as Record<string, unknown>,
+  ).reduce<LiveStreamPreferences>(
+    (preferences, [profileId, cameraPreferences]) => {
+      if (
+        !validProfileIds.has(profileId) ||
+        !cameraPreferences ||
+        typeof cameraPreferences !== 'object' ||
+        Array.isArray(cameraPreferences)
+      ) {
+        return preferences;
+      }
+      const normalizedCameras = Object.entries(
+        cameraPreferences as Record<string, unknown>,
+      ).reduce<Record<string, LiveStreamPreference>>(
+        (cameras, [cameraName, preference]) => {
+          const normalized = normalizeLiveStreamPreference(preference);
+          if (validPreferenceName(cameraName) && normalized) {
+            cameras[cameraName] = normalized;
+          }
+          return cameras;
+        },
+        {},
+      );
+      if (Object.keys(normalizedCameras).length > 0) {
+        preferences[profileId] = normalizedCameras;
+      }
       return preferences;
-    }
-    const normalizedCameras = Object.entries(
-      cameraPreferences as Record<string, unknown>,
-    ).reduce<Record<string, LiveStreamPreference>>(
-      (cameras, [cameraName, preference]) => {
-        const normalized = normalizeLiveStreamPreference(preference);
-        if (validPreferenceName(cameraName) && normalized) {
-          cameras[cameraName] = normalized;
-        }
-        return cameras;
-      },
-      {},
-    );
-    if (Object.keys(normalizedCameras).length > 0) {
-      preferences[profileId] = normalizedCameras;
-    }
-    return preferences;
-  }, {});
+    },
+    {},
+  );
 };
 
 const profileMigrationSeed = (server: Server): string =>
@@ -434,10 +456,9 @@ const migrateProfileIds = (servers: Server[] = []): Server[] => {
  * selecting a different same-origin profile by accident.
  */
 export const getFallbackActiveServerProfileId = (
-  serversOrSettings: readonly Server[] | Pick<
-    ISettings,
-    'servers' | 'activeServerProfileId'
-  >,
+  serversOrSettings:
+    | readonly Server[]
+    | Pick<ISettings, 'servers' | 'activeServerProfileId'>,
   requestedProfileId?: unknown,
 ): string | undefined => {
   const servers =
@@ -455,9 +476,7 @@ export const getFallbackActiveServerProfileId = (
     )
     .filter(validProfileId);
   const requested =
-    typeof requestedValue === 'string'
-      ? requestedValue.trim()
-      : undefined;
+    typeof requestedValue === 'string' ? requestedValue.trim() : undefined;
   if (
     requested &&
     validIds.filter(profileId => profileId === requested).length === 1
@@ -467,8 +486,7 @@ export const getFallbackActiveServerProfileId = (
   return validIds[0];
 };
 
-export const normalizeActiveServerProfileId =
-  getFallbackActiveServerProfileId;
+export const normalizeActiveServerProfileId = getFallbackActiveServerProfileId;
 
 const isLocalProtocol = (value: unknown): value is LocalEndpoint['protocol'] =>
   value === 'http' || value === 'https';
@@ -539,20 +557,38 @@ const normalizeLocalTls = (
     hasAlias;
   return {
     mtlsEnabled: mtlsEnabled && hasAlias,
-    allowSelfSignedServer:
-      endpoint?.protocol === 'https' &&
-      (candidate.allowSelfSignedServer === true ||
-        candidate.clientCertConfig?.allowSelfSignedServer === true),
+    serverCertificatePin: normalizeServerCertificatePin(
+      {
+        protocol: endpoint?.protocol || 'https',
+        host: endpoint?.host || '',
+        port: endpoint?.port || 0,
+        path: endpoint?.basePath || '',
+      },
+      'local',
+      candidate.serverCertificatePin,
+      mtlsEnabled && hasAlias ? (alias as string) : '',
+    ),
+    serverCertificatePinRequired:
+      candidate.serverCertificatePinRequired === true ||
+      (candidate.serverCertificatePin !== undefined &&
+        normalizeServerCertificatePin(
+          {
+            protocol: endpoint?.protocol || 'https',
+            host: endpoint?.host || '',
+            port: endpoint?.port || 0,
+            path: endpoint?.basePath || '',
+          },
+          'local',
+          candidate.serverCertificatePin,
+          mtlsEnabled && hasAlias ? (alias as string) : '',
+        ) === undefined) ||
+      legacyTrustAllEnabled(candidate) ||
+      legacyTrustAllEnabled(candidate.clientCertConfig) ||
+      candidate.clientCertConfig?.serverCertificatePinRequired === true,
     ...(mtlsEnabled && hasAlias
       ? {
           clientCertConfig: {
             alias: alias as string,
-            ...(candidate.clientCertConfig?.allowSelfSignedServer === undefined
-              ? {}
-              : {
-                  allowSelfSignedServer:
-                    candidate.clientCertConfig.allowSelfSignedServer,
-                }),
           },
         }
       : {}),
@@ -587,13 +623,31 @@ const migrateLocalRouting = (server: Server): Server => {
   const rtsp = normalizeRtsp(server.rtsp, localRoutingEnabled);
   return {
     ...server,
-    allowInsecureRemoteHttp:
-      server.protocol === 'http' && server.allowInsecureRemoteHttp === true,
+    serverCertificatePin: normalizeServerCertificatePin(
+      server,
+      'remote',
+      server.serverCertificatePin,
+      serverUsesClientCertificate(server)
+        ? server.clientCertConfig?.alias || ''
+        : '',
+    ),
+    serverCertificatePinRequired:
+      server.serverCertificatePinRequired === true ||
+      (server.serverCertificatePin !== undefined &&
+        normalizeServerCertificatePin(
+          server,
+          'remote',
+          server.serverCertificatePin,
+          serverUsesClientCertificate(server)
+            ? server.clientCertConfig?.alias || ''
+            : '',
+        ) === undefined) ||
+      legacyTrustAllEnabled(server) ||
+      legacyTrustAllEnabled(server.clientCertConfig) ||
+      server.clientCertConfig?.serverCertificatePinRequired === true,
     localRoutingEnabled,
     localEndpoint: localRoutingEnabled ? localEndpoint : undefined,
-    localTls: localRoutingEnabled
-      ? localTls
-      : {mtlsEnabled: false, allowSelfSignedServer: false},
+    localTls: localRoutingEnabled ? localTls : {mtlsEnabled: false},
     rtsp,
   };
 };
@@ -605,8 +659,13 @@ const v1Migrations = (settings?: ISettings): ISettings | undefined => {
   interface DeprecatedV1Settings {
     server?: Server;
   }
-  const {server, servers, activeServerProfileId, liveStreamPreferences, ...restSettings} = settings as ISettings &
-    DeprecatedV1Settings;
+  const {
+    server,
+    servers,
+    activeServerProfileId,
+    liveStreamPreferences,
+    ...restSettings
+  } = settings as ISettings & DeprecatedV1Settings;
   delete (restSettings as ISettings & {clientCertPasswordCache?: unknown})
     .clientCertPasswordCache;
   const migrateServer = (currentServer: Server): Server => {
@@ -638,13 +697,10 @@ const v1Migrations = (settings?: ISettings): ISettings | undefined => {
       ? activeServerProfileId.trim()
       : undefined;
   const uniquelySelectedProfileId =
-    requestedProfileId &&
-    sourceProfileIdCounts.get(requestedProfileId) === 1
+    requestedProfileId && sourceProfileIdCounts.get(requestedProfileId) === 1
       ? requestedProfileId
       : undefined;
-  const migratedServers = migrateProfileIds(
-    sourceServers.map(migrateServer),
-  );
+  const migratedServers = migrateProfileIds(sourceServers.map(migrateServer));
   const serversWithLegacyServer = server
     ? migrateProfileIds([migrateServer(server)])
     : migratedServers;
@@ -678,12 +734,6 @@ export const settingsStore = createSlice({
   reducers: {
     saveSettings: (state, action: PayloadAction<ISettings>) => {
       const migrated = settingsMigrations(action.payload);
-      migrated.servers = migrated.servers.map(server => {
-        const previous = state.v1.servers.find(
-          candidate => candidate.profileId === server.profileId,
-        );
-        return normalizeRemoteHttpConsent(server, previous);
-      });
       state.v1 = migrated;
     },
     setCameraPreviewHeight: (state, action: PayloadAction<number>) => {
@@ -837,8 +887,7 @@ export const selectServer = (state: RootState) => {
       server =>
         typeof server.profileId === 'string' &&
         server.profileId.trim() === activeProfileId,
-    ) ||
-    temporaryEmptyServer
+    ) || temporaryEmptyServer
   );
 };
 

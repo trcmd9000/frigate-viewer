@@ -76,7 +76,7 @@ describe('server identity', () => {
       },
       localTls: {
         mtlsEnabled: false,
-        allowSelfSignedServer: false,
+        serverCertificatePinRequired: false,
       },
       rtsp: {
         enabled: true,
@@ -86,7 +86,7 @@ describe('server identity', () => {
     };
     const selfSigned = {
       ...base,
-      localTls: {...base.localTls, allowSelfSignedServer: true},
+      localTls: {...base.localTls, serverCertificatePinRequired: true},
     };
     const consented = {
       ...base,

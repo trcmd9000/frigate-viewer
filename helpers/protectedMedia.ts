@@ -2,10 +2,11 @@ import {NativeModules, Platform} from 'react-native';
 import type {Server} from '../store/settings';
 import {
   canonicalServerEndpoint,
+  nativeRouteCertificatePin,
   serverProfileIdentity,
   serverUsesClientCertificate,
 } from './serverIdentity';
-import {assertRemoteHttpConsent} from './remoteHttpPolicy';
+import {assertRemoteHttps} from './remoteHttpPolicy';
 
 export const MEDIA_URI_SCHEME = 'frigate-media';
 
@@ -31,8 +32,7 @@ interface NativeMediaProfileConfig {
   username: string;
   password: string;
   clientCertAlias: string;
-  allowSelfSignedServer: boolean;
-  allowInsecureRemoteHttp: boolean;
+  serverCertificatePin: string;
   localRoutingEnabled: boolean;
   localProtocol: Server['protocol'];
   localHost: string;
@@ -40,7 +40,7 @@ interface NativeMediaProfileConfig {
   localBasePath: string;
   localMtlsEnabled: boolean;
   localClientCertAlias: string;
-  localAllowSelfSignedServer: boolean;
+  localServerCertificatePin: string;
   rtspEnabled: boolean;
   rtspPort: number;
   allowInsecureCredentials: boolean;
@@ -110,6 +110,7 @@ export const eventClipPath = (eventId: string): string => {
 };
 
 const registerProfile = (server: Server): Promise<string> => {
+  assertRemoteHttps(server);
   const native = nativeModule();
   const endpoint = canonicalServerEndpoint(server);
   if (
@@ -138,7 +139,6 @@ const registerProfile = (server: Server): Promise<string> => {
     profileId: server.profileId?.trim() || serverProfileIdentity(server),
     profileKey: serverProfileIdentity(server),
     protocol: server.protocol,
-    allowInsecureRemoteHttp: server.allowInsecureRemoteHttp === true,
     host: server.host,
     port: server.port || 0,
     path: server.path || '',
@@ -146,9 +146,8 @@ const registerProfile = (server: Server): Promise<string> => {
     username: server.auth === 'none' ? '' : server.credentials.username || '',
     password: server.auth === 'none' ? '' : server.credentials.password || '',
     clientCertAlias: alias,
-    allowSelfSignedServer: mtlsEnabled
-      ? server.clientCertConfig?.allowSelfSignedServer || false
-      : false,
+    serverCertificatePin:
+      nativeRouteCertificatePin(server, 'remote'),
     localRoutingEnabled: server.localRoutingEnabled === true,
     localProtocol: server.localEndpoint?.protocol || 'http',
     localHost: server.localEndpoint?.host || '',
@@ -159,7 +158,8 @@ const registerProfile = (server: Server): Promise<string> => {
       server.localTls?.mtlsEnabled === true
         ? server.localTls.clientCertConfig?.alias || ''
         : '',
-    localAllowSelfSignedServer: server.localTls?.allowSelfSignedServer === true,
+    localServerCertificatePin:
+      nativeRouteCertificatePin(server, 'local'),
     rtspEnabled: server.rtsp?.enabled === true,
     rtspPort: server.rtsp?.port || 8554,
     allowInsecureCredentials: server.rtsp?.allowInsecureCredentials === true,
@@ -207,7 +207,7 @@ export const protectedMediaUri = async (
     );
   }
   const path = normalizeProtectedMediaPath(resourcePath);
-  assertRemoteHttpConsent(server);
+  assertRemoteHttps(server);
   const profileId = await protectedMediaProfileId(server);
   const uri = await native.createMediaUri(profileId, path);
   if (typeof uri !== 'string' || !isProtectedMediaUri(uri)) {
@@ -227,7 +227,7 @@ export const protectedMseMediaUri = async (
   if (!validRtspStreamName(streamName)) {
     throw new Error('The protected MSE stream name is invalid');
   }
-  assertRemoteHttpConsent(server);
+  assertRemoteHttps(server);
   const profileId = await protectedMediaProfileId(server);
   const uri = await native.createMseMediaUri(profileId, streamName);
   if (typeof uri !== 'string' || !isProtectedMediaUri(uri)) {

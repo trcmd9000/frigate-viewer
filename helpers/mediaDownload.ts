@@ -12,8 +12,12 @@ import {
   profileTransportOptions,
   requestServerIdentity,
 } from './rest';
-import {serverIdentity, serverUsesClientCertificate} from './serverIdentity';
-import {assertRemoteHttpConsent} from './remoteHttpPolicy';
+import {
+  nativeRouteCertificatePin,
+  serverIdentity,
+  serverUsesClientCertificate,
+} from './serverIdentity';
+import {assertRemoteHttps} from './remoteHttpPolicy';
 
 export const MEDIA_CACHE_DIRECTORY = 'frigate-media';
 export const MAX_MEDIA_BYTES = 256 * 1024 * 1024;
@@ -704,8 +708,8 @@ const downloadMediaOnce = async (
       clientCertServerIdentity: mediaServerIdentity(server),
       maxBytes: reservation.maxBytes,
       mediaReservationId: reservation.id,
-      allowSelfSignedServer:
-        server.clientCertConfig?.allowSelfSignedServer || false,
+      serverCertificatePin:
+        nativeRouteCertificatePin(server, 'remote'),
     });
     return finalizeNativeMedia(reservation, response);
   }
@@ -717,6 +721,8 @@ const downloadMediaOnce = async (
       clientCertServerIdentity: mediaServerIdentity(server),
       maxBytes: reservation.maxBytes,
       mediaReservationId: reservation.id,
+      serverCertificatePin:
+        nativeRouteCertificatePin(server, 'remote'),
     });
     return finalizeNativeMedia(reservation, response);
   }
@@ -749,7 +755,7 @@ export const downloadMedia = async (
   server: Server,
   url: string,
 ): Promise<string> => {
-  assertRemoteHttpConsent(server);
+  assertRemoteHttps(server);
   await acquireDownloadSlot();
   let reservation: MediaReservation | undefined;
   try {

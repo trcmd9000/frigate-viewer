@@ -15,12 +15,14 @@ export const messages = makeMessages('settings', {
   'server.header': 'Server',
   'server.address.header': 'Address',
   'server.external.header': 'External connection',
-  'server.external.httpWarning':
-    'This connection uses unencrypted HTTP. A man-in-the-middle can read or alter Frigate credentials, cookies, images, and video.',
-  'server.external.httpConsent':
-    'I understand and consent to sending credentials, cookies, images, and video over remote unencrypted HTTP',
-  'server.external.httpConsentRequired':
-    'Explicit consent is required before using a remote HTTP endpoint.',
+  'server.tls.pin.register': 'Register server certificate',
+  'server.tls.pin.replace': 'Replace registered certificate',
+  'server.tls.pin.current': 'Registered SHA-256 leaf fingerprint: {fingerprint}',
+  'server.tls.pin.confirm.title': 'Trust this server certificate?',
+  'server.tls.pin.confirm.message':
+    'Verify this SHA-256 leaf fingerprint through a trusted channel before continuing.\n\nEndpoint: {endpoint}\nFingerprint: {fingerprint}\n\nIf the certificate changes, this profile will be blocked until you register it again.',
+  'server.tls.pin.cancel': 'Cancel',
+  'server.tls.pin.confirm': 'Register',
   'server.auth.header': 'Authorization',
   'server.auth.progressiveHeader': 'Frigate authentication',
   'server.mtls.progressiveHeader': 'Client certificate and trust',
@@ -86,9 +88,6 @@ export const messages = makeMessages('settings', {
     'The client certificate will be removed from this server profile.',
   'server.mtls.certificate.remove.cancel': 'Cancel',
   'server.mtls.certificate.remove.confirm': 'Remove',
-  'server.mtls.selfSigned.label': 'Allow self-signed server certificate',
-  'server.mtls.selfSigned.warning':
-    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'server.mtls.help':
     'Use this if your Frigate server requires mutual TLS (mTLS) authentication. The certificate must be installed on your device.',
   'server.local.header': 'Local route',
@@ -118,10 +117,6 @@ export const messages = makeMessages('settings', {
     'The local client identity will be removed from this server profile.',
   'server.local.mtls.certificate.remove.cancel': 'Cancel',
   'server.local.mtls.certificate.remove.confirm': 'Remove',
-  'server.local.mtls.selfSigned.label':
-    'Allow self-signed local server certificate',
-  'server.local.mtls.selfSigned.warning':
-    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'server.local.mtls.help':
     'The external server identity is preselected when available. Only the KeyChain alias is stored; certificate and private-key material stay in the device KeyChain.',
   'server.rtsp.header': 'RTSP reachability',

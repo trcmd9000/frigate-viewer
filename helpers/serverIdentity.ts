@@ -1,4 +1,8 @@
-import type {LocalEndpoint, RouteTlsSettings, Server} from '../store/settings';
+import type {
+  LocalEndpoint,
+  Server,
+  ServerCertificatePin,
+} from '../store/settings';
 
 type ServerIdentityInput = Pick<Server, 'protocol' | 'host' | 'port' | 'path'>;
 
@@ -13,7 +17,9 @@ const effectivePort = (server: ServerIdentityInput): number =>
   server.port || (server.protocol === 'https' ? 443 : 80);
 
 const normalizedHost = (host: string): string => {
-  const trimmed = String(host || '').trim().toLowerCase();
+  const trimmed = String(host || '')
+    .trim()
+    .toLowerCase();
   if (trimmed.includes(':') && !trimmed.startsWith('[')) {
     return `[${trimmed}]`;
   }
@@ -33,6 +39,81 @@ export interface CanonicalServerEndpoint {
 }
 
 export type ServerRoute = 'remote' | 'local';
+
+export const normalizeServerCertificatePin = (
+  endpointInput: ServerIdentityInput,
+  route: ServerRoute,
+  pin: ServerCertificatePin | undefined,
+  clientCertAlias: string,
+): ServerCertificatePin | undefined => {
+  const endpoint = canonicalServerEndpoint(endpointInput)?.scopeEndpoint;
+  const fingerprint = pin?.sha256Fingerprint?.toLowerCase();
+  const alias = String(clientCertAlias || '').trim();
+  if (
+    endpointInput.protocol !== 'https' ||
+    !endpoint ||
+    !pin ||
+    pin.route !== route ||
+    pin.endpoint !== endpoint ||
+    pin.clientCertAlias !== alias ||
+    !/^[0-9a-f]{64}$/.test(fingerprint || '')
+  ) {
+    return undefined;
+  }
+  return {
+    sha256Fingerprint: fingerprint as string,
+    route,
+    endpoint,
+    clientCertAlias: alias,
+  };
+};
+
+export const routeServerCertificatePin = (
+  server: Server,
+  route: ServerRoute,
+): ServerCertificatePin | undefined => {
+  const local = route === 'local';
+  const alias = local
+    ? server.localTls?.mtlsEnabled === true
+      ? server.localTls.clientCertConfig?.alias || ''
+      : ''
+    : serverUsesClientCertificate(server)
+    ? server.clientCertConfig?.alias || ''
+    : '';
+  const input: ServerIdentityInput =
+    local && server.localEndpoint
+      ? {
+          protocol: server.localEndpoint.protocol,
+          host: server.localEndpoint.host,
+          port: server.localEndpoint.port,
+          path: server.localEndpoint.basePath,
+        }
+      : server;
+  return normalizeServerCertificatePin(
+    input,
+    route,
+    local ? server.localTls?.serverCertificatePin : server.serverCertificatePin,
+    alias,
+  );
+};
+
+/** Value passed only to the native TLS layer; "required" is a fail-closed marker. */
+export const nativeRouteCertificatePin = (
+  server: Server,
+  route: ServerRoute,
+): string => {
+  const pin = routeServerCertificatePin(server, route);
+  if (pin) {
+    return pin.sha256Fingerprint;
+  }
+  const required =
+    route === 'local'
+      ? server.localTls?.serverCertificatePinRequired === true ||
+        server.localTls?.serverCertificatePin !== undefined
+      : server.serverCertificatePinRequired === true ||
+        server.serverCertificatePin !== undefined;
+  return required ? 'required' : '';
+};
 
 export const canonicalLocalEndpoint = (
   endpoint: LocalEndpoint | undefined,
@@ -62,9 +143,9 @@ export const canonicalServerEndpoint = (
   const basePath = normalizedBasePath(server.path);
   return {
     requestBaseUrl: `${protocol}://${urlHost}${port}${basePath}/`,
-    scopeEndpoint: `${protocol}://${normalizedHost(
-      host,
-    )}:${effectivePort(server)}${basePath}`,
+    scopeEndpoint: `${protocol}://${normalizedHost(host)}:${effectivePort(
+      server,
+    )}${basePath}`,
   };
 };
 
@@ -100,20 +181,13 @@ export const serverRouteIdentity = (
     route === 'local'
       ? canonicalLocalEndpoint(server.localEndpoint)
       : canonicalServerEndpoint(server);
-  const tls: Partial<RouteTlsSettings> =
+  const tls =
     route === 'local'
-      ? server.localTls || {
-          mtlsEnabled: false,
-          allowSelfSignedServer: false,
-        }
+      ? server.localTls || {mtlsEnabled: false}
       : {
           mtlsEnabled: serverUsesClientCertificate(server),
-          allowSelfSignedServer:
-            server.clientCertConfig?.allowSelfSignedServer === true,
+          clientCertConfig: server.clientCertConfig,
         };
-  const allowSelfSignedServer =
-      tls.allowSelfSignedServer === true ||
-      tls.clientCertConfig?.allowSelfSignedServer === true;
   const alias =
     tls.mtlsEnabled === true
       ? tls.clientCertConfig?.alias ||
@@ -124,15 +198,11 @@ export const serverRouteIdentity = (
     // Keep native sessions isolated by the logical profile even when two
     // profiles point at the same endpoint and use the same trust settings.
     profileId: encodeURIComponent(server.profileId?.trim() || ''),
-    enabled:
-      route === 'local' ? server.localRoutingEnabled === true : true,
+    enabled: route === 'local' ? server.localRoutingEnabled === true : true,
     endpoint: encodeURIComponent(endpoint?.scopeEndpoint || ''),
     auth: server.auth,
-    ...(route === 'remote'
-      ? {allowInsecureRemoteHttp: server.allowInsecureRemoteHttp === true}
-      : {}),
     mtlsEnabled: tls.mtlsEnabled === true,
-    allowSelfSignedServer,
+    serverCertificatePin: nativeRouteCertificatePin(server, route),
     clientCertAlias: encodeURIComponent(String(alias || '')),
     ...(route === 'local'
       ? {

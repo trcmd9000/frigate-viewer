@@ -59,7 +59,7 @@ final class LocalRouteResolver {
     final String password;
     final boolean localMtlsEnabled;
     final String localClientCertAlias;
-    final boolean localAllowSelfSignedServer;
+    final String localServerCertificatePin;
 
     RouteConfig(
       String profileKey,
@@ -74,7 +74,7 @@ final class LocalRouteResolver {
       String password,
       boolean localMtlsEnabled,
       String localClientCertAlias,
-      boolean localAllowSelfSignedServer
+      String localServerCertificatePin
     ) {
       this.profileKey = profileKey == null ? "" : profileKey;
       this.remoteBaseUrl = remoteBaseUrl == null ? "" : remoteBaseUrl;
@@ -89,7 +89,39 @@ final class LocalRouteResolver {
       this.localMtlsEnabled = localMtlsEnabled;
       this.localClientCertAlias =
         localClientCertAlias == null ? "" : localClientCertAlias;
-      this.localAllowSelfSignedServer = localAllowSelfSignedServer;
+      this.localServerCertificatePin = localServerCertificatePin == null ? "" : localServerCertificatePin;
+    }
+
+    RouteConfig(
+      String profileKey,
+      String remoteBaseUrl,
+      boolean localRoutingEnabled,
+      String localProtocol,
+      String localHost,
+      int localPort,
+      String localBasePath,
+      String auth,
+      String username,
+      String password,
+      boolean localMtlsEnabled,
+      String localClientCertAlias,
+      boolean legacyPinRequired
+    ) {
+      this(
+        profileKey,
+        remoteBaseUrl,
+        localRoutingEnabled,
+        localProtocol,
+        localHost,
+        localPort,
+        localBasePath,
+        auth,
+        username,
+        password,
+        localMtlsEnabled,
+        localClientCertAlias,
+        legacyPinRequired ? "required" : ""
+      );
     }
   }
 
@@ -431,7 +463,7 @@ final class LocalRouteResolver {
         context,
         emptyToNull(config.localClientCertAlias),
         config.profileKey,
-        config.localAllowSelfSignedServer
+        config.localServerCertificatePin
       );
     OkHttpClient client = checkedClient(session.client)
       .newBuilder()
@@ -594,7 +626,7 @@ final class LocalRouteResolver {
     return config.profileKey + "\u0000" + config.localProtocol + "\u0000" +
       config.localHost + "\u0000" + config.localPort + "\u0000" +
       config.localBasePath + "\u0000" + config.auth + "\u0000" +
-      config.localClientCertAlias + "\u0000" + config.localAllowSelfSignedServer +
+      config.localClientCertAlias + "\u0000" + config.localServerCertificatePin +
       "\u0000" + config.localMtlsEnabled +
       "\u0000" + credentialFingerprint(config.username, config.password);
   }

@@ -63,6 +63,29 @@ describe('HttpClientWithClientCert', () => {
     mockCertificateAvailability.mockResolvedValue({exists: true});
   });
 
+  it('fails closed without profile identity instead of using global fetch', async () => {
+    const globalFetch = jest.spyOn(globalThis, 'fetch');
+    await expect(
+      new HttpClientWithClientCert().request(
+        'https://example.test:443/frigate/api/config',
+      ),
+    ).rejects.toThrow('A server identity is required for profile transport');
+    expect(globalFetch).not.toHaveBeenCalled();
+    globalFetch.mockRestore();
+  });
+
+  it('rejects cleartext requests before reaching native transport', async () => {
+    await expect(
+      new HttpClientWithClientCert().request(
+        'http://example.test:80/frigate/api/config',
+        {
+          clientCertServerIdentity: scopedIdentity('profile'),
+        },
+      ),
+    ).rejects.toThrow('Secure transport requires HTTPS');
+    expect(mockNativeRequestWithoutCert).not.toHaveBeenCalled();
+  });
+
   it('passes the normalized server scope to the native request bridge', async () => {
     mockNativeRequest.mockResolvedValue({
       statusCode: 200,
@@ -91,7 +114,7 @@ describe('HttpClientWithClientCert', () => {
       'GET',
       [],
       undefined,
-      false,
+      '',
     );
   });
 
@@ -247,7 +270,7 @@ describe('HttpClientWithClientCert', () => {
         clientCertAlias: encodeURIComponent('selected'),
       })),
       [],
-      false,
+      '',
       1024,
       7,
     );
@@ -278,6 +301,7 @@ describe('HttpClientWithClientCert', () => {
       'https://example.test:443/frigate/events/1/thumbnail.jpg',
       scope,
       [],
+      '',
       1024,
       8,
     );

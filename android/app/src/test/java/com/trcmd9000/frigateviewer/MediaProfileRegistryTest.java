@@ -12,6 +12,7 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -22,6 +23,8 @@ import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.Credentials;
 import okhttp3.Cookie;
 import okhttp3.HttpUrl;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 
 import org.junit.After;
 import org.junit.Before;
@@ -34,11 +37,20 @@ import org.robolectric.RuntimeEnvironment;
 public class MediaProfileRegistryTest {
   private MockWebServer server;
   private MediaProfileRegistry registry;
+  private String serverCertificatePin;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() throws Exception {
+    HeldCertificate certificate = new HeldCertificate.Builder()
+      .addSubjectAlternativeName("127.0.0.1")
+      .build();
+    HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+      .heldCertificate(certificate)
+      .build();
     server = new MockWebServer();
+    server.useHttps(serverCertificates.sslSocketFactory(), false);
     server.start();
+    serverCertificatePin = fingerprint(certificate);
     registry = new MediaProfileRegistry(testContext());
   }
 
@@ -74,7 +86,7 @@ public class MediaProfileRegistryTest {
 
     MediaProfileRegistry.ResolvedMediaRequest absolute =
       registry.resolve(Uri.parse(
-        "http://127.0.0.1:" + server.getPort() + "/vod/event/segment.ts"
+        "https://127.0.0.1:" + server.getPort() + "/vod/event/segment.ts"
       ));
     assertEquals("/vod/event/segment.ts", absolute.url.encodedPath());
   }
@@ -95,10 +107,10 @@ public class MediaProfileRegistryTest {
         false
       ));
     } catch (IOException expected) {
-      assertTrue(expected.getMessage().contains("consent"));
+      assertTrue(expected.getMessage().contains("Remote HTTP"));
       return;
     }
-    throw new AssertionError("Expected remote HTTP consent to be required");
+    throw new AssertionError("Expected remote HTTP to be rejected");
   }
 
   @Test
@@ -107,7 +119,7 @@ public class MediaProfileRegistryTest {
     String profileId = registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
         "base-profile-" + server.getPort(),
-        "http",
+        "https",
         "127.0.0.1",
         server.getPort(),
         "/frigate",
@@ -115,7 +127,7 @@ public class MediaProfileRegistryTest {
         "",
         "",
         "",
-        false,
+        serverCertificatePin,
         true
       )
     );
@@ -133,7 +145,7 @@ public class MediaProfileRegistryTest {
     String profileId = registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
         "live-profile-" + server.getPort(),
-        "http",
+        "https",
         "127.0.0.1",
         server.getPort(),
         "/frigate",
@@ -141,7 +153,7 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false,
+        serverCertificatePin,
         true
       )
     );
@@ -164,7 +176,7 @@ public class MediaProfileRegistryTest {
     String profileId = registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
         "mse-profile-" + server.getPort(),
-        "http",
+        "https",
         "127.0.0.1",
         server.getPort(),
         "/frigate",
@@ -172,7 +184,7 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false,
+        serverCertificatePin,
         true
       )
     );
@@ -195,7 +207,7 @@ public class MediaProfileRegistryTest {
     String profileId = registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
         "mse-handle-profile-" + server.getPort(),
-        "http",
+        "https",
         "127.0.0.1",
         server.getPort(),
         "/frigate",
@@ -203,7 +215,7 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false,
+        serverCertificatePin,
         true
       )
     );
@@ -267,12 +279,12 @@ public class MediaProfileRegistryTest {
         testContext(),
         null,
         scopedIdentity,
-        false
+        serverCertificatePin
       );
     String profileId = registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
         profileKey,
-        "http",
+        "https",
         "127.0.0.1",
         server.getPort(),
         "",
@@ -280,7 +292,7 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false,
+        serverCertificatePin,
         true
       )
     );
@@ -385,21 +397,6 @@ public class MediaProfileRegistryTest {
   public void rejectsAbsoluteHttpWhenAnHttpsProfileExistsForTheHost() throws Exception {
     registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
-        "http-origin",
-        "http",
-        "media.example",
-        80,
-        "",
-        "none",
-        "",
-        "",
-        "",
-        false,
-        true
-      )
-    );
-    registry.register(
-      new MediaProfileRegistry.MediaProfileConfig(
         "https-origin",
         "https",
         "media.example",
@@ -427,7 +424,7 @@ public class MediaProfileRegistryTest {
     String profileId = registry.register(
       new MediaProfileRegistry.MediaProfileConfig(
         "rtsp-profile-" + server.getPort(),
-        "http",
+        "https",
         "127.0.0.1",
         server.getPort(),
         "",
@@ -435,7 +432,7 @@ public class MediaProfileRegistryTest {
         "viewer",
         "secret",
         "",
-        false,
+        serverCertificatePin,
         true,
         "http",
         "127.0.0.1",
@@ -443,7 +440,7 @@ public class MediaProfileRegistryTest {
         "",
         false,
         "",
-        false,
+        "",
         true,
         server.getPort(),
         false
@@ -600,7 +597,7 @@ public class MediaProfileRegistryTest {
     String first = registry.register(new MediaProfileRegistry.MediaProfileConfig(
       logicalProfileId,
       "configuration-one",
-      "http",
+      "https",
       "127.0.0.1",
       server.getPort(),
       "/first",
@@ -608,14 +605,14 @@ public class MediaProfileRegistryTest {
       "first-user",
       "first-password",
       "",
-      false,
+      serverCertificatePin,
       true
     ));
     AtomicReference<String> retiredProfile = new AtomicReference<>();
     String second = registry.register(new MediaProfileRegistry.MediaProfileConfig(
       logicalProfileId,
       "configuration-two",
-      "http",
+      "https",
       "127.0.0.1",
       server.getPort(),
       "/second",
@@ -623,7 +620,7 @@ public class MediaProfileRegistryTest {
       "second-user",
       "second-password",
       "",
-      false,
+      serverCertificatePin,
       true
     ), retiredProfile::set);
 
@@ -886,7 +883,7 @@ public class MediaProfileRegistryTest {
   }
 
   private String register(String auth) throws Exception {
-    return register("http", auth);
+    return register("https", auth);
   }
 
   private String register(String protocol, String auth) throws Exception {
@@ -901,7 +898,7 @@ public class MediaProfileRegistryTest {
         "viewer",
         "synthetic-password",
         "",
-        false,
+        serverCertificatePin,
         true
       )
     );
@@ -915,7 +912,7 @@ public class MediaProfileRegistryTest {
     return new MediaProfileRegistry.MediaProfileConfig(
       profileKey,
       profileKey,
-      "http",
+      "https",
       "127.0.0.1",
       server.getPort(),
       "",
@@ -923,7 +920,7 @@ public class MediaProfileRegistryTest {
       username,
       password,
       "",
-      false,
+      serverCertificatePin,
       true
     );
   }
@@ -937,7 +934,7 @@ public class MediaProfileRegistryTest {
     return new MediaProfileRegistry.MediaProfileConfig(
       profileKey,
       profileKey,
-      "http",
+      "https",
       "127.0.0.1",
       server.getPort(),
       basePath,
@@ -945,7 +942,7 @@ public class MediaProfileRegistryTest {
       username,
       password,
       "",
-      false,
+      serverCertificatePin,
       true
     );
   }
@@ -957,7 +954,7 @@ public class MediaProfileRegistryTest {
     return new MediaProfileRegistry.MediaProfileConfig(
       profileKey,
       profileKey,
-      "http",
+      "https",
       "127.0.0.1",
       server.getPort(),
       "",
@@ -965,7 +962,7 @@ public class MediaProfileRegistryTest {
       "viewer",
       password,
       "",
-      false,
+      serverCertificatePin,
       true,
       true,
       "http",
@@ -974,7 +971,7 @@ public class MediaProfileRegistryTest {
       "",
       false,
       "",
-      false,
+      "",
       true,
       server.getPort(),
       false
@@ -983,5 +980,15 @@ public class MediaProfileRegistryTest {
 
   private static Context testContext() {
     return RuntimeEnvironment.getApplication();
+  }
+
+  private static String fingerprint(HeldCertificate certificate) throws Exception {
+    byte[] digest = MessageDigest.getInstance("SHA-256")
+      .digest(certificate.certificate().getEncoded());
+    StringBuilder result = new StringBuilder(64);
+    for (byte value : digest) {
+      result.append(String.format("%02x", value & 0xff));
+    }
+    return result.toString();
   }
 }

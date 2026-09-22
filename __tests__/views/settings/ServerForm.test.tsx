@@ -17,6 +17,17 @@ import {clientCertManager} from '../../../helpers/clientCertificates';
 import {Navigation} from 'react-native-navigation';
 import de from '../../../i18n/de';
 
+const mockProbeServerCertificate = jest.fn().mockResolvedValue({
+  sha256Fingerprint: 'a'.repeat(64),
+});
+
+jest.mock('../../../helpers/httpWithClientCert', () => ({
+  httpClientWithCert: {
+    probeServerCertificate: (...args: unknown[]) =>
+      mockProbeServerCertificate(...args),
+  },
+}));
+
 jest.mock('react-native', () => {
   const actual = jest.requireActual('react-native');
   Object.defineProperty(actual.Platform, 'OS', {
@@ -658,7 +669,7 @@ describe('ServerForm Component', () => {
         credentials: {username: '', password: ''},
         clientCertConfig: {
           alias: 'my-cert',
-          allowSelfSignedServer: true,
+          serverCertificatePinRequired: true,
         },
       };
 
@@ -775,7 +786,7 @@ describe('ServerForm Component', () => {
         credentials: {username: '', password: ''},
         clientCertConfig: {
           alias: 'my-cert',
-          allowSelfSignedServer: true,
+          serverCertificatePinRequired: true,
         },
       };
 
@@ -1007,14 +1018,14 @@ describe('ServerForm Component', () => {
       expect(getByLabelText('Password').props.secureTextEntry).toBe(false);
     });
 
-    it('requires and persists explicit consent for remote HTTP', async () => {
+    it('blocks remote HTTP profiles', async () => {
       const server: Server = {
         ...emptyServer(),
         protocol: 'http',
         host: 'example.com',
         port: 80,
       };
-      const {getByTestId, getByText} = render(
+      const {getByTestId, getByText, queryByTestId} = render(
         <ServerFormTestWrapper
           componentId={mockComponentId}
           server={server}
@@ -1022,31 +1033,12 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expect(getByTestId('server-remote-http-warning')).toBeTruthy();
+      expect(queryByTestId('server-remote-http-consent-toggle')).toBeNull();
       fireEvent.press(getByTestId('server-form-submit'));
       await waitFor(() => {
-        expect(
-          getByText(
-            'Explicit consent is required before using a remote HTTP endpoint.',
-          ),
-        ).toBeTruthy();
+        expect(getByText('mTLS requires HTTPS.')).toBeTruthy();
       });
       expect(mockOnSubmit).not.toHaveBeenCalled();
-
-      fireEvent(
-        getByTestId('server-remote-http-consent-toggle'),
-        'valueChange',
-        true,
-      );
-      fireEvent.press(getByTestId('server-form-submit'));
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            protocol: 'http',
-            allowInsecureRemoteHttp: true,
-          }),
-        );
-      });
     });
 
     it('validates HTTPS and certificate selection when mTLS is enabled', async () => {
@@ -1267,7 +1259,7 @@ describe('ServerForm Component', () => {
       alertSpy.mockRestore();
     });
 
-    it('exposes and updates the self-signed server toggle while mTLS is enabled', async () => {
+    it('registers an explicitly confirmed remote leaf fingerprint', async () => {
       const server: Server = {
         ...emptyServer(),
         host: 'example.com',
@@ -1281,20 +1273,17 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      expect(
-        getByText(
-          'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
-        ),
-      ).toBeTruthy();
-      fireEvent(
-        getByTestId('server-mtls-self-signed-toggle'),
-        'valueChange',
-        true,
-      );
       fireEvent.press(getByLabelText('Choose certificate'));
       await waitFor(() => {
         expect(getByText('cert-1')).toBeTruthy();
       });
+      const alertSpy = jest
+        .spyOn(Alert, 'alert')
+        .mockImplementation((_title, _message, buttons) => {
+          buttons?.[1]?.onPress?.();
+        });
+      fireEvent.press(getByTestId('server-tls-pin-register'));
+      await waitFor(() => expect(alertSpy).toHaveBeenCalled());
       fireEvent.press(getByTestId('server-form-submit'));
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledWith(
@@ -1302,14 +1291,19 @@ describe('ServerForm Component', () => {
             mtlsEnabled: true,
             clientCertConfig: {
               alias: 'cert-1',
-              allowSelfSignedServer: true,
             },
+            serverCertificatePin: expect.objectContaining({
+              sha256Fingerprint: 'a'.repeat(64),
+              route: 'remote',
+              clientCertAlias: 'cert-1',
+            }),
           }),
         );
       });
+      alertSpy.mockRestore();
     });
 
-    it('preserves local self-signed trust when changing the certificate', async () => {
+    it('registers the local leaf pin with the selected local identity', async () => {
       const server: Server = {
         ...emptyServer(),
         host: 'api.example.test',
@@ -1322,7 +1316,7 @@ describe('ServerForm Component', () => {
         },
         localTls: {
           mtlsEnabled: true,
-          allowSelfSignedServer: false,
+          serverCertificatePinRequired: false,
           clientCertConfig: {alias: 'old-local-cert'},
         },
       };
@@ -1334,35 +1328,42 @@ describe('ServerForm Component', () => {
         />,
       );
 
-      fireEvent(
-        getByTestId('server-local-mtls-self-signed-toggle'),
-        'valueChange',
-        true,
-      );
       fireEvent.press(getByLabelText('Change local identity'));
       await waitFor(() => {
         expect(getByText('cert-1')).toBeTruthy();
       });
+      const alertSpy = jest
+        .spyOn(Alert, 'alert')
+        .mockImplementation((_title, _message, buttons) => {
+          buttons?.[1]?.onPress?.();
+        });
+      fireEvent.press(getByTestId('server-local-tls-pin-register'));
+      await waitFor(() => expect(alertSpy).toHaveBeenCalled());
       fireEvent.press(getByTestId('server-form-submit'));
 
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledWith(
           expect.objectContaining({
             localTls: expect.objectContaining({
-              allowSelfSignedServer: true,
               clientCertConfig: {alias: 'cert-1'},
+              serverCertificatePin: expect.objectContaining({
+                sha256Fingerprint: 'a'.repeat(64),
+                route: 'local',
+                clientCertAlias: 'cert-1',
+              }),
             }),
           }),
         );
-        expect(
-          mockOnSubmit.mock.calls[0][0].localTls.clientCertConfig,
-        ).not.toHaveProperty('allowSelfSignedServer');
+        expect(mockOnSubmit.mock.calls[0][0].localTls.clientCertConfig).not.toHaveProperty(
+          'serverCertificatePinRequired',
+        );
       });
+      alertSpy.mockRestore();
     });
   });
 
   describe('Form Fields', () => {
-    it('should accept both HTTP and HTTPS protocols', () => {
+    it('renders legacy HTTP profiles so they can be migrated to HTTPS', () => {
       const serverHTTP: Server = {
         ...emptyServer(),
         protocol: 'http',

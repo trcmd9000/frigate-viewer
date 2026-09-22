@@ -222,12 +222,16 @@ export default {
   'settings.server.header': 'Server',
   'settings.server.address.header': 'Adresse',
   'settings.server.external.header': 'Externe Verbindung',
-  'settings.server.external.httpWarning':
-    'Diese Verbindung verwendet unverschlüsseltes HTTP. Ein Man-in-the-Middle kann Frigate-Anmeldedaten, Cookies, Bilder und Videos mitlesen oder verändern.',
-  'settings.server.external.httpConsent':
-    'Ich verstehe das Risiko und stimme zu, Anmeldedaten, Cookies, Bilder und Videos über unverschlüsseltes Remote-HTTP zu übertragen',
-  'settings.server.external.httpConsentRequired':
-    'Vor der Verwendung eines Remote-HTTP-Endpunkts ist eine ausdrückliche Zustimmung erforderlich.',
+  'settings.server.tls.pin.register': 'Serverzertifikat registrieren',
+  'settings.server.tls.pin.replace': 'Registriertes Zertifikat ersetzen',
+  'settings.server.tls.pin.current':
+    'Registrierter SHA-256-Fingerabdruck des Blattzertifikats: {fingerprint}',
+  'settings.server.tls.pin.confirm.title':
+    'Diesem Serverzertifikat vertrauen?',
+  'settings.server.tls.pin.confirm.message':
+    'Prüfe diesen SHA-256-Fingerabdruck vor dem Fortfahren über einen vertrauenswürdigen Kanal.\n\nEndpunkt: {endpoint}\nFingerabdruck: {fingerprint}\n\nNach einem Zertifikatswechsel bleibt dieses Profil gesperrt, bis das Zertifikat erneut registriert wurde.',
+  'settings.server.tls.pin.cancel': 'Abbrechen',
+  'settings.server.tls.pin.confirm': 'Registrieren',
   'settings.server.auth.header': 'Autorisierung',
   'settings.server.auth.progressiveHeader': 'Frigate-Authentifizierung',
   'settings.server.mtls.progressiveHeader':
@@ -300,10 +304,6 @@ export default {
     'Das Client-Zertifikat wird aus diesem Serverprofil entfernt.',
   'settings.server.mtls.certificate.remove.cancel': 'Abbrechen',
   'settings.server.mtls.certificate.remove.confirm': 'Entfernen',
-  'settings.server.mtls.selfSigned.label':
-    'Selbstsigniertes Serverzertifikat zulassen',
-  'settings.server.mtls.selfSigned.warning':
-    'Zertifikatskette, Aussteller und Gültigkeit des Serverzertifikats werden nicht geprüft; die Hostnamenprüfung bleibt aktiv.',
   'settings.server.mtls.help':
     'Verwenden Sie dies, wenn Ihr Frigate-Server eine gegenseitige TLS-Authentifizierung (mTLS) erfordert. Das Zertifikat muss auf Ihrem Gerät installiert sein.',
   'settings.server.local.header': 'Lokale Route',
@@ -336,10 +336,6 @@ export default {
     'Die lokale Client-Identität wird aus diesem Serverprofil entfernt.',
   'settings.server.local.mtls.certificate.remove.cancel': 'Abbrechen',
   'settings.server.local.mtls.certificate.remove.confirm': 'Entfernen',
-  'settings.server.local.mtls.selfSigned.label':
-    'Selbstsigniertes lokales Serverzertifikat zulassen',
-  'settings.server.local.mtls.selfSigned.warning':
-    'Zertifikatskette, Aussteller und Gültigkeit des Serverzertifikats werden nicht geprüft; die Hostnamenprüfung bleibt aktiv.',
   'settings.server.local.mtls.help':
     'Die Identität des externen Servers wird, falls vorhanden, vorausgewählt. Nur der KeyChain-Alias wird gespeichert; Zertifikat und privater Schlüssel bleiben im KeyChain.',
   'settings.server.rtsp.header': 'RTSP-Erreichbarkeit',
@@ -464,9 +460,4 @@ export default {
   'system.usageChart.usage': 'Auslastung',
   'system.usageChart.memory': 'Speicher',
   'system.cameraInfoChart.usage': 'Auslastung',
-  'cameraEvents.topBar.back': 'Zurück',
-  'logs.topBar.back': 'Zurück',
-  'report.topBar.back': 'Zurück',
-  'storage.topBar.back': 'Zurück',
-  'system.topBar.back': 'Zurück',
 };

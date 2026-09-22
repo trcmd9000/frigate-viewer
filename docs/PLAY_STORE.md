@@ -8,9 +8,9 @@ Google Play review.
 - App name: `Frigate Viewer`
 - Package ID: `com.trcmd9000.frigateviewer`
 - Current production version name: `18.0.7`
-- Current Internal Testing version name: `18.0.12` (`versionCode` `37`)
-- Next release candidate version name: `18.0.15`
-- Next release candidate version code: `40`
+- Current Internal Testing version name: `18.0.16` (`versionCode` `41`)
+- Next release candidate version name: `18.0.17`
+- Next release candidate version code: `42`
 - Minimum Android version: API 24
 - Target Android version: API 36
 - Current release ABI: `arm64-v8a`
@@ -132,15 +132,16 @@ content is synthetic and intentionally publishable.
 ## Internal testing checklist
 
 1. Back up the upload key and credentials outside the repository.
-2. Confirm that `versionCode` 40 has not already been uploaded; otherwise
+2. Confirm that `versionCode` 42 has not already been uploaded; otherwise
   increment it and rebuild the AAB.
 3. Build and verify the signed AAB as described in `ANDROID_RELEASE.md`.
 4. Upload to an internal testing track.
 5. Add only intended tester accounts or groups.
 6. Install through Google Play on a physical arm64 device.
 7. Test normal authentication and Android mTLS.
-8. Test cancellation, certificate removal, strict TLS, self-signed opt-in,
-   playback, downloads, sharing, and app upgrades.
+8. Test cancellation, certificate removal, strict TLS, certificate enrollment
+   and replacement, remote HTTP rejection, playback, downloads, sharing, and
+   app upgrades.
 9. Review Android vitals, pre-launch reports, and policy warnings.
 10. Promote only after the physical-device checklist passes.
 

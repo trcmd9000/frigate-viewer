@@ -26,7 +26,12 @@ import {
 } from '../../store/settings';
 import {messages} from './messages';
 import {InlineState} from '../../components/primitives';
-import {normalizeRemoteHttpConsent} from '../../helpers/remoteHttpPolicy';
+import {httpClientWithCert} from '../../helpers/httpWithClientCert';
+import {
+  canonicalServerEndpoint,
+  normalizeServerCertificatePin,
+  routeServerCertificatePin,
+} from '../../helpers/serverIdentity';
 
 interface ServerProps {
   server?: Server;
@@ -65,10 +70,6 @@ const formServer = (server?: Server): Server => {
     localTls: {
       ...empty.localTls,
       ...server?.localTls,
-      allowSelfSignedServer:
-        server?.localTls?.allowSelfSignedServer ??
-        server?.localTls?.clientCertConfig?.allowSelfSignedServer ??
-        false,
       clientCertConfig: localClientCertAlias
         ? {alias: localClientCertAlias}
         : server?.clientCertConfig?.alias
@@ -137,17 +138,13 @@ const containsControlCharacter = (value: string): boolean =>
     return code < 32 || code === 127;
   });
 
-const submittedServer = (server: Server, previousServer?: Server): Server => {
+const submittedServer = (server: Server, _previousServer?: Server): Server => {
   const mtlsEnabled = server.mtlsEnabled === true;
   const serverToSubmit = {
     ...server,
     profileId: server.profileId?.trim() || generateServerProfileId(),
     mtlsEnabled,
   };
-  Object.assign(
-    serverToSubmit,
-    normalizeRemoteHttpConsent(serverToSubmit, previousServer),
-  );
   if (!mtlsEnabled) {
     delete serverToSubmit.clientCertConfig;
   }
@@ -158,7 +155,6 @@ const submittedServer = (server: Server, previousServer?: Server): Server => {
     delete serverToSubmit.localEndpoint;
     serverToSubmit.localTls = {
       mtlsEnabled: false,
-      allowSelfSignedServer: false,
     };
   } else {
     const localEndpoint = serverToSubmit.localEndpoint as LocalEndpoint;
@@ -170,14 +166,46 @@ const submittedServer = (server: Server, previousServer?: Server): Server => {
       Boolean(localAlias);
     serverToSubmit.localTls = {
       mtlsEnabled: localMtlsEnabled,
-      allowSelfSignedServer:
-        localEndpoint.protocol === 'https' &&
-        localTls.allowSelfSignedServer === true,
       ...(localMtlsEnabled
         ? {clientCertConfig: {alias: localAlias as string}}
         : {}),
+      serverCertificatePin: normalizeServerCertificatePin(
+        {
+          protocol: localEndpoint.protocol,
+          host: localEndpoint.host,
+          port: localEndpoint.port,
+          path: localEndpoint.basePath,
+        },
+        'local',
+        localTls.serverCertificatePin,
+        localMtlsEnabled ? localAlias || '' : '',
+      ),
+      serverCertificatePinRequired:
+        normalizeServerCertificatePin(
+          {
+            protocol: localEndpoint.protocol,
+            host: localEndpoint.host,
+            port: localEndpoint.port,
+            path: localEndpoint.basePath,
+          },
+          'local',
+          localTls.serverCertificatePin,
+          localMtlsEnabled ? localAlias || '' : '',
+        ) === undefined &&
+        (localTls.serverCertificatePinRequired === true ||
+          localTls.serverCertificatePin !== undefined),
     };
   }
+  serverToSubmit.serverCertificatePin = normalizeServerCertificatePin(
+    serverToSubmit,
+    'remote',
+    serverToSubmit.serverCertificatePin,
+    mtlsEnabled ? serverToSubmit.clientCertConfig?.alias || '' : '',
+  );
+  serverToSubmit.serverCertificatePinRequired =
+    serverToSubmit.serverCertificatePin === undefined &&
+    (server.serverCertificatePinRequired === true ||
+      server.serverCertificatePin !== undefined);
   const rtsp = serverToSubmit.rtsp;
   serverToSubmit.rtsp = {
     enabled: rtsp?.enabled === true,
@@ -312,7 +340,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
   const [certificateSelectionPending, setCertificateSelectionPending] =
     useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [submitAttempted, setSubmitAttempted] = useState(false);
   const intl = useIntl();
 
   useEffect(() => {
@@ -341,9 +368,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
     const consentRequiredError = intl.formatMessage(
       messages['server.rtsp.credentialsConsentRequired'],
     );
-    const remoteHttpConsentRequiredError = intl.formatMessage(
-      messages['server.external.httpConsentRequired'],
-    );
     const localRouteRequiredError = intl.formatMessage(
       messages['server.rtsp.localRouteRequired'],
     );
@@ -351,6 +375,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
     return yup.object().shape({
       protocol: yup
         .string()
+        .oneOf(['https'], httpsError)
         .required(requiredError)
         .test('mtls-https', httpsError, function (value) {
           return (
@@ -359,16 +384,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
             this.createError({message: httpsError})
           );
         }),
-      allowInsecureRemoteHttp: yup
-        .boolean()
-        .required(requiredError)
-        .test(
-          'remote-http-consent',
-          remoteHttpConsentRequiredError,
-          function (value) {
-            return this.from?.[1]?.value?.protocol !== 'http' || value === true;
-          },
-        ),
       host: yup.string().required(requiredError),
       port: yup.number().nullable(),
       path: yup.string(),
@@ -509,14 +524,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
       helpers.setStatus(undefined);
       try {
         const serverToSubmit = submittedServer(modifiedServer, server);
-        if (
-          serverToSubmit.protocol === 'http' &&
-          serverToSubmit.allowInsecureRemoteHttp !== true
-        ) {
-          throw new Error(
-            intl.formatMessage(messages['server.external.httpConsentRequired']),
-          );
-        }
         if (serverToSubmit.auth !== 'none' && serverToSubmit.credentials) {
           if (!serverToSubmit.profileId) {
             throw new Error('Server profile identifier is unavailable');
@@ -620,11 +627,72 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
         const rtsp = values.rtsp as RtspSettings | undefined;
         const formatSummary = (key: keyof typeof messages) =>
           intl.formatMessage(messages[key]);
-        const remoteHttpNeedsConsent =
-          values.protocol === 'http' && values.allowInsecureRemoteHttp !== true;
-        const remoteHttpConsentError = intl.formatMessage(
-          messages['server.external.httpConsentRequired'],
-        );
+        const registerCertificatePin = async (
+          route: 'remote' | 'local',
+        ): Promise<void> => {
+          const endpointInput =
+            route === 'local' && values.localEndpoint
+              ? {
+                  protocol: values.localEndpoint.protocol,
+                  host: values.localEndpoint.host,
+                  port: values.localEndpoint.port,
+                  path: values.localEndpoint.basePath,
+                }
+              : values;
+          const endpoint = canonicalServerEndpoint(endpointInput);
+          if (!endpoint || endpointInput.protocol !== 'https') {
+            throw new Error('Certificate registration requires HTTPS');
+          }
+          const alias =
+            route === 'local'
+              ? values.localTls?.mtlsEnabled === true
+                ? values.localTls.clientCertConfig?.alias || ''
+                : ''
+              : values.mtlsEnabled === true
+              ? values.clientCertConfig?.alias || ''
+              : '';
+          const result = await httpClientWithCert.probeServerCertificate(
+            endpoint.requestBaseUrl,
+            alias,
+            route === 'local',
+          );
+          const displayFingerprint = result.sha256Fingerprint
+            .toUpperCase()
+            .match(/.{1,2}/g)
+            ?.join(':');
+          Alert.alert(
+            intl.formatMessage(messages['server.tls.pin.confirm.title']),
+            intl.formatMessage(messages['server.tls.pin.confirm.message'], {
+              fingerprint: displayFingerprint,
+              endpoint: endpoint.scopeEndpoint,
+            }),
+            [
+              {
+                text: intl.formatMessage(messages['server.tls.pin.cancel']),
+                style: 'cancel',
+              },
+              {
+                text: intl.formatMessage(messages['server.tls.pin.confirm']),
+                onPress: () => {
+                  const pin = {
+                    sha256Fingerprint: result.sha256Fingerprint,
+                    route,
+                    endpoint: endpoint.scopeEndpoint,
+                    clientCertAlias: alias.trim(),
+                  };
+                  if (route === 'local') {
+                    void setFieldValue('localTls', {
+                      ...(values.localTls || {}),
+                      serverCertificatePin: pin,
+                    });
+                  } else {
+                    void setFieldValue('serverCertificatePin', pin);
+                  }
+                },
+              },
+            ],
+          );
+        };
         const externalNeedsAttention = Boolean(errors.protocol || errors.host);
         const externalConfigured =
           Boolean(values.protocol) && Boolean(values.host?.trim());
@@ -827,15 +895,13 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                 compact
                 alwaysExpanded
                 summary={
-                  remoteHttpNeedsConsent
-                    ? formatSummary('server.summary.needsConsent')
-                    : externalNeedsAttention
+                  externalNeedsAttention
                     ? formatSummary('server.summary.needsAttention')
                     : externalConfigured
                     ? formatSummary('server.summary.configured')
                     : formatSummary('server.summary.needsSetup')
                 }
-                invalid={externalNeedsAttention || remoteHttpNeedsConsent}
+                invalid={externalNeedsAttention}
               >
                 <Label
                   text={intl.formatMessage(messages['server.protocol.label'])}
@@ -845,16 +911,13 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                 >
                   <Dropdown
                     value={values.protocol}
-                    options={[
-                      {value: 'http', label: 'http'},
-                      {value: 'https', label: 'https'},
-                    ]}
+                    options={[{value: 'https', label: 'https'}]}
                     accessibilityLabel={intl.formatMessage(
                       messages['server.protocol.label'],
                     )}
                     onValueChange={(protocol: 'http' | 'https') => {
                       void setFieldValue('protocol', protocol);
-                      void setFieldValue('allowInsecureRemoteHttp', false);
+                      void setFieldValue('serverCertificatePin', undefined);
                     }}
                   />
                 </Label>
@@ -872,7 +935,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     onBlur={handleBlur('host')}
                     onChangeText={(value: string) => {
                       handleChange('host')(value);
-                      void setFieldValue('allowInsecureRemoteHttp', false);
+                      void setFieldValue('serverCertificatePin', undefined);
                     }}
                     keyboardType="default"
                   />
@@ -890,7 +953,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                     onBlur={handleBlur('port')}
                     onChangeText={(value: string) => {
                       void setFieldValue('port', parseFloat(value) || null);
-                      void setFieldValue('allowInsecureRemoteHttp', false);
+                      void setFieldValue('serverCertificatePin', undefined);
                     }}
                     keyboardType="numeric"
                   />
@@ -906,54 +969,46 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                       messages['server.path.label'],
                     )}
                     onBlur={handleBlur('path')}
-                    onChangeText={handleChange('path')}
+                    onChangeText={(value: string) => {
+                      handleChange('path')(value);
+                      void setFieldValue('serverCertificatePin', undefined);
+                    }}
                     keyboardType="default"
                   />
                 </Label>
-                {values.protocol === 'http' && (
-                  <>
-                    <InlineState
-                      icon="warning"
-                      tone="warning"
-                      title={intl.formatMessage(
-                        messages['server.external.httpWarning'],
-                      )}
-                      testID="server-remote-http-warning"
-                    />
-                    <Label
-                      text={intl.formatMessage(
-                        messages['server.external.httpConsent'],
-                      )}
-                      touched={Boolean(
-                        touched.allowInsecureRemoteHttp ||
-                          (submitAttempted && remoteHttpNeedsConsent),
-                      )}
-                      error={
-                        (errors.allowInsecureRemoteHttp as string) ||
-                        (submitAttempted && remoteHttpNeedsConsent
-                          ? remoteHttpConsentError
-                          : undefined)
+                <Button
+                  testID="server-tls-pin-register"
+                  label={intl.formatMessage(
+                    messages[
+                      routeServerCertificatePin(values, 'remote')
+                        ? 'server.tls.pin.replace'
+                        : 'server.tls.pin.register'
+                    ],
+                  )}
+                  onPress={() => {
+                    void registerCertificatePin('remote').catch(async error => {
+                      const appError = await handleError(
+                        error,
+                        'ServerForm.registerServerCertificate',
+                        {showToUser: true},
+                      );
+                      if (mounted.current) {
+                        formRef.current?.setStatus(
+                          getUserFriendlyMessage(appError),
+                        );
                       }
-                    >
-                      <Switch
-                        testID="server-remote-http-consent-toggle"
-                        value={values.allowInsecureRemoteHttp === true}
-                        accessibilityRole="switch"
-                        accessibilityLabel={intl.formatMessage(
-                          messages['server.external.httpConsent'],
-                        )}
-                        accessibilityState={{
-                          checked: values.allowInsecureRemoteHttp === true,
-                        }}
-                        onValueChange={(allowInsecureRemoteHttp: boolean) => {
-                          void setFieldValue(
-                            'allowInsecureRemoteHttp',
-                            allowInsecureRemoteHttp,
-                          );
-                        }}
-                      />
-                    </Label>
-                  </>
+                    });
+                  }}
+                />
+                {routeServerCertificatePin(values, 'remote') && (
+                  <Text style={styles.tip} testID="server-tls-pin-fingerprint">
+                    {intl.formatMessage(messages['server.tls.pin.current'], {
+                      fingerprint: routeServerCertificatePin(
+                        values,
+                        'remote',
+                      )?.sha256Fingerprint.toUpperCase(),
+                    })}
+                  </Text>
                 )}
               </Section>
               <Section
@@ -1163,13 +1218,14 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                                   const nextClientCertConfig: ClientCertConfig =
                                     {
                                       alias,
-                                      allowSelfSignedServer:
-                                        values.clientCertConfig
-                                          ?.allowSelfSignedServer ?? false,
                                     };
                                   void setFieldValue(
                                     'clientCertConfig',
                                     nextClientCertConfig,
+                                  );
+                                  void setFieldValue(
+                                    'serverCertificatePin',
+                                    undefined,
                                   );
                                 }
                               })
@@ -1241,40 +1297,8 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                           {clientCertObjectError}
                         </Text>
                       )}
-                      <Label
-                        text={intl.formatMessage(
-                          messages['server.mtls.selfSigned.label'],
-                        )}
-                      >
-                        <Switch
-                          testID="server-mtls-self-signed-toggle"
-                          value={
-                            values.clientCertConfig?.allowSelfSignedServer ??
-                            false
-                          }
-                          accessibilityLabel={intl.formatMessage(
-                            messages['server.mtls.selfSigned.label'],
-                          )}
-                          accessibilityState={{
-                            checked:
-                              values.clientCertConfig?.allowSelfSignedServer ??
-                              false,
-                          }}
-                          onValueChange={(allowSelfSignedServer: boolean) => {
-                            void setFieldValue('clientCertConfig', {
-                              ...(values.clientCertConfig || {alias: ''}),
-                              allowSelfSignedServer,
-                            });
-                          }}
-                        />
-                      </Label>
                       <Text style={styles.tip}>
                         {intl.formatMessage(messages['server.mtls.help'])}
-                      </Text>
-                      <Text style={styles.tip}>
-                        {intl.formatMessage(
-                          messages['server.mtls.selfSigned.warning'],
-                        )}
                       </Text>
                     </>
                   )}
@@ -1460,6 +1484,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                             void setFieldValue('localTls', {
                               ...(localTls || {}),
                               mtlsEnabled: enabled,
+                              serverCertificatePin: undefined,
                             });
                           }}
                         />
@@ -1526,6 +1551,7 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                                       void setFieldValue('localTls', {
                                         ...(localTls || {}),
                                         clientCertConfig: {alias},
+                                        serverCertificatePin: undefined,
                                       });
                                     }
                                   })
@@ -1589,41 +1615,51 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                               testID: 'server-local-mtls-certificate',
                             })}
                           </Label>
-                          <Label
-                            text={intl.formatMessage(
-                              messages['server.local.mtls.selfSigned.label'],
-                            )}
-                          >
-                            <Switch
-                              testID="server-local-mtls-self-signed-toggle"
-                              value={localTls.allowSelfSignedServer === true}
-                              accessibilityRole="switch"
-                              accessibilityLabel={intl.formatMessage(
-                                messages['server.local.mtls.selfSigned.label'],
-                              )}
-                              accessibilityState={{
-                                checked:
-                                  localTls.allowSelfSignedServer === true,
-                              }}
-                              onValueChange={allowSelfSignedServer => {
-                                void setFieldValue('localTls', {
-                                  ...(localTls || {}),
-                                  allowSelfSignedServer,
-                                });
-                              }}
-                            />
-                          </Label>
                           <Text style={styles.tip}>
                             {intl.formatMessage(
                               messages['server.local.mtls.help'],
                             )}
                           </Text>
-                          <Text style={styles.tip}>
-                            {intl.formatMessage(
-                              messages['server.local.mtls.selfSigned.warning'],
-                            )}
-                          </Text>
                         </>
+                      )}
+                      <Button
+                        testID="server-local-tls-pin-register"
+                        label={intl.formatMessage(
+                          messages[
+                            routeServerCertificatePin(values, 'local')
+                              ? 'server.tls.pin.replace'
+                              : 'server.tls.pin.register'
+                          ],
+                        )}
+                        onPress={() => {
+                          void registerCertificatePin('local').catch(
+                            async error => {
+                              const appError = await handleError(
+                                error,
+                                'ServerForm.registerLocalCertificate',
+                                {showToUser: true},
+                              );
+                              if (mounted.current) {
+                                formRef.current?.setStatus(
+                                  getUserFriendlyMessage(appError),
+                                );
+                              }
+                            },
+                          );
+                        }}
+                      />
+                      {routeServerCertificatePin(values, 'local') && (
+                        <Text style={styles.tip}>
+                          {intl.formatMessage(
+                            messages['server.tls.pin.current'],
+                            {
+                              fingerprint: routeServerCertificatePin(
+                                values,
+                                'local',
+                              )?.sha256Fingerprint.toUpperCase(),
+                            },
+                          )}
+                        </Text>
                       )}
                     </Section>
                   )}
@@ -1771,7 +1807,6 @@ export const ServerForm: NavigationFunctionComponent<ServerProps> = ({
                   testID="server-form-submit"
                   disabled={isSubmitting || saveInFlight.current}
                   onPress={() => {
-                    setSubmitAttempted(true);
                     submitRequested.current = true;
                     void formRef.current?.handleSubmit();
                     setTimeout(() => {

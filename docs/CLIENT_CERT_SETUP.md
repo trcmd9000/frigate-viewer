@@ -1,7 +1,7 @@
 # Android Client Certificate Authentication
 
-This guide covers the Android mTLS implementation included in Frigate Viewer
-`14.3.1`. iOS mTLS is not part of the validated release.
+This guide covers the Android mTLS implementation included in the current
+Frigate Viewer release line. iOS mTLS is not part of the validated release.
 
 ## How it works
 
@@ -60,16 +60,17 @@ Client authentication and server authentication are independent:
 - The server certificate proves the server's identity to the app.
 
 Native mTLS server certificate and hostname validation remain enabled by
-default. Prefer a certificate trusted by Android's system store. The **Allow
-self-signed server certificate** option disables those native checks for the
-selected server and should be used only when the risk is understood and the
-network is otherwise trusted.
+default. Prefer a certificate trusted by Android's system store. For a server
+whose certificate is not system-trusted, use the certificate enrollment action
+in the server form, compare the complete displayed SHA-256 leaf fingerprint
+with a trusted out-of-band source, and confirm it explicitly. The fingerprint
+is bound to the route, endpoint, and selected client identity; merely observing
+a certificate never creates trust. A missing or changed fingerprint blocks
+requests until a new enrollment is completed.
 
-The Android manifest currently permits cleartext traffic so an explicitly
-configured legacy `http` Frigate server continues to work. This is a
-compatibility exception, not a strict global Android networking default.
-Tightening that policy requires either removing HTTP support or adding an
-approved per-server transport policy.
+Remote profiles require HTTPS. Android denies cleartext traffic globally, and
+local HTTP endpoints are not used for authenticated API routes. Local RTSP
+continues to use the existing private-address and connected-peer protections.
 
 ## Troubleshooting
 
@@ -112,7 +113,9 @@ KeyChain.
 - Use a separate client identity per person or device when possible.
 - Set a reasonable certificate lifetime and maintain a revocation process.
 - Protect the Android device with a secure lock screen.
-- Prefer normal trusted server certificates over the self-signed override.
+- Prefer normal trusted server certificates. If a self-signed server is
+  unavoidable, compare the full displayed SHA-256 fingerprint with a trusted
+  out-of-band source before confirming enrollment.
 - Review server access logs and revoke lost-device identities promptly.
 
 For support, open a

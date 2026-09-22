@@ -12,6 +12,7 @@ import androidx.media3.datasource.DataSpec;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,6 +22,8 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import okio.ByteString;
 
 import org.junit.After;
@@ -34,11 +37,20 @@ import org.robolectric.RuntimeEnvironment;
 public class ProtectedMseLiveDataSourceTest {
   private MockWebServer server;
   private MediaProfileRegistry registry;
+  private String serverCertificatePin;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() throws Exception {
+    HeldCertificate certificate = new HeldCertificate.Builder()
+      .addSubjectAlternativeName("127.0.0.1")
+      .build();
+    HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+      .heldCertificate(certificate)
+      .build();
     server = new MockWebServer();
+    server.useHttps(serverCertificates.sslSocketFactory(), false);
     server.start();
+    serverCertificatePin = fingerprint(certificate);
     registry = new MediaProfileRegistry(testContext());
   }
 
@@ -126,7 +138,7 @@ public class ProtectedMseLiveDataSourceTest {
   private String registerProfile() throws Exception {
     return registry.register(new MediaProfileRegistry.MediaProfileConfig(
       "mse-data-source-" + server.getPort(),
-      "http",
+      "https",
       "127.0.0.1",
       server.getPort(),
       "",
@@ -134,7 +146,7 @@ public class ProtectedMseLiveDataSourceTest {
       "",
       "",
       "",
-      false,
+      serverCertificatePin,
       true
     ));
   }
@@ -149,5 +161,15 @@ public class ProtectedMseLiveDataSourceTest {
 
   private static Context testContext() {
     return RuntimeEnvironment.getApplication().getApplicationContext();
+  }
+
+  private static String fingerprint(HeldCertificate certificate) throws Exception {
+    byte[] digest = MessageDigest.getInstance("SHA-256")
+      .digest(certificate.certificate().getEncoded());
+    StringBuilder result = new StringBuilder(64);
+    for (byte value : digest) {
+      result.append(String.format("%02x", value & 0xff));
+    }
+    return result.toString();
   }
 }

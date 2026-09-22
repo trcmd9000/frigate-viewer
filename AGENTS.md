@@ -16,8 +16,8 @@ decisions that future maintainers and coding agents must preserve.
   is present, but iOS mTLS and release builds are not currently supported or
   validated.
 - Current production release: `18.0.7` with Android `versionCode 30`.
-- Current Internal Testing release: `18.0.12` with Android `versionCode 37`.
-- The next release candidate is `18.0.15` with Android `versionCode 40`.
+- Current Internal Testing release: `18.0.16` with Android `versionCode 41`.
+- The next release candidate is `18.0.17` with Android `versionCode 42`.
 
 ## Public repository rules
 
@@ -60,11 +60,10 @@ Do not:
 - Add a global trust-all manager or hostname verifier.
 
 Native mTLS server certificate and hostname validation must remain enabled by
-default. The self-signed server option is an explicit per-server override and
-must stay clearly labeled as a security reduction. The Android manifest
-currently permits cleartext traffic for explicitly configured legacy HTTP
-servers, so do not describe the app as having a strict global cleartext
-default; tightening that compatibility exception requires product approval.
+default. Non-system-trusted servers require explicit per-route SHA-256 leaf
+certificate enrollment and out-of-band fingerprint confirmation; never add a
+trust-all override. Remote profiles require HTTPS, Android cleartext is denied
+globally, and local HTTP is not an authenticated API route.
 
 The primary implementation surfaces are:
 

@@ -189,7 +189,7 @@ describe('mediaDownload', () => {
           endpoint: encodeURIComponent('https://example.invalid:443/frigate'),
           clientCertAlias: encodeURIComponent('selected'),
         }),
-        allowSelfSignedServer: false,
+        serverCertificatePin: '',
         maxBytes: expect.any(Number),
       }),
     );

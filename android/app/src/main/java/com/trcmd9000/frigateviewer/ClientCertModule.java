@@ -23,6 +23,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,6 +32,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -45,6 +48,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
@@ -286,6 +291,120 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     });
   }
 
+  /**
+       * Performs only a TLS handshake. It never sends HTTP bytes, authentication
+       * headers, cookies, or Frigate credentials.
+       */
+  @ReactMethod
+  public void probeServerCertificate(
+        String url,
+        String clientCertAlias,
+        boolean localRoute,
+        Promise promise
+      ) {
+        executor.execute(() -> {
+          try {
+            HttpUrl endpoint = HttpUrl.parse(url);
+            if (endpoint == null || !endpoint.isHttps()) {
+              promise.reject("TLS_REQUIRED", "Certificate registration requires HTTPS");
+              return;
+            }
+            final X509Certificate[][] observedChain = new X509Certificate[1][];
+            X509TrustManager observingTrustManager = new X509TrustManager() {
+              @Override
+              public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+              @Override
+              public void checkServerTrusted(X509Certificate[] chain, String authType)
+                throws CertificateException {
+                if (chain == null || chain.length == 0) {
+                  throw new CertificateException("The server did not present a certificate");
+                }
+                observedChain[0] = chain.clone();
+              }
+
+              @Override
+              public X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+              }
+            };
+            KeyManager[] keyManagers = null;
+            String alias = clientCertAlias == null ? "" : clientCertAlias.trim();
+            if (!alias.isEmpty()) {
+              PrivateKey privateKey = KeyChain.getPrivateKey(reactContext, alias);
+              X509Certificate[] clientChain =
+                KeyChain.getCertificateChain(reactContext, alias);
+              if (privateKey == null || clientChain == null || clientChain.length == 0) {
+                throw new IllegalStateException("The selected client identity is unavailable");
+              }
+              keyManagers = new KeyManager[] {
+                new AliasKeyManager(alias, privateKey, clientChain)
+              };
+            }
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(
+              keyManagers,
+              new TrustManager[] {observingTrustManager},
+              null
+            );
+            Socket connectedSocket = null;
+            if (localRoute) {
+              IOException lastFailure = null;
+              for (InetAddress address : InetAddress.getAllByName(endpoint.host())) {
+                LocalRouteResolver.validateAddress(address);
+                Socket candidate = new Socket();
+                try {
+                  candidate.connect(
+                    new InetSocketAddress(address, endpoint.port()),
+                    10_000
+                  );
+                  LocalRouteResolver.validateConnectedPeer(candidate.getInetAddress());
+                  connectedSocket = candidate;
+                  break;
+                } catch (IOException failure) {
+                  lastFailure = failure;
+                  candidate.close();
+                }
+              }
+              if (connectedSocket == null) {
+                throw lastFailure == null
+                  ? new IOException("No private local address is available")
+                  : lastFailure;
+              }
+            }
+            try (SSLSocket socket = localRoute
+              ? (SSLSocket) context.getSocketFactory().createSocket(
+                  connectedSocket,
+                  endpoint.host(),
+                  endpoint.port(),
+                  true
+                )
+              : (SSLSocket) context.getSocketFactory().createSocket(
+                  endpoint.host(),
+                  endpoint.port()
+                )) {
+              socket.setSoTimeout(10_000);
+              SSLParameters parameters = socket.getSSLParameters();
+              // Certificate discovery never disables hostname verification.
+              parameters.setEndpointIdentificationAlgorithm("HTTPS");
+              socket.setSSLParameters(parameters);
+              socket.startHandshake();
+            }
+            if (observedChain[0] == null || observedChain[0].length == 0) {
+              throw new CertificateException("The server did not present a certificate");
+            }
+            WritableMap result = Arguments.createMap();
+            result.putString(
+              "sha256Fingerprint",
+              leafFingerprint(observedChain[0][0])
+            );
+            promise.resolve(result);
+          } catch (Exception error) {
+            rejectRequestError(promise, error);
+          }
+        });
+  }
+
   @ReactMethod
   public void performHttpRequestWithClientCert(
     String url,
@@ -294,7 +413,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String method,
     ReadableArray headers,
     String body,
-    boolean allowSelfSignedServer,
+    String serverCertificatePin,
     Promise promise
   ) {
     executor.execute(() -> {
@@ -330,7 +449,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         }
 
         OkHttpClient client =
-          createHttpClient(alias, serverIdentity, allowSelfSignedServer);
+          createHttpClient(alias, serverIdentity, serverCertificatePin);
         if (isLocalRouteIdentity(serverIdentity)) {
           client = LocalRouteResolver.checkedClient(client);
         }
@@ -355,7 +474,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
           }
           result.putMap("headers", responseHeaders);
           if (response.isSuccessful() && isLoginRequest(request)) {
-            markLoginSuccess(alias, serverIdentity, allowSelfSignedServer);
+            markLoginSuccess(alias, serverIdentity, serverCertificatePin);
           }
           promise.resolve(result);
         }
@@ -372,6 +491,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String method,
     ReadableArray headers,
     String body,
+    String serverCertificatePin,
     Promise promise
   ) {
     executor.execute(() -> {
@@ -402,7 +522,14 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             : null;
         requestBuilder.method(method, permitsRequestBody(method) ? requestBody : null);
         Request request = requestBuilder.build();
-        OkHttpClient client = createDefaultHttpClient(serverIdentity);
+        if (!request.url().isHttps()) {
+          promise.reject("TLS_REQUIRED", "Secure transport requires HTTPS");
+          return;
+        }
+        OkHttpClient client = createDefaultHttpClient(
+          serverIdentity,
+          serverCertificatePin
+        );
         if (isLocalRouteIdentity(serverIdentity)) {
           client = LocalRouteResolver.checkedClient(client);
         }
@@ -416,7 +543,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
           }
           result.putMap("headers", responseHeaders);
           if (response.isSuccessful() && isLoginRequest(requestBuilder.build())) {
-            markLoginSuccess(null, serverIdentity, false);
+            markLoginSuccess(null, serverIdentity, serverCertificatePin);
           }
           promise.resolve(result);
         }
@@ -457,7 +584,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             mapString(config, "password"),
             mapBoolean(config, "localMtlsEnabled"),
             mapString(config, "localClientCertAlias"),
-            mapBoolean(config, "localAllowSelfSignedServer")
+            mapString(config, "localServerCertificatePin")
           );
         LocalRouteResolver.Resolution resolution =
           localRouteResolver.resolve(routeConfig, method);
@@ -483,7 +610,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String alias,
     String serverIdentity,
     ReadableArray headers,
-    boolean allowSelfSignedServer,
+    String serverCertificatePin,
     int maxBytes,
     int mediaReservationId,
     Promise promise
@@ -494,7 +621,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         alias,
         serverIdentity,
         headers,
-        allowSelfSignedServer,
+        serverCertificatePin,
         true,
         maxBytes,
         mediaReservationId,
@@ -508,6 +635,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String url,
     String serverIdentity,
     ReadableArray headers,
+    String serverCertificatePin,
     int maxBytes,
     int mediaReservationId,
     Promise promise
@@ -518,7 +646,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         null,
         serverIdentity,
         headers,
-        false,
+        serverCertificatePin,
         false,
         maxBytes,
         mediaReservationId,
@@ -564,8 +692,8 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             mapString(config, "username"),
             mapString(config, "password"),
             mapString(config, "clientCertAlias"),
-            mapBoolean(config, "allowSelfSignedServer"),
-            mapBoolean(config, "allowInsecureRemoteHttp"),
+            mapString(config, "serverCertificatePin"),
+            false,
             mapBoolean(config, "localRoutingEnabled"),
             mapString(config, "localProtocol"),
             mapString(config, "localHost"),
@@ -573,7 +701,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             mapString(config, "localBasePath"),
             mapBoolean(config, "localMtlsEnabled"),
             mapString(config, "localClientCertAlias"),
-            mapBoolean(config, "localAllowSelfSignedServer"),
+            mapString(config, "localServerCertificatePin"),
             mapBoolean(config, "rtspEnabled"),
             mapInt(config, "rtspPort"),
             mapBoolean(config, "allowInsecureCredentials")
@@ -833,7 +961,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     String alias,
     String serverIdentity,
     ReadableArray headers,
-    boolean allowSelfSignedServer,
+    String serverCertificatePin,
     boolean withClientCert,
     int maxBytes,
     int mediaReservationId,
@@ -854,6 +982,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
         promise.reject("MEDIA_RESERVATION_REQUIRED", "A media reservation is required");
         return;
       }
+
       Request.Builder requestBuilder = new Request.Builder().url(url).get();
       if (headers != null) {
         for (int index = 0; index < headers.size(); index++) {
@@ -870,15 +999,15 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       }
 
       Request request = requestBuilder.build();
-      if (withClientCert && !request.url().isHttps()) {
-        promise.reject("TLS_REQUIRED", "Client certificates require HTTPS");
+      if (!request.url().isHttps()) {
+        promise.reject("TLS_REQUIRED", "Secure transport requires HTTPS");
         return;
       }
 
       OkHttpClient client =
         withClientCert
-          ? createHttpClient(alias, serverIdentity, allowSelfSignedServer)
-          : createDefaultHttpClient(serverIdentity);
+          ? createHttpClient(alias, serverIdentity, serverCertificatePin)
+          : createDefaultHttpClient(serverIdentity, serverCertificatePin);
       client = client.newBuilder().callTimeout(30, TimeUnit.SECONDS).build();
       Log.i(TAG, "media download started with a bounded byte budget");
       try (Response response = client.newCall(request).execute()) {
@@ -986,12 +1115,12 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     android.content.Context context,
     String alias,
     String serverIdentity,
-    boolean allowSelfSignedServer
+    String serverCertificatePin
   ) throws Exception {
     String clientKey = clientSessionKey(
       alias,
       serverIdentity,
-      allowSelfSignedServer
+      serverCertificatePin
     );
 
     synchronized (clientSessions) {
@@ -1002,13 +1131,14 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
             scopePrefix.equals(authenticationScopePrefix(session.serverIdentity)) &&
             !(
               serverIdentity.equals(session.serverIdentity) &&
-              allowSelfSignedServer == session.allowSelfSignedServer &&
+              normalizedPin(serverCertificatePin).equals(normalizedPin(session.serverCertificatePin)) &&
               (alias == null ? "" : alias).equals(session.alias == null ? "" : session.alias)
             ) &&
             clientSessions.remove(key, session)
           ) {
             closeClientSession(session);
           }
+
         });
       }
 
@@ -1020,16 +1150,16 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       OkHttpClient.Builder clientBuilder;
       if (alias == null || alias.trim().isEmpty()) {
         clientBuilder = new OkHttpClient.Builder();
-        if (allowSelfSignedServer) {
-          X509TrustManager trustManager = createTrustManager(true);
+        if (!normalizedPin(serverCertificatePin).isEmpty()) {
+          X509TrustManager trustManager = createTrustManager(serverCertificatePin);
           SSLContext sslContext = SSLContext.getInstance("TLS");
           sslContext.init(null, new TrustManager[] {trustManager}, null);
           clientBuilder.sslSocketFactory(sslContext.getSocketFactory(), trustManager);
         }
       } else {
         SSLContext sslContext =
-          createClientSslContext(context, alias, allowSelfSignedServer);
-        X509TrustManager trustManager = createTrustManager(allowSelfSignedServer);
+          createClientSslContext(context, alias, serverCertificatePin);
+        X509TrustManager trustManager = createTrustManager(serverCertificatePin);
         clientBuilder = new OkHttpClient.Builder()
           .sslSocketFactory(sslContext.getSocketFactory(), trustManager);
       }
@@ -1037,7 +1167,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       NativeClientSession created = new NativeClientSession(
         serverIdentity,
         alias,
-        allowSelfSignedServer,
+        serverCertificatePin,
         clientBuilder
           .followRedirects(false)
           .followSslRedirects(false)
@@ -1049,15 +1179,29 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     }
   }
 
+  static NativeClientSession getSharedClientSession(
+    android.content.Context context,
+    String alias,
+    String serverIdentity,
+    boolean legacyPinRequired
+  ) throws Exception {
+    return getSharedClientSession(
+      context,
+      alias,
+      serverIdentity,
+      legacyPinRequired ? "required" : ""
+    );
+  }
+
   private static String clientSessionKey(
     String alias,
     String serverIdentity,
-    boolean allowSelfSignedServer
+    String serverCertificatePin
   ) {
     String identityKey = serverIdentity == null ? "" : serverIdentity;
     return opaqueFingerprint(
       identityKey + "\u0000" + (alias == null ? "" : alias) +
-      "\u0000" + allowSelfSignedServer
+      "\u0000" + serverCertificatePin
     );
   }
 
@@ -1098,15 +1242,16 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   static void removeSharedClientSession(
     String alias,
     String serverIdentity,
-    boolean allowSelfSignedServer
+    String serverCertificatePin
   ) {
     List<NativeClientSession> removed = new ArrayList<>();
     synchronized (clientSessions) {
-      String clientKey = clientSessionKey(alias, serverIdentity, allowSelfSignedServer);
+      String clientKey = clientSessionKey(alias, serverIdentity, serverCertificatePin);
       NativeClientSession exact = clientSessions.remove(clientKey);
       if (exact != null) {
         removed.add(exact);
       }
+
       String scopePrefix = authenticationScopePrefix(serverIdentity);
       if (scopePrefix != null) {
         clientSessions.forEach((key, session) -> {
@@ -1118,6 +1263,18 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       }
     }
     removed.forEach(ClientCertModule::closeClientSession);
+  }
+
+  static void removeSharedClientSession(
+    String alias,
+    String serverIdentity,
+    boolean legacyPinRequired
+  ) {
+    removeSharedClientSession(
+      alias,
+      serverIdentity,
+      legacyPinRequired ? "required" : ""
+    );
   }
 
   private static void retireClientSessionsForIdentity(String serverIdentity) {
@@ -1235,12 +1392,12 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   private static void markLoginSuccess(
     String alias,
     String serverIdentity,
-    boolean allowSelfSignedServer
+    String serverCertificatePin
   ) {
     String clientKey = clientSessionKey(
       alias,
       serverIdentity,
-      allowSelfSignedServer
+      serverCertificatePin
     );
     NativeClientSession session = clientSessions.get(clientKey);
     if (session == null) {
@@ -1255,19 +1412,27 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   private OkHttpClient createHttpClient(
     String alias,
     String serverIdentity,
-    boolean allowSelfSignedServer
+    String serverCertificatePin
   ) throws Exception {
     return getSharedClientSession(
       reactContext,
       alias,
       serverIdentity,
-      allowSelfSignedServer
+      serverCertificatePin
     ).client;
   }
 
-  private OkHttpClient createDefaultHttpClient(String serverIdentity) {
+  private OkHttpClient createDefaultHttpClient(
+    String serverIdentity,
+    String serverCertificatePin
+  ) {
     try {
-      return getSharedClientSession(reactContext, null, serverIdentity, false).client;
+      return getSharedClientSession(
+        reactContext,
+        null,
+        serverIdentity,
+        serverCertificatePin
+      ).client;
     } catch (Exception error) {
       throw new IllegalStateException("Unable to initialize the native HTTP client", error);
     }
@@ -1276,7 +1441,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
   private static SSLContext createClientSslContext(
     android.content.Context appContext,
     String alias,
-    boolean allowSelfSignedServer
+    String serverCertificatePin
   ) throws Exception {
     PrivateKey privateKey = KeyChain.getPrivateKey(appContext, alias);
     X509Certificate[] certificateChain =
@@ -1288,20 +1453,58 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     KeyManager[] keyManagers = {
       new AliasKeyManager(alias, privateKey, certificateChain)
     };
-    X509TrustManager trustManager = createTrustManager(allowSelfSignedServer);
+    X509TrustManager trustManager = createTrustManager(serverCertificatePin);
     SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(keyManagers, new TrustManager[] {trustManager}, null);
     return sslContext;
   }
 
-  private static X509TrustManager createTrustManager(boolean allowSelfSigned) throws Exception {
-    if (allowSelfSigned) {
+  private static String normalizedPin(String pin) {
+    return pin == null ? "" : pin.trim().toLowerCase(Locale.US);
+  }
+
+  private static String leafFingerprint(X509Certificate certificate)
+    throws CertificateException {
+    try {
+      byte[] digest = MessageDigest.getInstance("SHA-256")
+        .digest(certificate.getEncoded());
+      StringBuilder fingerprint = new StringBuilder(64);
+      for (byte value : digest) {
+        fingerprint.append(String.format(Locale.US, "%02x", value & 0xff));
+      }
+      return fingerprint.toString();
+    } catch (NoSuchAlgorithmException error) {
+      throw new CertificateException("SHA-256 is unavailable", error);
+    }
+  }
+
+  private static X509TrustManager createTrustManager(String certificatePin)
+    throws Exception {
+    final String expectedPin = normalizedPin(certificatePin);
+    if (!expectedPin.isEmpty()) {
+      if (!expectedPin.matches("[0-9a-f]{64}")) {
+        throw new MissingServerPinException();
+      }
       return new X509TrustManager() {
         @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+        public void checkClientTrusted(X509Certificate[] chain, String authType)
+          throws CertificateException {
+          throw new CertificateException("Client certificate trust is unsupported");
+        }
 
         @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+        public void checkServerTrusted(X509Certificate[] chain, String authType)
+          throws CertificateException {
+          if (chain == null || chain.length == 0) {
+            throw new ChangedServerPinException();
+          }
+          if (!MessageDigest.isEqual(
+            expectedPin.getBytes(StandardCharsets.US_ASCII),
+            leafFingerprint(chain[0]).getBytes(StandardCharsets.US_ASCII)
+          )) {
+            throw new ChangedServerPinException();
+          }
+        }
 
         @Override
         public X509Certificate[] getAcceptedIssuers() {
@@ -1319,6 +1522,18 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       }
     }
     throw new IllegalStateException("No system X509TrustManager is available");
+  }
+
+  static final class MissingServerPinException extends CertificateException {
+    MissingServerPinException() {
+      super("A registered server certificate is required");
+    }
+  }
+
+  static final class ChangedServerPinException extends CertificateException {
+    ChangedServerPinException() {
+      super("The server certificate no longer matches the registered certificate");
+    }
   }
 
   private boolean permitsRequestBody(String method) {
@@ -1379,7 +1594,19 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
       root = root.getCause();
     }
     Log.e(TAG, "request failed with " + root.getClass().getSimpleName());
-    if (findCause(error, SSLHandshakeException.class) != null) {
+    if (findCause(error, MissingServerPinException.class) != null) {
+      promise.reject(
+        "SERVER_CERT_PIN_MISSING",
+        "A registered server certificate is required",
+        error
+      );
+    } else if (findCause(error, ChangedServerPinException.class) != null) {
+      promise.reject(
+        "SERVER_CERT_PIN_CHANGED",
+        "The server certificate has changed; register it again",
+        error
+      );
+    } else if (findCause(error, SSLHandshakeException.class) != null) {
       promise.reject(
         "TLS_HANDSHAKE_ERROR",
         "TLS handshake with the server failed",
@@ -1777,7 +2004,7 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     final OkHttpClient client;
     final String serverIdentity;
     final String alias;
-    final boolean allowSelfSignedServer;
+    final String serverCertificatePin;
     final Object loginLock = new Object();
     long sessionGeneration = 0L;
     boolean loginInFlight = false;
@@ -1786,12 +2013,12 @@ public class ClientCertModule extends ReactContextBaseJavaModule implements Life
     NativeClientSession(
       String serverIdentity,
       String alias,
-      boolean allowSelfSignedServer,
+      String serverCertificatePin,
       OkHttpClient client
     ) {
       this.serverIdentity = serverIdentity;
       this.alias = alias;
-      this.allowSelfSignedServer = allowSelfSignedServer;
+      this.serverCertificatePin = serverCertificatePin;
       this.client = client;
     }
   }

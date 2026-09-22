@@ -33,6 +33,11 @@ const secureStorageUnavailable = (): Error & {code: string} =>
     {code: 'SECURE_STORAGE_UNAVAILABLE'},
   );
 
+const secureStorageWriteFailed = (): Error & {code: string} =>
+  Object.assign(new Error('Platform secure credential storage write failed'), {
+    code: 'SECURE_STORAGE_WRITE_FAILED',
+  });
+
 // Platform detection
 export const getPlatform = (): 'ios' | 'android' | 'unknown' => {
   if (Platform.OS === 'ios') {
@@ -53,6 +58,46 @@ const getServiceKey = (storageKey: string): string => {
   return `${KEYCHAIN_PREFIX}${storageKey}`;
 };
 
+const isCredentials = (value: unknown): value is Credentials => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<Credentials>;
+  return (
+    typeof candidate.username === 'string' &&
+    typeof candidate.password === 'string'
+  );
+};
+
+const writeCredentials = async (
+  service: string,
+  credentials: Credentials,
+): Promise<void> => {
+  if (!isCredentials(credentials)) {
+    throw new Error('Invalid credentials for secure storage');
+  }
+
+  const result = await KeychainModule.setGenericPassword(
+    credentials.username,
+    JSON.stringify(credentials),
+    {
+      service,
+      accessible: Platform.select({
+        ios: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+        android: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
+      }),
+      storage: Platform.select({
+        android: KeychainModule.STORAGE_TYPE.AES,
+      }),
+    },
+  );
+
+  if (result === false) {
+    throw secureStorageWriteFailed();
+  }
+};
+
 /**
  * Save credentials securely to Keychain/Keystore.
  */
@@ -65,22 +110,7 @@ export const saveCredentials = async (
       throw secureStorageUnavailable();
     }
     const service = getServiceKey(storageKey);
-    const credentialString = JSON.stringify(credentials);
-
-    await KeychainModule.setGenericPassword(
-      credentials.username,
-      credentialString,
-      {
-        service,
-        accessible: Platform.select({
-          ios: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
-          android: KeychainModule.ACCESSIBLE.WHEN_UNLOCKED,
-        }),
-        storage: Platform.select({
-          android: KeychainModule.STORAGE_TYPE.AES,
-        }),
-      },
-    );
+    await writeCredentials(service, credentials);
   } catch (error) {
     SecureLogger.logError(error as Error, 'secure-storage.save');
     throw error;
@@ -103,17 +133,37 @@ export const loadCredentials = async (
     if (!credentials) {
       return null;
     }
+    if (
+      typeof credentials.username !== 'string' ||
+      typeof credentials.password !== 'string'
+    ) {
+      throw new Error('Invalid credentials in secure storage');
+    }
 
-    // Credentials are stored as JSON string in the Keychain password field.
+    let parsedCredentials: Credentials = {
+      username: credentials.username,
+      password: credentials.password,
+    };
+    let parsed: unknown;
     try {
-      return JSON.parse(credentials.password);
+      parsed = JSON.parse(credentials.password);
     } catch {
       // Preserve compatibility with the old Keychain format.
-      return {
-        username: credentials.username,
-        password: credentials.password,
-      };
     }
+    if (parsed !== undefined) {
+      if (!isCredentials(parsed)) {
+        throw new Error('Invalid credentials in secure storage');
+      }
+      parsedCredentials = parsed;
+    }
+
+    // iOS does not expose an entry's accessibility on read. Rewriting it is
+    // the only way to migrate readable legacy items to device-only storage.
+    // Do not return the secret unless the stronger write succeeds.
+    if (Platform.OS === 'ios') {
+      await writeCredentials(service, parsedCredentials);
+    }
+    return parsedCredentials;
   } catch (error) {
     SecureLogger.logError(error as Error, 'secure-storage.load');
     throw error;
@@ -158,11 +208,14 @@ export const migrateAsyncStorageCredentials = async (): Promise<void> => {
       try {
         const data = await AsyncStorage.getItem(key);
         if (data) {
-          const credentials = JSON.parse(data);
+          const parsed: unknown = JSON.parse(data);
+          if (!isCredentials(parsed)) {
+            throw new Error('Invalid credentials in legacy storage');
+          }
           const storageKey = key.substring(KEYCHAIN_PREFIX.length);
 
           // Save to keychain
-          await saveCredentials(storageKey, credentials);
+          await saveCredentials(storageKey, parsed);
 
           // Remove from AsyncStorage after successful migration
           await AsyncStorage.removeItem(key);

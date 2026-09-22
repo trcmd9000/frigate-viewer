@@ -59,7 +59,7 @@ describe('settings persistence security boundary', () => {
           },
           localTls: {
             mtlsEnabled: true,
-            allowSelfSignedServer: true,
+            serverCertificatePinRequired: true,
             clientCertConfig: {alias: 'untrusted'},
           },
           rtsp: {
@@ -75,7 +75,6 @@ describe('settings persistence security boundary', () => {
     expect(persisted.servers[0].localEndpoint).toBeUndefined();
     expect(persisted.servers[0].localTls).toEqual({
       mtlsEnabled: false,
-      allowSelfSignedServer: false,
     });
     expect(persisted.servers[0].rtsp).toEqual({
       enabled: false,

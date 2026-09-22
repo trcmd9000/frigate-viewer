@@ -312,7 +312,8 @@ then remains the supported path.
 - Model: codec metadata parsing, capability decisions, unsupported/unknown
   fallback, malformed input, and stable serialization.
 - Native security: auth success/failure, mTLS success/failure, hostname and
-  self-signed opt-in behavior, route allow-list rejection, no secret logging.
+  certificate-enrollment behavior, route allow-list rejection, no secret
+  logging.
 - WebRTC: existing H.264 regression, HEVC offer/answer, injected factory
   selection, actual-frame assertion, mute-by-default, retry, lifecycle, and
   media replacement.

@@ -27,7 +27,7 @@ describe('settings persistence', () => {
           credentials: {username: 'user', password: 'secret'},
           clientCertConfig: {
             alias: 'selected',
-            allowSelfSignedServer: false,
+            serverCertificatePinRequired: false,
           },
         },
       ],
@@ -43,7 +43,6 @@ describe('settings persistence', () => {
     expect(JSON.parse(serialized)).not.toHaveProperty('v1');
     expect(JSON.parse(serialized).servers[0].clientCertConfig).toEqual({
       alias: 'selected',
-      allowSelfSignedServer: false,
     });
     expect(state.servers[0].credentials).toEqual({
       username: 'user',

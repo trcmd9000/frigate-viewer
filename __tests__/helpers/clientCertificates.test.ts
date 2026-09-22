@@ -6,7 +6,19 @@ jest.mock('react-native-keychain', () => ({
   resetGenericPassword: jest.fn(),
 }));
 
+import {readFileSync, readdirSync} from 'fs';
+import {join, resolve} from 'path';
 import ClientCertificateManager from '../../helpers/clientCertificates';
+
+const sourceFilesBelow = (directory: string): string[] =>
+  readdirSync(directory, {withFileTypes: true}).flatMap(entry => {
+    const entryPath = join(directory, entry.name);
+    return entry.isDirectory()
+      ? sourceFilesBelow(entryPath)
+      : /\.(m|mm|swift)$/.test(entry.name)
+      ? [entryPath]
+      : [];
+  });
 
 describe('ClientCertificateManager', () => {
   beforeEach(() => {
@@ -34,5 +46,22 @@ describe('ClientCertificateManager', () => {
     const manager = new ClientCertificateManager();
 
     expect(typeof manager.isAvailable()).toBe('boolean');
+  });
+
+  it('keeps global React Native trust-all challenge handlers out of the iOS tree and target', () => {
+    const iosDirectory = resolve(__dirname, '../../ios/FrigateViewer');
+    const project = readFileSync(
+      resolve(__dirname, '../../ios/FrigateViewer.xcodeproj/project.pbxproj'),
+      'utf8',
+    );
+    const nativeSources = sourceFilesBelow(iosDirectory)
+      .map(file => readFileSync(file, 'utf8'))
+      .join('\n');
+
+    expect(project).not.toMatch(/RCHTTPRequestHandler\+ignoreSSL/);
+    expect(nativeSources).not.toMatch(
+      /@implementation\s+RCTHTTPRequestHandler\s*\([^)]*\)[\s\S]*credentialForTrust\s*:\s*challenge\.protectionSpace\.serverTrust/,
+    );
+    expect(nativeSources).not.toMatch(/URLCredential\s*\(\s*trust\s*:/);
   });
 });

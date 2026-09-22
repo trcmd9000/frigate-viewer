@@ -614,7 +614,7 @@ describe('REST API Helper', () => {
       );
     });
 
-    it('fails closed for remote HTTP without explicit consent', async () => {
+    it('fails closed for remote HTTP', async () => {
       const server: Server = {
         protocol: 'http',
         host: 'remote.example',
@@ -622,18 +622,17 @@ describe('REST API Helper', () => {
         path: '',
         auth: 'none',
         credentials: {username: '', password: ''},
-        allowInsecureRemoteHttp: false,
       };
 
       await expect(
         executeServerRequest(server, 'http://remote.example/api/config', {
           method: 'GET',
         }),
-      ).rejects.toMatchObject({code: 'REMOTE_HTTP_CONSENT_REQUIRED'});
+      ).rejects.toMatchObject({code: 'REMOTE_HTTP_UNSUPPORTED'});
       expect(clientCertRequest).not.toHaveBeenCalled();
     });
 
-    it('allows consented remote HTTP through the common transport', async () => {
+    it('does not allow legacy settings to bypass the remote HTTP block', async () => {
       clientCertRequest.mockResolvedValue({
         status: 200,
         headers: {},
@@ -648,15 +647,14 @@ describe('REST API Helper', () => {
         path: '',
         auth: 'none',
         credentials: {username: '', password: ''},
-        allowInsecureRemoteHttp: true,
       };
 
       await expect(
         executeServerRequest(server, 'http://remote.example/api/config', {
           method: 'GET',
         }),
-      ).resolves.toBeDefined();
-      expect(clientCertRequest).toHaveBeenCalled();
+      ).rejects.toMatchObject({code: 'REMOTE_HTTP_UNSUPPORTED'});
+      expect(clientCertRequest).not.toHaveBeenCalled();
     });
 
     it('exposes targeted profile-session invalidation for logout and deletion', () => {
@@ -876,12 +874,12 @@ describe('REST API Helper', () => {
         credentials: {username: '', password: ''},
         clientCertConfig: {
           alias: 'my-cert',
-          allowSelfSignedServer: true,
+          serverCertificatePinRequired: true,
         },
       };
 
       expect(server.clientCertConfig?.alias).toBe('my-cert');
-      expect(server.clientCertConfig?.allowSelfSignedServer).toBe(true);
+      expect(server.clientCertConfig?.serverCertificatePinRequired).toBe(true);
     });
 
     it('should support server without client certificate config', () => {
@@ -911,7 +909,7 @@ describe('REST API Helper', () => {
       };
 
       expect(server.clientCertConfig?.alias).toBeDefined();
-      expect(server.clientCertConfig?.allowSelfSignedServer).toBeUndefined();
+      expect(server.clientCertConfig?.serverCertificatePinRequired).toBeUndefined();
     });
   });
 
@@ -1008,7 +1006,7 @@ describe('REST API Helper', () => {
         credentials: {username: 'user', password: 'pass'},
         clientCertConfig: {
           alias: 'cert-alias',
-          allowSelfSignedServer: false,
+          serverCertificatePinRequired: false,
         },
       };
 

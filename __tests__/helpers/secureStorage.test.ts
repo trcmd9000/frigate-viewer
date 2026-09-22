@@ -51,6 +51,15 @@ describe('secureStorage', () => {
 
       await migrateAsyncStorageCredentials();
 
+      const keychain = require('react-native-keychain');
+      expect(keychain.setGenericPassword).toHaveBeenCalledWith(
+        credentials.username,
+        JSON.stringify(credentials),
+        expect.objectContaining({
+          service: 'frigate_server1',
+          accessible: 'whenUnlockedThisDeviceOnly',
+        }),
+      );
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith('frigate_server1');
     });
 
@@ -77,7 +86,10 @@ describe('secureStorage', () => {
         expect(keychain.setGenericPassword).toHaveBeenCalledWith(
           'user',
           JSON.stringify({username: 'user', password: 'secret'}),
-          expect.objectContaining({service: 'frigate_profile-one'}),
+          expect.objectContaining({
+            service: 'frigate_profile-one',
+            accessible: 'whenUnlockedThisDeviceOnly',
+          }),
         );
       });
 
@@ -100,7 +112,54 @@ describe('secureStorage', () => {
         await expect(
           loadCredentials('https://example.test:443/base'),
         ).resolves.toEqual({username: 'user', password: 'secret'});
+        expect(keychain.setGenericPassword).toHaveBeenCalledWith(
+          'user',
+          JSON.stringify({username: 'user', password: 'secret'}),
+          expect.objectContaining({
+            accessible: 'whenUnlockedThisDeviceOnly',
+          }),
+        );
         expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+      });
+
+      it('fails closed when a readable entry cannot be upgraded', async () => {
+        const keychain = require('react-native-keychain');
+        keychain.getGenericPassword.mockResolvedValue({
+          username: 'user',
+          password: JSON.stringify({username: 'user', password: 'secret'}),
+        });
+        keychain.setGenericPassword.mockRejectedValueOnce(
+          new Error('Keychain update failed'),
+        );
+
+        await expect(loadCredentials('profile-one')).rejects.toThrow(
+          'Keychain update failed',
+        );
+        expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+      });
+
+      it('upgrades legacy secure entries without a plaintext fallback', async () => {
+        const keychain = require('react-native-keychain');
+        keychain.getGenericPassword.mockResolvedValue({
+          username: 'legacy-user',
+          password: 'legacy-password',
+        });
+
+        await expect(loadCredentials('profile-one')).resolves.toEqual({
+          username: 'legacy-user',
+          password: 'legacy-password',
+        });
+        expect(keychain.setGenericPassword).toHaveBeenCalledWith(
+          'legacy-user',
+          JSON.stringify({
+            username: 'legacy-user',
+            password: 'legacy-password',
+          }),
+          expect.objectContaining({
+            accessible: 'whenUnlockedThisDeviceOnly',
+          }),
+        );
+        expect(AsyncStorage.setItem).not.toHaveBeenCalled();
       });
     });
   });

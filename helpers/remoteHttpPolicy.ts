@@ -1,48 +1,25 @@
 import type {Server} from '../store/settings';
 
-export const REMOTE_HTTP_CONSENT_REQUIRED = 'REMOTE_HTTP_CONSENT_REQUIRED';
+export const REMOTE_HTTP_UNSUPPORTED = 'REMOTE_HTTP_UNSUPPORTED';
 
-export class RemoteHttpConsentError extends Error {
-  readonly code = REMOTE_HTTP_CONSENT_REQUIRED;
+export class RemoteHttpUnsupportedError extends Error {
+  readonly code = REMOTE_HTTP_UNSUPPORTED;
 
   constructor() {
-    super('Explicit consent is required before using a remote HTTP endpoint.');
-    this.name = 'RemoteHttpConsentError';
+    super('Remote server profiles require HTTPS.');
+    this.name = 'RemoteHttpUnsupportedError';
   }
 }
 
 export const isRemoteHttpEndpoint = (
   server: Pick<Server, 'protocol'>,
-): boolean => server.protocol === 'http';
+): boolean => String(server.protocol || '').toLowerCase() === 'http';
 
-export const hasRemoteHttpConsent = (
-  server: Pick<Server, 'protocol' | 'allowInsecureRemoteHttp'>,
-): boolean =>
-  !isRemoteHttpEndpoint(server) || server.allowInsecureRemoteHttp === true;
-
-/**
- * Keep an HTTP consent tied to the authority it was granted for. A migration
- * has no previous authority to compare, so it preserves only an explicit
- * stored true value and otherwise fails closed.
- */
-export const normalizeRemoteHttpConsent = (
-  server: Server,
-  previousServer?: Server,
-): Server => ({
-  ...server,
-  allowInsecureRemoteHttp:
-    isRemoteHttpEndpoint(server) &&
-    server.allowInsecureRemoteHttp === true &&
-    (!previousServer ||
-      remoteAuthorityIdentity(previousServer) ===
-        remoteAuthorityIdentity(server)),
-});
-
-export const assertRemoteHttpConsent = (
-  server: Pick<Server, 'protocol' | 'allowInsecureRemoteHttp'>,
+export const assertRemoteHttps = (
+  server: Pick<Server, 'protocol'>,
 ): void => {
-  if (!hasRemoteHttpConsent(server)) {
-    throw new RemoteHttpConsentError();
+  if (isRemoteHttpEndpoint(server)) {
+    throw new RemoteHttpUnsupportedError();
   }
 };
 
@@ -50,7 +27,9 @@ export const remoteAuthorityIdentity = (
   server: Pick<Server, 'protocol' | 'host' | 'port'>,
 ): string => {
   const protocol = String(server.protocol || '').toLowerCase();
-  const host = String(server.host || '').trim().toLowerCase();
+  const host = String(server.host || '')
+    .trim()
+    .toLowerCase();
   const port =
     server.port || (protocol === 'https' ? 443 : protocol === 'http' ? 80 : 0);
   return `${protocol}://${host}:${port}`;

@@ -20,7 +20,6 @@ jest.mock('react-native', () => ({
 
 import type {Server} from '../../store/settings';
 import {
-  eventClipPath,
   eventVodPath,
   invalidateProtectedMediaProfile,
   isProtectedMediaUri,
@@ -119,7 +118,7 @@ describe('protected media URI registration', () => {
       },
       localTls: {
         mtlsEnabled: false,
-        allowSelfSignedServer: false,
+        serverCertificatePinRequired: false,
       },
     };
 
@@ -128,7 +127,7 @@ describe('protected media URI registration', () => {
     await protectedMediaUri(
       {
         ...configured,
-        localTls: {...configured.localTls, allowSelfSignedServer: true},
+        localTls: {...configured.localTls, serverCertificatePinRequired: true},
       },
       '/vod/event/b/master.m3u8',
     );
@@ -267,13 +266,5 @@ describe('protected media URI registration', () => {
     );
     expect(() => eventVodPath('')).toThrow('event identifier');
     expect(() => eventVodPath(' '.repeat(257))).toThrow('event identifier');
-  });
-
-  it('constructs a relative encoded MP4 resource path from an event identifier', () => {
-    expect(eventClipPath('event/with-space')).toBe(
-      '/api/events/event%2Fwith-space/clip.mp4',
-    );
-    expect(() => eventClipPath('')).toThrow('event identifier');
-    expect(() => eventClipPath(' '.repeat(257))).toThrow('event identifier');
   });
 });

@@ -205,12 +205,15 @@ export default {
   'settings.server.header': 'Server',
   'settings.server.address.header': 'Address',
   'settings.server.external.header': 'External connection',
-  'settings.server.external.httpWarning':
-    'This connection uses unencrypted HTTP. A man-in-the-middle can read or alter Frigate credentials, cookies, images, and video.',
-  'settings.server.external.httpConsent':
-    'I understand and consent to sending credentials, cookies, images, and video over remote unencrypted HTTP',
-  'settings.server.external.httpConsentRequired':
-    'Explicit consent is required before using a remote HTTP endpoint.',
+  'settings.server.tls.pin.register': 'Register server certificate',
+  'settings.server.tls.pin.replace': 'Replace registered certificate',
+  'settings.server.tls.pin.current':
+    'Registered SHA-256 leaf fingerprint: {fingerprint}',
+  'settings.server.tls.pin.confirm.title': 'Trust this server certificate?',
+  'settings.server.tls.pin.confirm.message':
+    'Verify this SHA-256 leaf fingerprint through a trusted channel before continuing.\n\nEndpoint: {endpoint}\nFingerprint: {fingerprint}\n\nIf the certificate changes, this profile will be blocked until you register it again.',
+  'settings.server.tls.pin.cancel': 'Cancel',
+  'settings.server.tls.pin.confirm': 'Register',
   'settings.server.auth.header': 'Authorization',
   'settings.server.auth.progressiveHeader': 'Frigate authentication',
   'settings.server.mtls.progressiveHeader': 'Client certificate and trust',
@@ -280,10 +283,6 @@ export default {
     'The client certificate will be removed from this server profile.',
   'settings.server.mtls.certificate.remove.cancel': 'Cancel',
   'settings.server.mtls.certificate.remove.confirm': 'Remove',
-  'settings.server.mtls.selfSigned.label':
-    'Allow self-signed server certificate',
-  'settings.server.mtls.selfSigned.warning':
-    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'settings.server.mtls.help':
     'Use this if your Frigate server requires mutual TLS (mTLS) authentication. The certificate must be installed on your device.',
   'settings.server.local.header': 'Local route',
@@ -314,10 +313,6 @@ export default {
     'The local client identity will be removed from this server profile.',
   'settings.server.local.mtls.certificate.remove.cancel': 'Cancel',
   'settings.server.local.mtls.certificate.remove.confirm': 'Remove',
-  'settings.server.local.mtls.selfSigned.label':
-    'Allow self-signed local server certificate',
-  'settings.server.local.mtls.selfSigned.warning':
-    'The server certificate chain, issuer, and validity are not checked; hostname verification remains active.',
   'settings.server.local.mtls.help':
     'The external server identity is preselected when available. Only the KeyChain alias is stored; certificate and private-key material stay in the device KeyChain.',
   'settings.server.rtsp.header': 'RTSP reachability',
@@ -437,9 +432,4 @@ export default {
   'system.usageChart.usage': 'Usage',
   'system.usageChart.memory': 'Memory',
   'system.cameraInfoChart.usage': 'Usage',
-  'cameraEvents.topBar.back': 'Back',
-  'logs.topBar.back': 'Back',
-  'report.topBar.back': 'Back',
-  'storage.topBar.back': 'Back',
-  'system.topBar.back': 'Back',
 };

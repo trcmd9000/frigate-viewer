@@ -94,100 +94,6 @@ class ClientCertModule: NSObject, URLSessionDelegate {
   }
   
   /**
-   * Perform an HTTP request using a client certificate from the Keychain.
-   * The certificate is used for mutual TLS authentication (mTLS).
-   * 
-   * @param url The URL to request
-   * @param certIdentity The certificate identity from the Keychain
-   * @param method HTTP method (GET, POST, etc.)
-   * @param headers Array of header objects {key, value}
-   * @param body Request body (optional)
-   * @param allowSelfSignedServer Allow self-signed server certificates (default: false)
-   * @param resolve Promise to resolve with the response
-   * @param reject Promise to reject on error
-   */
-  @objc
-  func performHttpRequestWithClientCert(
-    _ url: String,
-    certIdentity: String,
-    method: String,
-    headers: [[String: String]],
-    body: String?,
-    allowSelfSignedServer: Bool,
-    resolver resolve: @escaping RCTPromiseResolveBlock,
-    rejecter reject: @escaping RCTPromiseRejectBlock
-  ) {
-    guard let url = URL(string: url) else {
-      reject("INVALID_URL", "Invalid URL: \(url)", nil)
-      return
-    }
-    
-    do {
-      // Get the identity from the Keychain
-      guard let identity = try getSecIdentityFromKeychain(certIdentity) else {
-        reject("CERT_NOT_FOUND", "Certificate not found: \(certIdentity)", nil)
-        return
-      }
-      
-      // Build the request
-      var request = URLRequest(url: url)
-      request.httpMethod = method
-      
-      // Add headers
-      for header in headers {
-        if let key = header["key"], let value = header["value"] {
-          request.setValue(value, forHTTPHeaderField: key)
-        }
-      }
-      
-      // Add body if present
-      if let body = body {
-        request.httpBody = body.data(using: .utf8)
-      }
-      
-      // Create a URLSession with a delegate that provides the client certificate
-      let configuration = URLSessionConfiguration.default
-      let delegate = ClientCertURLSessionDelegate(identity: identity, allowSelfSignedServer: allowSelfSignedServer)
-      let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
-      
-      // Perform the request
-      let task = session.dataTask(with: request) { data, response, error in
-        if let error = error {
-          reject("HTTP_ERROR", "HTTP request failed: \(error.localizedDescription)", error)
-          return
-        }
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-          reject("HTTP_ERROR", "Invalid response", nil)
-          return
-        }
-        
-        let responseBody = String(data: data ?? Data(), encoding: .utf8) ?? ""
-        var responseHeaders: [String: String] = [:]
-        
-        for (key, value) in httpResponse.allHeaderFields {
-          if let keyStr = key as? String, let valueStr = value as? String {
-            responseHeaders[keyStr] = valueStr
-          }
-        }
-        
-        let result: [String: Any] = [
-          "statusCode": httpResponse.statusCode,
-          "body": responseBody,
-          "headers": responseHeaders
-        ]
-        
-        resolve(result)
-      }
-      
-      task.resume()
-      
-    } catch {
-      reject("KEYCHAIN_ERROR", "Error accessing certificate: \(error.localizedDescription)", error)
-    }
-  }
-
-  /**
    * Perform a profile-scoped request with an ephemeral URLSession.
    * The session key is already credential-scoped and is never logged.
    */
@@ -307,7 +213,7 @@ class ClientCertModule: NSObject, URLSessionDelegate {
   private func profileURL(_ value: String) -> URL? {
     guard let url = URL(string: value),
           let scheme = url.scheme?.lowercased(),
-          (scheme == "http" || scheme == "https"),
+          scheme == "https",
           url.host != nil else {
       return nil
     }
@@ -803,62 +709,5 @@ private final class ProfileSessionStore {
     let context = contexts.removeValue(forKey: key)
     lock.unlock()
     context?.invalidate()
-  }
-}
-
-/**
- * URLSessionDelegate that provides client certificates for mutual TLS authentication
- * and handles server certificate validation.
- */
-class ClientCertURLSessionDelegate: NSObject, URLSessionDelegate {
-  let identity: SecIdentity
-  let allowSelfSignedServer: Bool
-  
-  init(identity: SecIdentity, allowSelfSignedServer: Bool = false) {
-    self.identity = identity
-    self.allowSelfSignedServer = allowSelfSignedServer
-    super.init()
-  }
-  
-  func urlSession(
-    _ session: URLSession,
-    didReceive challenge: URLAuthenticationChallenge,
-    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-  ) {
-    if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate {
-      // Provide the client certificate
-      if let credential = URLCredential(identity: identity, certificates: nil, persistence: .forSession) {
-        completionHandler(.useCredential, credential)
-        return
-      }
-    } else if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
-      // Handle server certificate validation
-      validateServerCertificate(challenge, completionHandler: completionHandler)
-      return
-    }
-    
-    // For other challenges, use the default handling
-    completionHandler(.performDefaultHandling, nil)
-  }
-  
-  /**
-   * Validate server certificate based on configuration.
-   */
-  private func validateServerCertificate(
-    _ challenge: URLAuthenticationChallenge,
-    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-  ) {
-    if allowSelfSignedServer {
-      // Accept all server certificates (including self-signed) when explicitly configured
-      // WARNING: Only use this for development and private networks!
-      if let serverTrust = challenge.protectionSpace.serverTrust {
-        let credential = URLCredential(trust: serverTrust)
-        completionHandler(.useCredential, credential)
-        return
-      }
-    }
-    
-    // Default: Use system default handling (strict validation)
-    completionHandler(.performDefaultHandling, nil)
   }
 }

@@ -11,7 +11,11 @@ import {
   getFallbackActiveServerProfileId,
   normalizeLiveStreamPreferences,
 } from '../store/settings';
-import {serverIdentity, serverUsesClientCertificate} from './serverIdentity';
+import {
+  normalizeServerCertificatePin,
+  serverIdentity,
+  serverUsesClientCertificate,
+} from './serverIdentity';
 
 /**
  * Remove credentials from the copy written to redux-persist. Credentials are
@@ -70,26 +74,42 @@ export const stripCredentialsFromPersistence = (
     const hasAlias = typeof alias === 'string' && alias.trim().length > 0;
     const mtlsEnabled =
       https &&
-      (tls?.mtlsEnabled === undefined
-        ? hasAlias
-        : tls.mtlsEnabled === true) &&
+      (tls?.mtlsEnabled === undefined ? hasAlias : tls.mtlsEnabled === true) &&
       hasAlias;
     return {
       mtlsEnabled,
-      allowSelfSignedServer:
+      serverCertificatePin: https
+        ? normalizeServerCertificatePin(
+            {
+              protocol: endpoint.protocol,
+              host: endpoint.host,
+              port: endpoint.port,
+              path: endpoint.basePath,
+            },
+            'local',
+            tls?.serverCertificatePin,
+            mtlsEnabled ? (alias as string) : '',
+          )
+        : undefined,
+      serverCertificatePinRequired:
         https &&
-        (tls?.allowSelfSignedServer === true ||
-          tls?.clientCertConfig?.allowSelfSignedServer === true),
+        (tls?.serverCertificatePinRequired === true ||
+          (tls?.serverCertificatePin !== undefined &&
+            normalizeServerCertificatePin(
+              {
+                protocol: endpoint.protocol,
+                host: endpoint.host,
+                port: endpoint.port,
+                path: endpoint.basePath,
+              },
+              'local',
+              tls.serverCertificatePin,
+              mtlsEnabled ? (alias as string) : '',
+            ) === undefined)),
       ...(mtlsEnabled
         ? {
             clientCertConfig: {
               alias: alias as string,
-              ...(tls?.clientCertConfig?.allowSelfSignedServer === undefined
-                ? {}
-                : {
-                    allowSelfSignedServer:
-                      tls.clientCertConfig.allowSelfSignedServer,
-                  }),
             },
           }
         : {}),
@@ -121,10 +141,11 @@ export const stripCredentialsFromPersistence = (
   delete cameras.liveView;
   delete cameras.actionWhenPressed;
   stateWithoutLegacyCache.cameras = cameras;
-  stateWithoutLegacyCache.liveStreamPreferences = normalizeLiveStreamPreferences(
-    stateWithoutLegacyCache.liveStreamPreferences,
-    Array.isArray(inboundState.servers) ? inboundState.servers : [],
-  );
+  stateWithoutLegacyCache.liveStreamPreferences =
+    normalizeLiveStreamPreferences(
+      stateWithoutLegacyCache.liveStreamPreferences,
+      Array.isArray(inboundState.servers) ? inboundState.servers : [],
+    );
 
   if (!Array.isArray(inboundState.servers)) {
     return stateWithoutLegacyCache;
@@ -142,21 +163,27 @@ export const stripCredentialsFromPersistence = (
         mtlsEnabled && server.clientCertConfig
           ? {
               alias: server.clientCertConfig.alias,
-              ...(server.clientCertConfig.allowSelfSignedServer === undefined
-                ? {}
-                : {
-                    allowSelfSignedServer:
-                      server.clientCertConfig.allowSelfSignedServer,
-                  }),
             }
           : undefined;
       const persistedServer = {
         ...server,
         credentials: {username: '', password: ''},
         mtlsEnabled,
-        allowInsecureRemoteHttp:
-          server.protocol === 'http' &&
-          server.allowInsecureRemoteHttp === true,
+        serverCertificatePin: normalizeServerCertificatePin(
+          server,
+          'remote',
+          server.serverCertificatePin,
+          mtlsEnabled ? server.clientCertConfig?.alias || '' : '',
+        ),
+        serverCertificatePinRequired:
+          server.serverCertificatePinRequired === true ||
+          (server.serverCertificatePin !== undefined &&
+            normalizeServerCertificatePin(
+              server,
+              'remote',
+              server.serverCertificatePin,
+              mtlsEnabled ? server.clientCertConfig?.alias || '' : '',
+            ) === undefined),
       };
       const localEndpoint = persistedLocalEndpoint(server.localEndpoint);
       const localRoutingEnabled =
@@ -167,7 +194,7 @@ export const stripCredentialsFromPersistence = (
         : undefined;
       persistedServer.localTls = localRoutingEnabled
         ? persistedLocalTls(server.localTls, localEndpoint)
-        : {mtlsEnabled: false, allowSelfSignedServer: false};
+        : {mtlsEnabled: false};
       persistedServer.rtsp = persistedRtsp(server.rtsp, localRoutingEnabled);
       if (clientCertConfig) {
         persistedServer.clientCertConfig = clientCertConfig;

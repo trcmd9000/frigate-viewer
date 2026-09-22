@@ -25,7 +25,7 @@ describe('ClientCertConfig Redux', () => {
 
       const certConfig = {
         alias: 'my-client-cert',
-        allowSelfSignedServer: false,
+        serverCertificatePinRequired: false,
       };
 
       const newState = settingsStore.reducer(
@@ -41,7 +41,7 @@ describe('ClientCertConfig Redux', () => {
       expect(newState.v1.servers[0].clientCertConfig).toEqual(certConfig);
     });
 
-    it('should set allowSelfSignedServer to true when configured', () => {
+    it('should set serverCertificatePinRequired to true when configured', () => {
       const initialState = settingsStore.getInitialState();
 
       const stateWithServer = settingsStore.reducer(
@@ -63,7 +63,7 @@ describe('ClientCertConfig Redux', () => {
 
       const certConfig = {
         alias: 'my-client-cert',
-        allowSelfSignedServer: true,
+        serverCertificatePinRequired: true,
       };
 
       const newState = settingsStore.reducer(
@@ -75,7 +75,7 @@ describe('ClientCertConfig Redux', () => {
       );
 
       expect(
-        newState.v1.servers[0].clientCertConfig?.allowSelfSignedServer,
+        newState.v1.servers[0].clientCertConfig?.serverCertificatePinRequired,
       ).toBe(true);
     });
 
@@ -189,7 +189,7 @@ describe('ClientCertConfig Redux', () => {
               credentials: {username: '', password: ''},
               clientCertConfig: {
                 alias: 'my-cert',
-                allowSelfSignedServer: true,
+                serverCertificatePinRequired: true,
               },
             },
           ],
@@ -198,7 +198,7 @@ describe('ClientCertConfig Redux', () => {
 
       const updatedConfig = {
         alias: 'my-cert',
-        allowSelfSignedServer: true,
+        serverCertificatePinRequired: true,
       };
 
       const newState = settingsStore.reducer(
@@ -210,7 +210,7 @@ describe('ClientCertConfig Redux', () => {
       );
 
       expect(newState.v1.servers[0].clientCertConfig?.alias).toBe('my-cert');
-      expect(newState.v1.servers[0].clientCertConfig?.allowSelfSignedServer).toBe(
+      expect(newState.v1.servers[0].clientCertConfig?.serverCertificatePinRequired).toBe(
         true,
       );
     });
@@ -306,7 +306,7 @@ describe('ClientCertConfig Redux', () => {
           serverIndex: 0,
           clientCertConfig: {
             alias: 'cert-1',
-            allowSelfSignedServer: false,
+            serverCertificatePinRequired: false,
           },
         }),
       );
@@ -317,7 +317,7 @@ describe('ClientCertConfig Redux', () => {
           serverIndex: 1,
           clientCertConfig: {
             alias: 'cert-2',
-            allowSelfSignedServer: true,
+            serverCertificatePinRequired: true,
           },
         }),
       );
@@ -333,11 +333,11 @@ describe('ClientCertConfig Redux', () => {
       );
 
       expect(state.v1.servers[0].clientCertConfig?.alias).toBe('cert-1');
-      expect(state.v1.servers[0].clientCertConfig?.allowSelfSignedServer).toBe(
+      expect(state.v1.servers[0].clientCertConfig?.serverCertificatePinRequired).toBe(
         false,
       );
       expect(state.v1.servers[1].clientCertConfig?.alias).toBe('cert-2');
-      expect(state.v1.servers[1].clientCertConfig?.allowSelfSignedServer).toBe(
+      expect(state.v1.servers[1].clientCertConfig?.serverCertificatePinRequired).toBe(
         true,
       );
       expect(state.v1.servers[2].clientCertConfig?.alias).toBe('cert-3');
@@ -459,7 +459,7 @@ describe('ClientCertConfig Redux', () => {
       );
     });
 
-    it('should handle allowSelfSignedServer false explicitly', () => {
+    it('should handle serverCertificatePinRequired false explicitly', () => {
       const initialState = settingsStore.getInitialState();
 
       const stateWithServer = settingsStore.reducer(
@@ -481,7 +481,7 @@ describe('ClientCertConfig Redux', () => {
 
       const certConfig = {
         alias: 'my-cert',
-        allowSelfSignedServer: false,
+        serverCertificatePinRequired: false,
       };
 
       const newState = settingsStore.reducer(
@@ -492,7 +492,7 @@ describe('ClientCertConfig Redux', () => {
         }),
       );
 
-      expect(newState.v1.servers[0].clientCertConfig?.allowSelfSignedServer).toBe(
+      expect(newState.v1.servers[0].clientCertConfig?.serverCertificatePinRequired).toBe(
         false,
       );
     });

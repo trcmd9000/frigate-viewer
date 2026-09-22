@@ -10,19 +10,16 @@ import {
   isScopedServerIdentity,
 } from './httpWithClientCert';
 import {SecureLogger} from './secureLogger';
-import {
-  handleError,
-  ErrorCode,
-  getUserFriendlyMessage,
-} from './errorHandler';
+import {handleError, ErrorCode, getUserFriendlyMessage} from './errorHandler';
 import {
   canonicalServerEndpoint,
+  nativeRouteCertificatePin,
   serverIdentity,
   serverProfileIdentity,
   serverRouteIdentity,
   serverUsesClientCertificate,
 } from './serverIdentity';
-import {assertRemoteHttpConsent} from './remoteHttpPolicy';
+import {assertRemoteHttps} from './remoteHttpPolicy';
 import {invalidateProtectedMediaProfile} from './protectedMedia';
 
 export const buildServerUrl = (server: Server) => {
@@ -54,16 +51,20 @@ export const requestServerIdentity = (server: Server): string => {
  * Platforms without profile-scoped native networking safely no-op.
  */
 export const invalidateServerSession = (server: Server): void => {
-  const username = server.auth === 'none' ? '' : server.credentials.username || '';
-  const password = server.auth === 'none' ? '' : server.credentials.password || '';
-  [requestRouteIdentity(server, 'remote'), requestRouteIdentity(server, 'local')].forEach(
-    identity =>
-      httpClientWithCert.invalidateServerSession(
-        identity,
-        server.auth,
-        username,
-        password,
-      ),
+  const username =
+    server.auth === 'none' ? '' : server.credentials.username || '';
+  const password =
+    server.auth === 'none' ? '' : server.credentials.password || '';
+  [
+    requestRouteIdentity(server, 'remote'),
+    requestRouteIdentity(server, 'local'),
+  ].forEach(identity =>
+    httpClientWithCert.invalidateServerSession(
+      identity,
+      server.auth,
+      username,
+      password,
+    ),
   );
   httpClientWithCert.invalidateMediaProfile?.(serverProfileIdentity(server));
   invalidateProtectedMediaProfile(server);
@@ -76,8 +77,10 @@ export const profileTransportOptions = (
   'profileAuth' | 'profileUsername' | 'profilePassword'
 > => ({
   profileAuth: server.auth,
-  profileUsername: server.auth === 'none' ? '' : server.credentials.username || '',
-  profilePassword: server.auth === 'none' ? '' : server.credentials.password || '',
+  profileUsername:
+    server.auth === 'none' ? '' : server.credentials.username || '',
+  profilePassword:
+    server.auth === 'none' ? '' : server.credentials.password || '',
 });
 
 const requestRouteIdentity = (
@@ -88,13 +91,13 @@ const requestRouteIdentity = (
     route === 'local'
       ? serverRouteIdentity(server, 'local')
       : server.profileId?.trim()
-        ? serverRouteIdentity(server, 'remote')
-        : serverIdentity(
-            server,
-            serverUsesClientCertificate(server)
-              ? server.clientCertConfig?.alias
-              : undefined,
-          );
+      ? serverRouteIdentity(server, 'remote')
+      : serverIdentity(
+          server,
+          serverUsesClientCertificate(server)
+            ? server.clientCertConfig?.alias
+            : undefined,
+        );
   if (Platform.OS !== 'android') {
     return identity;
   }
@@ -135,6 +138,8 @@ export const executeServerRequest = async (
   url: string,
   options: HttpRequestOptions,
 ): Promise<HttpResponse> => {
+  // Remote profiles are HTTPS-only even when a local route is available.
+  assertRemoteHttps(server);
   const route = await httpClientWithCert.resolveServerRoute?.(
     server,
     options.method || 'GET',
@@ -144,9 +149,6 @@ export const executeServerRequest = async (
     route?.route === 'local' &&
     Boolean(remoteBaseUrl) &&
     url.startsWith(remoteBaseUrl);
-  if (!useLocalRoute) {
-    assertRemoteHttpConsent(server);
-  }
   const requestUrl = useLocalRoute
     ? routeRequestUrl(url, remoteBaseUrl, route.baseUrl)
     : url;
@@ -171,12 +173,13 @@ export const executeServerRequest = async (
       ...options,
       ...profileTransportOptions(server),
       clientCertAlias: routeServer.clientCertConfig?.alias || '',
-      clientCertServerIdentity:
-        useLocalRoute
-          ? requestRouteIdentity(server, 'local')
-          : requestServerIdentity(server),
-      allowSelfSignedServer:
-        routeServer.clientCertConfig?.allowSelfSignedServer || false,
+      clientCertServerIdentity: useLocalRoute
+        ? requestRouteIdentity(server, 'local')
+        : requestServerIdentity(server),
+      serverCertificatePin: nativeRouteCertificatePin(
+        server,
+        useLocalRoute ? 'local' : 'remote',
+      ),
     });
   }
 
@@ -186,6 +189,10 @@ export const executeServerRequest = async (
     clientCertServerIdentity: useLocalRoute
       ? requestRouteIdentity(server, 'local')
       : requestServerIdentity(server),
+    serverCertificatePin: nativeRouteCertificatePin(
+      server,
+      useLocalRoute ? 'local' : 'remote',
+    ),
   });
 };
 
@@ -271,9 +278,7 @@ export const useRest = () => {
       const executeFetch = () =>
         executeServerRequest(
           server,
-          `${url}${
-            queryParams ? `?${new URLSearchParams(queryParams)}` : ''
-          }`,
+          `${url}${queryParams ? `?${new URLSearchParams(queryParams)}` : ''}`,
           {
             method,
             headers,
@@ -302,14 +307,16 @@ export const useRest = () => {
               url: 'the configured server',
             }),
           });
-          if (
-            method === 'GET'
-          ) {
+          if (method === 'GET') {
             response = await executeFetch();
           }
         }
 
-        if (response.status === 401 || method === 'POST' || method === 'DELETE') {
+        if (
+          response.status === 401 ||
+          method === 'POST' ||
+          method === 'DELETE'
+        ) {
           SecureLogger.logAuth('unauthorized-access');
           const error = new Error(
             intl.formatMessage(messages['error.unauthorized'], {

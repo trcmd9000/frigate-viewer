@@ -55,12 +55,12 @@ public class LocalRouteResolverTest {
       "password",
       true,
       "local-only",
-      true
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     );
 
     assertEquals("local-only", config.localClientCertAlias);
     assertTrue(!externalAlias.equals(config.localClientCertAlias));
-    assertTrue(config.localAllowSelfSignedServer);
+    assertFalse(config.localServerCertificatePin.isEmpty());
     LocalRouteResolver.validateLocalSecurity(config);
   }
 
@@ -79,7 +79,7 @@ public class LocalRouteResolverTest {
       "password",
       true,
       "",
-      false
+      ""
     );
     try {
       LocalRouteResolver.validateLocalSecurity(config);
@@ -117,7 +117,7 @@ public class LocalRouteResolverTest {
       "password",
       false,
       "",
-      false
+      ""
     );
 
     LocalRouteResolver.Resolution result = resolver.resolve(config, "GET");

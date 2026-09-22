@@ -74,9 +74,10 @@ KeyChain must be managed separately through Android settings.
 
 ## Security
 
-Use HTTPS with a certificate trusted by Android whenever possible. Support for
-self-signed server certificates is disabled by default and must be enabled
-explicitly for each server. Enabling that option weakens server authentication.
+Use HTTPS with a certificate trusted by Android whenever possible. A
+non-system-trusted server certificate requires explicit per-route SHA-256 leaf
+fingerprint enrollment and out-of-band confirmation. The app does not provide
+a trust-all or cleartext remote-HTTP fallback.
 
 No software or transmission method can guarantee absolute security. Users are
 responsible for securing their device, network, Frigate server, certificates,
