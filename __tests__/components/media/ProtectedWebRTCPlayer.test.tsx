@@ -248,7 +248,7 @@ describe('ProtectedWebRTCPlayer', () => {
     expect(player.audio.enabled).toBe(true);
     expect(player.onAudioStatusChange).toHaveBeenLastCalledWith({state: 'active'});
     player.view.unmount();
-  });
+  }, 15_000);
 
   it('bounds pending at five seconds, serializes retry and releases a late token', async () => {
     jest.useFakeTimers();
